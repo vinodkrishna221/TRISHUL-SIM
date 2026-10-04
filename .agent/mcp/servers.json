@@ -1,0 +1,17 @@
+{
+  "_doc": "Canonical MCP server list. scripts/sync.sh mirrors this to .mcp.json (Claude Code), opencode.json (OpenCode), and .agents/mcp_config.json (Antigravity workspace). Secrets stay in env — reference with ${VAR}, never paste values. Keep 3-5 servers max: every server eats context.",
+  "servers": {
+    "convex": {
+      "command": "npx",
+      "args": ["-y", "convex@latest", "mcp", "start"],
+      "env": {},
+      "_when": "Convex projects — schema/data introspection while coding. Delete if not using Convex."
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PAT}" },
+      "_when": "PR/issue ops from chat during integration. Export GITHUB_PAT in your shell first."
+    }
+  }
+}

@@ -19,3 +19,28 @@ AFFECTS: Demo Narrative beat order, UI copy tone, Herald pitch spine sentence.
 CHOSE: Unity 2022/6 LTS URP + Windows .exe + localhost WebSocket IPC; XR plugin scaffolded for future VR.
 BECAUSE: SIH26247 constraint (Unity mandatory), MoD air-gap requirement (no cloud), team capability.
 AFFECTS: All tracks — Unreal Engine banned; no cloud API calls permitted at any layer.
+
+### 4 · Data store: NDJSON file over SQLite            2026-10-04 · by Atlas (/blueprint)
+CHOSE: Newline-delimited JSON written to %AppData%\TRISHUL-SIM\sessions\ at 10 Hz.
+BECAUSE: Zero extra dependency; grep-able; Timeline Scrubber can seek by byte offset; PDF export is a C# loop. SQLite adds a package and migration surface for zero benefit at 2-station scale.
+AFFECTS: aar-engine (owns write); ui-ux (reads for scrubber); PDF export reads same file.
+
+### 5 · WebSocket authority: Instructor C2 is server   2026-10-04 · by Orion (/blueprint)
+CHOSE: Instructor C2 app binds ws://127.0.0.1:9700 as server; Trainee Cockpit connects as client.
+BECAUSE: Scenario state authority must have a single owner; JCO machine is the natural command node; avoids split-brain in split-screen fallback (same process hosts both sides).
+AFFECTS: unity-sim (implements both server + client); all contracts reference this topology.
+
+### 6 · Swarm AI: deterministic Boids + HBT, no ML     2026-10-04 · by Sage (/blueprint)
+CHOSE: Reynolds Boids (Burst/Job System, C#) + Hierarchical Behavior Trees for tactic logic.
+BECAUSE: Deterministic = replay-safe (AAR Scrubber can reproduce any tick exactly); ML-Agents are non-deterministic black boxes incompatible with MoD trust model; HBT is auditable and timeboxable.
+AFFECTS: swarm-ai track exclusively; sensor physics models consume SwarmAgentState (contract).
+
+### 7 · 4-track confirmation                           2026-10-04 · by Orion (/blueprint)
+CHOSE: 4 tracks confirmed — unity-sim · swarm-ai · aar-engine · ui-ux. No collapse.
+BECAUSE: Each track has a clean file-ownership boundary with zero overlap; contracts are the only shared surface. Collapsing any two would create ambiguous ownership of the walking skeleton critical path.
+AFFECTS: All phase plans; missions will be generated per this 4-track split.
+
+### 8 · Fit audit: clean bill of health                2026-10-04 · by Orion (/blueprint)
+CHOSE: No new kit rules/packs required; one optional micro-addition (rules/stack/unity-cs.md, 3 lines) pending human approval.
+BECAUSE: All tech gaps are Unity/C# stdlib — no external vendor rules needed; existing WarRoom rules cover all process concerns.
+AFFECTS: Kit is frozen; unity-cs.md added only if human approves the diff in board/FIT-AUDIT.md.

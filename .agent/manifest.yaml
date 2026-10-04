@@ -1,0 +1,29 @@
+# WarRoom kit manifest — edited by scripts/new-hackathon.sh at each hackathon start
+kit:
+  name: WarRoom
+  version: 1.0.0
+
+project:
+  name: "Drone-simi"           # set at init
+  hackathon: ""             # e.g. "HackXYZ 2026, Bengaluru"
+  ends_at: "2026-10-05T23:59:00+05:30"               # ISO datetime — freeze calendar derives from this
+  mode: team                # solo | team   (drives /missions behavior)
+  scale_gate: ""            # QUICK | FULL  (decided at /kickoff, recorded here too)
+
+stacks:                     # toggles: which stack rule packs sessions should load
+  nextjs: true
+  fastapi: false
+  node_api: false
+  mongodb: false
+  convex: true
+  ai_llm: true
+  mcp: false
+
+tools:                      # which coding agents this team runs (sync.sh mirrors for all three regardless)
+  antigravity: true
+  claude_code: true
+  opencode: true
+
+discipline:
+  ponytail: full            # lite | full | ultra — builder personas' default level
+  caveman: full             # lite | full | off  — build-loop chat compression
