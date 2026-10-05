@@ -225,6 +225,7 @@ GameObject:
   m_Component:
   - component: {fileID: 300000001}
   - component: {fileID: 300000002}
+  - component: {fileID: 300000003}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -267,6 +268,26 @@ MonoBehaviour:
   baseReconnectDelayMs: 1000
   autoReconnect: 1
   autoStart: 1
+--- !u!114 &300000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 300000000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1b2c3d4e5f647898a1b2c3d4e5f6012, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  server: {fileID: 0}
+  client: {fileID: 300000002}
+  scenarioDropdown: {fileID: 0}
+  launchButton: {fileID: 0}
+  traineeCockpitRoot: {fileID: 0}
+  traineeCockpitSceneName: TraineeCockpit
+  loadSceneOnScenarioStart: 1
+  ackTimeoutMs: 1000
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

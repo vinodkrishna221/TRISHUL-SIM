@@ -160,7 +160,7 @@ TEST:
 DEPENDS: US-P0-A               UNBLOCKS: SA-P0-A, AA-P0-A, UX-P0-A (SCENARIO_START shape frozen)
 
 DEMO: "Instructor clicks Launch → Trainee screen transitions." (Beat 1)
-PERSONA: unity-sim builder     STATUS: [ ] todo
+PERSONA: unity-sim builder     STATUS: [x] done
 ```
 
 ---

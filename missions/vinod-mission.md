@@ -136,7 +136,7 @@ DELIVERABLE:
 
 TEST:
   Click Launch → Trainee Console: [WsClient] SCENARIO_START received — sessionId: sess-XXXXXXXX
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
