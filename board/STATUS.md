@@ -47,6 +47,6 @@
 
 ## Log (one line per session-end, newest first)
 
-- 2026-10-05T19:45 IST · Rani: UX-P0-A done — UITK shell (C2 + Cockpit) with status icon, 3 sensor pane stubs, threat indicator, scenario dropdown; mock path used (US-P0-A/B not merged); branch feat/ui-ux-uitk-shell pushed
+- 2026-10-05T22:45 IST · Rani: UX-P0-A done — UITK shell (C2 + Cockpit), status icon, 3 sensor stubs, threat indicator, dropdown, null safety; UiShellSelfTest PASSED
 - 2026-10-04T11:03 IST · Orion: /blueprint complete — ARCHITECTURE.md · SCHEMA.md · 4× contracts · FIT-AUDIT (clean) · BUILD-PLAN.md written; 4 tracks confirmed; ready for /phase-plan
 - 2026-10-04T10:52 IST · Orion: /kickoff complete — PRD drafted, board seeded, vocabulary frozen, ready for /blueprint

@@ -49,6 +49,18 @@ namespace TrishulSim.UI
         private bool scenarioRunning = false;
         private string currentThreatState = "GREEN";
 
+        // ── Public Accessors for Tests / UI Validation ────────
+        public bool ScenarioRunning { get { return scenarioRunning; } }
+        public string CurrentThreatState { get { return currentThreatState; } }
+        public VisualElement Root { get { return root; } }
+        public VisualElement ThreatIndicator { get { return threatIndicator; } }
+        public Label ThreatLabel { get { return threatLabel; } }
+        public VisualElement ControlsRow { get { return controlsRow; } }
+        public VisualElement ScorecardPanel { get { return scorecardPanel; } }
+        public VisualElement ComputingOverlay { get { return computingOverlay; } }
+        public Label DopplerReading { get { return dopplerReading; } }
+        public Label AcousticReading { get { return acousticReading; } }
+
         // ══════════════════════════════════════════════════════
         // Lifecycle
         // ══════════════════════════════════════════════════════
@@ -56,8 +68,11 @@ namespace TrishulSim.UI
         private void Awake()
         {
             var uiDoc = GetComponent<UIDocument>();
-            root = uiDoc.rootVisualElement;
-            BindElements();
+            if (uiDoc != null)
+            {
+                root = uiDoc.rootVisualElement;
+                BindElements();
+            }
         }
 
         private void Start()
@@ -74,8 +89,14 @@ namespace TrishulSim.UI
         // UI Binding
         // ══════════════════════════════════════════════════════
 
-        private void BindElements()
+        public void BindElements(VisualElement customRoot = null)
         {
+            if (customRoot != null)
+                root = customRoot;
+
+            if (root == null)
+                return;
+
             threatIndicator    = root.Q<VisualElement>("threat-indicator");
             threatLabel        = root.Q<Label>("threat-label");
 
@@ -108,17 +129,20 @@ namespace TrishulSim.UI
         public void OnScenarioStart(string scenarioId, string scenarioName)
         {
             scenarioRunning = true;
-            Debug.Log($"[Cockpit] SCENARIO_START: {scenarioId} — {scenarioName}");
+            Debug.Log(string.Format("[Cockpit] SCENARIO_START: {0} — {1}", scenarioId, scenarioName));
 
             // Show controls row (EW + SMASH controls added in UX-P1-B)
-            controlsRow.RemoveFromClassList("hidden");
+            if (controlsRow != null)
+                controlsRow.RemoveFromClassList("hidden");
 
             // Set threat indicator to GREEN
             SetThreatState("GREEN");
 
             // Hide scorecard panel and computing overlay
-            scorecardPanel.AddToClassList("hidden");
-            computingOverlay.AddToClassList("hidden");
+            if (scorecardPanel != null)
+                scorecardPanel.AddToClassList("hidden");
+            if (computingOverlay != null)
+                computingOverlay.AddToClassList("hidden");
         }
 
         /// <summary>
@@ -143,19 +167,19 @@ namespace TrishulSim.UI
             // Update threat indicator
             SetThreatState(threatState);
 
-            // Forward sensor data to renderers (stub: log values)
+            // Forward sensor data to renderers (stub: update reading labels)
             // Replace with actual renderer calls in UX-P1-A:
             //   RfWaterfallRenderer.UpdateWaterfall(sensorReadings)
             //   DopplerScopeRenderer.UpdateScope(sensorReadings, swarm)
             //   AcousticFftRenderer.UpdateAcoustic(sensorReadings)
             if (dopplerReading != null)
-                dopplerReading.text = $"Doppler: {dopplerHz:F1} Hz";
+                dopplerReading.text = string.Format("Doppler: {0:F1} Hz", dopplerHz);
             if (acousticReading != null)
-                acousticReading.text = $"SPL: {acousticDb:F1} dB";
+                acousticReading.text = string.Format("SPL: {0:F1} dB", acousticDb);
 
             // Log sensor values (stub — removed when renderers are wired)
-            Debug.Log($"[Cockpit][TICK] threat={threatState} RF={rfPeakGHz}GHz/{rfPeakDbm}dBm " +
-                      $"Doppler={dopplerHz}Hz Acoustic={acousticDb}dB radar={radarCount}");
+            Debug.Log(string.Format("[Cockpit][TICK] threat={0} RF={1}GHz/{2}dBm Doppler={3}Hz Acoustic={4}dB radar={5}",
+                threatState, rfPeakGHz, rfPeakDbm, dopplerHz, acousticDb, radarCount));
         }
 
         /// <summary>
@@ -166,10 +190,11 @@ namespace TrishulSim.UI
         public void OnScenarioEnd(string reason)
         {
             scenarioRunning = false;
-            Debug.Log($"[Cockpit] SCENARIO_END: reason={reason}");
+            Debug.Log(string.Format("[Cockpit] SCENARIO_END: reason={0}", reason));
 
             // Show computing overlay
-            computingOverlay.RemoveFromClassList("hidden");
+            if (computingOverlay != null)
+                computingOverlay.RemoveFromClassList("hidden");
         }
 
         /// <summary>
@@ -180,14 +205,17 @@ namespace TrishulSim.UI
         /// </summary>
         public void OnScorecardReceived(string sessionId)
         {
-            Debug.Log($"[Cockpit] SCORECARD_PAYLOAD received for session {sessionId}.");
+            Debug.Log(string.Format("[Cockpit] SCORECARD_PAYLOAD received for session {0}.", sessionId));
 
             // Hide computing overlay
-            computingOverlay.AddToClassList("hidden");
+            if (computingOverlay != null)
+                computingOverlay.AddToClassList("hidden");
 
             // Show scorecard panel (stub — full render in UX-P1-D)
-            scorecardPanel.RemoveFromClassList("hidden");
-            scorecardStubLabel.text = $"Scorecard received — Session: {sessionId}";
+            if (scorecardPanel != null)
+                scorecardPanel.RemoveFromClassList("hidden");
+            if (scorecardStubLabel != null)
+                scorecardStubLabel.text = string.Format("Scorecard received — Session: {0}", sessionId);
         }
 
         // ══════════════════════════════════════════════════════
@@ -198,9 +226,12 @@ namespace TrishulSim.UI
         /// Updates the threat indicator visual.
         /// MIL-STD-2525 colours: GREEN #00B300, AMBER #FFB300, RED #CC0000.
         /// </summary>
-        private void SetThreatState(string state)
+        public void SetThreatState(string state)
         {
             currentThreatState = state;
+
+            if (threatIndicator == null)
+                return;
 
             // Remove all threat classes
             threatIndicator.RemoveFromClassList("threat-green");
@@ -212,20 +243,20 @@ namespace TrishulSim.UI
             {
                 case "GREEN":
                     threatIndicator.AddToClassList("threat-green");
-                    threatLabel.text = "GREEN";
+                    if (threatLabel != null) threatLabel.text = "GREEN";
                     break;
                 case "AMBER":
                     threatIndicator.AddToClassList("threat-amber");
-                    threatLabel.text = "AMBER";
+                    if (threatLabel != null) threatLabel.text = "AMBER";
                     break;
                 case "RED":
                     threatIndicator.AddToClassList("threat-red");
-                    threatLabel.text = "RED";
+                    if (threatLabel != null) threatLabel.text = "RED";
                     break;
                 default:
                     threatIndicator.AddToClassList("threat-green");
-                    threatLabel.text = "GREEN";
-                    Debug.LogWarning($"[Cockpit] Unknown threat state: {state}");
+                    if (threatLabel != null) threatLabel.text = "GREEN";
+                    Debug.LogWarning(string.Format("[Cockpit] Unknown threat state: {0}", state));
                     break;
             }
         }
@@ -260,20 +291,29 @@ namespace TrishulSim.UI
         /// <summary>
         /// Editor helper: cycle threat states on keypress for visual testing.
         /// T key cycles GREEN → AMBER → RED → GREEN.
+        /// Safely wrapped to prevent input system mismatch crashes.
         /// </summary>
         private void Update()
         {
-            if (Input.GetKeyDown(KeyCode.T))
+            try
             {
-                string next = currentThreatState switch
+                if (Input.GetKeyDown(KeyCode.T))
                 {
-                    "GREEN" => "AMBER",
-                    "AMBER" => "RED",
-                    "RED" => "GREEN",
-                    _ => "GREEN"
-                };
-                Debug.Log($"[Cockpit][MOCK] Cycling threat state → {next}");
-                SetThreatState(next);
+                    string next;
+                    switch (currentThreatState)
+                    {
+                        case "GREEN": next = "AMBER"; break;
+                        case "AMBER": next = "RED"; break;
+                        case "RED": next = "GREEN"; break;
+                        default: next = "GREEN"; break;
+                    }
+                    Debug.Log(string.Format("[Cockpit][MOCK] Cycling threat state → {0}", next));
+                    SetThreatState(next);
+                }
+            }
+            catch (System.Exception)
+            {
+                // Degrade gracefully if new Input System is active in editor
             }
         }
 #endif

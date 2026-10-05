@@ -40,6 +40,16 @@ namespace TrishulSim.UI
         private List<string> scenarioNames = new List<string>();
         private List<string> scenarioIds = new List<string>();
 
+        // ── Public Accessors for Tests / UI Validation ────────
+        public bool IsConnected { get { return isConnected; } }
+        public string SelectedScenarioId { get { return selectedScenarioId; } }
+        public VisualElement Root { get { return root; } }
+        public Label LinkStatusLabel { get { return linkStatusLabel; } }
+        public VisualElement LinkStatusIcon { get { return linkStatusIcon; } }
+        public DropdownField ScenarioDropdown { get { return scenarioDropdown; } }
+        public VisualElement ScorecardMirror { get { return scorecardMirror; } }
+        public Label ScorecardStubLabel { get { return scorecardStubLabel; } }
+
         // ══════════════════════════════════════════════════════
         // Lifecycle
         // ══════════════════════════════════════════════════════
@@ -47,8 +57,11 @@ namespace TrishulSim.UI
         private void Awake()
         {
             var uiDoc = GetComponent<UIDocument>();
-            root = uiDoc.rootVisualElement;
-            BindElements();
+            if (uiDoc != null)
+            {
+                root = uiDoc.rootVisualElement;
+                BindElements();
+            }
         }
 
         private void Start()
@@ -73,17 +86,23 @@ namespace TrishulSim.UI
         // UI Binding
         // ══════════════════════════════════════════════════════
 
-        private void BindElements()
+        public void BindElements(VisualElement customRoot = null)
         {
-            appTitle         = root.Q<Label>("app-title");
-            linkStatusIcon   = root.Q<VisualElement>("link-status-icon");
-            linkStatusLabel  = root.Q<Label>("link-status-label");
-            scenarioDropdown = root.Q<DropdownField>("scenario-dropdown");
-            traineeIdField   = root.Q<TextField>("trainee-id");
-            launchBtn        = root.Q<Button>("launch-btn");
-            abortBtn         = root.Q<Button>("abort-btn");
-            langToggle       = root.Q<Button>("lang-toggle");
-            scorecardMirror  = root.Q<VisualElement>("scorecard-mirror");
+            if (customRoot != null)
+                root = customRoot;
+
+            if (root == null)
+                return;
+
+            appTitle           = root.Q<Label>("app-title");
+            linkStatusIcon     = root.Q<VisualElement>("link-status-icon");
+            linkStatusLabel    = root.Q<Label>("link-status-label");
+            scenarioDropdown   = root.Q<DropdownField>("scenario-dropdown");
+            traineeIdField     = root.Q<TextField>("trainee-id");
+            launchBtn          = root.Q<Button>("launch-btn");
+            abortBtn           = root.Q<Button>("abort-btn");
+            langToggle         = root.Q<Button>("lang-toggle");
+            scorecardMirror    = root.Q<VisualElement>("scorecard-mirror");
             scorecardStubLabel = root.Q<Label>("scorecard-stub-label");
         }
 
@@ -96,7 +115,7 @@ namespace TrishulSim.UI
         /// MOCK PATH: hard-coded scenario list until US-P0-B
         /// (ScenarioLibrary.LoadAll()) is merged.
         /// </summary>
-        private void PopulateScenarioDropdown()
+        public void PopulateScenarioDropdown()
         {
             // ── MOCK: Hard-coded scenarios (US-P0-B not merged) ──
             // Replace with ScenarioLibrary.LoadAll() once available.
@@ -115,11 +134,14 @@ namespace TrishulSim.UI
                 "andaman-coastal-01"
             };
 
-            scenarioDropdown.choices = scenarioNames;
-            if (scenarioNames.Count > 0)
+            if (scenarioDropdown != null)
             {
-                scenarioDropdown.index = 0;
-                selectedScenarioId = scenarioIds[0];
+                scenarioDropdown.choices = scenarioNames;
+                if (scenarioNames.Count > 0)
+                {
+                    scenarioDropdown.index = 0;
+                    selectedScenarioId = scenarioIds[0];
+                }
             }
         }
 
@@ -127,26 +149,29 @@ namespace TrishulSim.UI
         // Callbacks
         // ══════════════════════════════════════════════════════
 
-        private void RegisterCallbacks()
+        public void RegisterCallbacks()
         {
-            launchBtn.clicked += OnLaunchClicked;
-            abortBtn.clicked += OnAbortClicked;
-            langToggle.clicked += OnLangToggleClicked;
+            if (launchBtn != null) launchBtn.clicked += OnLaunchClicked;
+            if (abortBtn != null) abortBtn.clicked += OnAbortClicked;
+            if (langToggle != null) langToggle.clicked += OnLangToggleClicked;
 
-            scenarioDropdown.RegisterValueChangedCallback(OnScenarioChanged);
+            if (scenarioDropdown != null)
+                scenarioDropdown.RegisterValueChangedCallback(OnScenarioChanged);
         }
 
-        private void UnregisterCallbacks()
+        public void UnregisterCallbacks()
         {
-            launchBtn.clicked -= OnLaunchClicked;
-            abortBtn.clicked -= OnAbortClicked;
-            langToggle.clicked -= OnLangToggleClicked;
+            if (launchBtn != null) launchBtn.clicked -= OnLaunchClicked;
+            if (abortBtn != null) abortBtn.clicked -= OnAbortClicked;
+            if (langToggle != null) langToggle.clicked -= OnLangToggleClicked;
 
-            scenarioDropdown.UnregisterValueChangedCallback(OnScenarioChanged);
+            if (scenarioDropdown != null)
+                scenarioDropdown.UnregisterValueChangedCallback(OnScenarioChanged);
         }
 
-        private void OnScenarioChanged(ChangeEvent<string> evt)
+        public void OnScenarioChanged(ChangeEvent<string> evt)
         {
+            if (evt == null) return;
             int idx = scenarioNames.IndexOf(evt.newValue);
             if (idx >= 0 && idx < scenarioIds.Count)
                 selectedScenarioId = scenarioIds[idx];
@@ -156,7 +181,7 @@ namespace TrishulSim.UI
         /// Launch the selected scenario.
         /// MOCK: logs to console until ScenarioManager is available.
         /// </summary>
-        private void OnLaunchClicked()
+        public void OnLaunchClicked()
         {
             if (!isConnected)
             {
@@ -164,8 +189,8 @@ namespace TrishulSim.UI
                 return;
             }
 
-            string traineeId = traineeIdField?.value ?? "";
-            Debug.Log($"[C2] LAUNCH: scenario={selectedScenarioId}, trainee={traineeId}");
+            string traineeId = traineeIdField != null ? traineeIdField.value : "";
+            Debug.Log(string.Format("[C2] LAUNCH: scenario={0}, trainee={1}", selectedScenarioId, traineeId));
 
             // TODO: Replace with ScenarioManager.LaunchScenario(selectedScenarioId)
             // once US-P0-B is merged.
@@ -175,7 +200,7 @@ namespace TrishulSim.UI
         /// Abort the running scenario.
         /// MOCK: logs to console until ScenarioManager is available.
         /// </summary>
-        private void OnAbortClicked()
+        public void OnAbortClicked()
         {
             Debug.Log("[C2] ABORT requested by Instructor.");
 
@@ -186,7 +211,7 @@ namespace TrishulSim.UI
         /// <summary>
         /// Toggle language (placeholder — full implementation in UX-P0-B).
         /// </summary>
-        private void OnLangToggleClicked()
+        public void OnLangToggleClicked()
         {
             Debug.Log("[C2] Language toggle clicked. Full implementation in UX-P0-B.");
             // TODO: Wire to LocaleToggle.ToggleLanguage() in UX-P0-B.
@@ -203,10 +228,16 @@ namespace TrishulSim.UI
         public void OnClientConnected()
         {
             isConnected = true;
-            linkStatusIcon.RemoveFromClassList("status-waiting");
-            linkStatusIcon.RemoveFromClassList("status-lost");
-            linkStatusIcon.AddToClassList("status-connected");
-            linkStatusLabel.text = "● LAN LINK CONFIRMED";
+            if (linkStatusIcon != null)
+            {
+                linkStatusIcon.RemoveFromClassList("status-waiting");
+                linkStatusIcon.RemoveFromClassList("status-lost");
+                linkStatusIcon.AddToClassList("status-connected");
+            }
+            if (linkStatusLabel != null)
+            {
+                linkStatusLabel.text = "● LAN LINK CONFIRMED";
+            }
             Debug.Log("[C2] Trainee connected — status GREEN.");
         }
 
@@ -217,10 +248,16 @@ namespace TrishulSim.UI
         public void OnClientDisconnected()
         {
             isConnected = false;
-            linkStatusIcon.RemoveFromClassList("status-connected");
-            linkStatusIcon.RemoveFromClassList("status-waiting");
-            linkStatusIcon.AddToClassList("status-lost");
-            linkStatusLabel.text = "✕ LINK LOST";
+            if (linkStatusIcon != null)
+            {
+                linkStatusIcon.RemoveFromClassList("status-connected");
+                linkStatusIcon.RemoveFromClassList("status-waiting");
+                linkStatusIcon.AddToClassList("status-lost");
+            }
+            if (linkStatusLabel != null)
+            {
+                linkStatusLabel.text = "✕ LINK LOST";
+            }
             Debug.LogWarning("[C2] Trainee disconnected — status RED.");
         }
 
@@ -235,9 +272,15 @@ namespace TrishulSim.UI
         /// </summary>
         public void OnScorecardReceived(string sessionId)
         {
-            scorecardMirror.RemoveFromClassList("hidden");
-            scorecardStubLabel.text = $"Scorecard ready — Session: {sessionId}";
-            Debug.Log($"[C2] SCORECARD_PAYLOAD received for session {sessionId}.");
+            if (scorecardMirror != null)
+            {
+                scorecardMirror.RemoveFromClassList("hidden");
+            }
+            if (scorecardStubLabel != null)
+            {
+                scorecardStubLabel.text = string.Format("Scorecard ready — Session: {0}", sessionId);
+            }
+            Debug.Log(string.Format("[C2] SCORECARD_PAYLOAD received for session {0}.", sessionId));
         }
 
         // ══════════════════════════════════════════════════════
