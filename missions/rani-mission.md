@@ -150,7 +150,7 @@ TEST:
   Play TraineeCockpit: 3 grey sensor pane boxes labelled; GREEN threat indicator visible.
   Trigger scenario: threat indicator updates on TICK. Resolution: 1920×1080 — no overflow.
 DEMO: "Both screens render with correct layout at 1920×1080." (P0 gate · Beat 1 foundation)
-STATUS: [ ] todo
+STATUS: [x] done — 2026-10-05
 ```
 
 ---
@@ -362,4 +362,4 @@ STATUS: [ ] todo
 
 > I, Rani, have read this brief and will push `feat/ui-ux-uitk-shell` the same day Vinod's WS IPC branch lands.
 
-- [ ] **ACCEPTED**
+- [x] **ACCEPTED**

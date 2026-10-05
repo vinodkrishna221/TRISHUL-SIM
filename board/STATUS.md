@@ -1,4 +1,4 @@
-# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-04T10:52 IST by Orion (/kickoff)
+# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-05T19:45 IST by Rani (UX-P0-A)
 
 > The single glance-source. Every session reads this first, appends one line at end.
 > Standup blocks replace the top section; history accumulates below.
@@ -16,7 +16,7 @@
 | unity-sim | — | — | Walking skeleton: sensor panes + WebSocket IPC |
 | swarm-ai | — | — | Reynolds Boids + HBT scaffold |
 | aar-engine | — | — | 10 Hz telemetry logger + Scorecard renderer |
-| ui-ux | — | — | Bilingual UI shell + MIL-STD-2525 symbology |
+| ui-ux | UX-P0-A (UITK shell) | — | UX-P0-B (localization) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
 
@@ -47,5 +47,6 @@
 
 ## Log (one line per session-end, newest first)
 
-- 2026-10-04T10:52 IST · Orion: /kickoff complete — PRD drafted, board seeded, vocabulary frozen, ready for /blueprint
+- 2026-10-05T19:45 IST · Rani: UX-P0-A done — UITK shell (C2 + Cockpit) with status icon, 3 sensor pane stubs, threat indicator, scenario dropdown; mock path used (US-P0-A/B not merged); branch feat/ui-ux-uitk-shell pushed
 - 2026-10-04T11:03 IST · Orion: /blueprint complete — ARCHITECTURE.md · SCHEMA.md · 4× contracts · FIT-AUDIT (clean) · BUILD-PLAN.md written; 4 tracks confirmed; ready for /phase-plan
+- 2026-10-04T10:52 IST · Orion: /kickoff complete — PRD drafted, board seeded, vocabulary frozen, ready for /blueprint
