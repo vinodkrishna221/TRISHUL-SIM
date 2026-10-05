@@ -107,7 +107,7 @@ TEST:
 
 DEPENDS: —    UNBLOCKS: everyone (push this branch immediately when TEST passes)
 DEMO: "Two-laptop LAN link confirmed — green icon on C2." (Beat 1)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -312,4 +312,4 @@ STATUS: [ ] todo
 
 > I, Vinod, have read this brief, understand my cards and the dependency chain, and will push `feat/unity-sim-ws-ipc` by **04 Oct 2026 EOD**.
 
-- [ ] **ACCEPTED** — sign off with your name in team chat and tick this box.
+- [x] **ACCEPTED** — sign off with your name in team chat and tick this box.
