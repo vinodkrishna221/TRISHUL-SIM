@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-05T20:15 IST · Vinod (unity-sim): [US-P0-C] ✅ 10 Hz `SCENARIO_TICK` + `SCENARIO_END` broadcast loop live (`ScenarioManager.TickLoop`, `BroadcastScenarioEnd`, `InjectSwarmSnapshot`, C2 Abort button wired in `InstructorC2.unity`) — self-test green on `feat/unity-sim-tick-loop`
 - 2026-10-05T19:52 IST · Vinod (unity-sim): [US-P0-B] ✅ Scenario Library loader + `SCENARIO_START` broadcast live (`ScenarioConfig`, `ScenarioLibrary`, `ScenarioManager`, 4× `StreamingAssets/scenarios/*.json`, C2 Launch UI + Trainee scene transition) — self-test green on `feat/unity-sim-scenario-library`
 - 2026-10-05T18:58 IST · Vinod (unity-sim): [US-P0-A] ✅ WS IPC bootstrap live (`WsServer`, `WsClient`, `JsonEnvelope`, `ConnectionStatusUI`, `InstructorC2.unity`, `TraineeCockpit.unity`) — self-test green on `feat/unity-sim-ws-ipc`
 - 2026-10-04T10:52 IST · Orion: /kickoff complete — PRD drafted, board seeded, vocabulary frozen, ready for /blueprint

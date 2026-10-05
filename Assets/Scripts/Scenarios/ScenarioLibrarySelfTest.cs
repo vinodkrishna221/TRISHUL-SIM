@@ -27,7 +27,7 @@ namespace TrishulSim.Scenarios
             {
                 WsIpcSelfTest.RunAllAsync().GetAwaiter().GetResult();
                 RunAllAsync().GetAwaiter().GetResult();
-                Console.WriteLine("[PASS] All US-P0-B Scenario Library + SCENARIO_START tests passed.");
+                Console.WriteLine("[PASS] All US-P0-B + US-P0-C Scenario Library, SCENARIO_START, SCENARIO_TICK, and SCENARIO_END tests passed.");
                 return 0;
             }
             catch (Exception ex)
@@ -43,7 +43,9 @@ namespace TrishulSim.Scenarios
             TestPunjabScenarioFileAndSchemaValidation();
             TestScenarioLibraryLoadAllAndSeedRegeneration();
             TestSceneAndMetaGuidWiring();
+            TestScenarioTickAndEndPayloadContracts();
             await TestScenarioLaunchBroadcastSceneLoadAndErrorsAsync();
+            await TestScenarioTickLoopAbortAndTerminalConditionsAsync();
         }
 
         private static void TestPunjabScenarioFileAndSchemaValidation()
@@ -141,8 +143,166 @@ namespace TrishulSim.Scenarios
             Assert(c2Scene.Contains("m_Name: ScenarioDropdown"), "InstructorC2.unity must contain ScenarioDropdown");
             Assert(c2Scene.Contains("m_Name: LaunchButton"), "InstructorC2.unity must contain LaunchButton");
             Assert(c2Scene.Contains("m_MethodName: LaunchSelectedScenario"), "LaunchButton must wire LaunchSelectedScenario");
+            Assert(c2Scene.Contains("m_Name: AbortButton"), "InstructorC2.unity must contain AbortButton");
+            Assert(c2Scene.Contains("abortButton: {fileID: 430000003}"), "ScenarioManager must wire abortButton in InstructorC2.unity");
+            Assert(c2Scene.Contains("m_MethodName: BroadcastScenarioEnd"), "AbortButton must wire BroadcastScenarioEnd");
+            Assert(c2Scene.Contains("m_StringArgument: INSTRUCTOR_ABORT"), "AbortButton must pass INSTRUCTOR_ABORT");
 
             Assert(cockpitScene.Contains("guid: a1b2c3d4e5f647898a1b2c3d4e5f6012"), "TraineeCockpit.unity must reference ScenarioManager GUID");
+        }
+
+        private static void TestScenarioTickAndEndPayloadContracts()
+        {
+            // Verify P0 default stub SCENARIO_TICK payload shape
+            ScenarioTickPayload stubTick = new ScenarioTickPayload
+            {
+                sessionId = "sess-20261004-143201",
+                t = 100
+            };
+
+            JsonEnvelope stubEnv = ScenarioTickPayload.CreateEnvelope(stubTick, 1759600021100);
+            Assert(stubEnv.type == JsonEnvelope.SCENARIO_TICK, "Expected envelope type SCENARIO_TICK");
+            ScenarioTickPayload parsedStub = ScenarioTickPayload.Parse(stubEnv.payload);
+            Assert(parsedStub.sessionId == "sess-20261004-143201", "Expected sessionId preserved");
+            Assert(parsedStub.t == 100, "Expected t == 100");
+            Assert(parsedStub.swarmSnapshot != null && parsedStub.swarmSnapshot.Length == 0, "Expected empty stub swarmSnapshot=[]");
+            Assert(parsedStub.sensorReadings != null, "Expected non-null sensorReadings");
+            Assert(Math.Abs(parsedStub.sensorReadings.rfWaterfallPeakGHz) < 0.0001f &&
+                   Math.Abs(parsedStub.sensorReadings.rfWaterfallPeakDbm) < 0.0001f &&
+                   Math.Abs(parsedStub.sensorReadings.dopplerPeakHz) < 0.0001f &&
+                   Math.Abs(parsedStub.sensorReadings.acousticSplDb) < 0.0001f &&
+                   parsedStub.sensorReadings.radarDetectedCount == 0, "Expected stub sensorReadings all zeros");
+            Assert(parsedStub.threatState == ScenarioTickPayload.THREAT_GREEN, "Expected stub threatState == GREEN");
+            Assert(!parsedStub.friendlyVhfActive, "Expected stub friendlyVhfActive == false");
+            Assert(parsedStub.traineeAction != null && !parsedStub.traineeAction.ewEngaged &&
+                   !parsedStub.traineeAction.ewBandGHz.HasValue && parsedStub.traineeAction.kinetic == null,
+                   "Expected default stub traineeAction");
+            Assert(parsedStub.ewJammerState != null && !parsedStub.ewJammerState.engaged &&
+                   !parsedStub.ewJammerState.friendlyBlackoutRisk, "Expected default stub ewJammerState");
+
+            // Verify full SCENARIO_TICK example from board/contracts/scenario-events.md
+            ScenarioTickPayload richTick = new ScenarioTickPayload
+            {
+                sessionId = "sess-20261004-143201",
+                t = 12300,
+                swarmSnapshot = new SwarmAgentState[]
+                {
+                    new SwarmAgentState
+                    {
+                        agentId = "agent-0",
+                        isDecoy = true,
+                        positionWorld = new Vector3(200.0f, 10.0f, -100.0f),
+                        velocityMs = new Vector3(-28.0f, 0.0f, 10.0f),
+                        headingDeg = 250.0f,
+                        altitudeM = 10.0f,
+                        rfEmitting = true,
+                        rfFreqGHz = 2.4f,
+                        rfPowerDbm = 20.0f,
+                        propellerRpm = 9800,
+                        rcs = 0.08f,
+                        isNeutralised = false,
+                        neutralisedAtMs = null
+                    },
+                    new SwarmAgentState
+                    {
+                        agentId = "agent-3",
+                        isDecoy = false,
+                        positionWorld = new Vector3(142.3f, 8.3f, -87.1f),
+                        velocityMs = new Vector3(-28.4f, -0.2f, 12.1f),
+                        headingDeg = 247.0f,
+                        altitudeM = 8.3f,
+                        rfEmitting = true,
+                        rfFreqGHz = 5.825f,
+                        rfPowerDbm = 23.0f,
+                        propellerRpm = 11400,
+                        rcs = 0.012f,
+                        isNeutralised = false,
+                        neutralisedAtMs = null
+                    }
+                },
+                sensorReadings = new SensorReadings
+                {
+                    rfWaterfallPeakGHz = 5.825f,
+                    rfWaterfallPeakDbm = -62.3f,
+                    dopplerPeakHz = 220.4f,
+                    acousticSplDb = 54.2f,
+                    radarDetectedCount = 4
+                },
+                threatState = ScenarioTickPayload.THREAT_RED,
+                traineeAction = new TraineeAction
+                {
+                    antennaBearingDeg = 247.0f,
+                    antennaElevationDeg = -5.0f,
+                    ewEngaged = true,
+                    ewBandGHz = 5.825f,
+                    kinetic = new KineticEvent
+                    {
+                        firedAtMs = 12300,
+                        targetAgentId = "agent-3",
+                        hit = true,
+                        leadAngleDeg = 3.2f
+                    }
+                },
+                ewJammerState = new EWJammerState
+                {
+                    engaged = true,
+                    bearingDeg = 247.0f,
+                    elevationDeg = -5.0f,
+                    bandGHz = 5.825f,
+                    friendlyBlackoutRisk = false
+                },
+                friendlyVhfActive = false
+            };
+
+            string richTickJson = richTick.ToJson();
+            ScenarioTickPayload roundTripTick = ScenarioTickPayload.Parse(richTickJson);
+            Assert(roundTripTick.t == 12300 && roundTripTick.swarmSnapshot.Length == 2, "Expected 2 agents in round-trip SCENARIO_TICK");
+            Assert(roundTripTick.swarmSnapshot[1].agentId == "agent-3" &&
+                   Math.Abs(roundTripTick.swarmSnapshot[1].positionWorld.x - 142.3f) < 0.001f &&
+                   Math.Abs(roundTripTick.swarmSnapshot[1].propellerRpm - 11400f) < 0.001f,
+                   "Expected agent-3 fields preserved in round-trip");
+            Assert(roundTripTick.traineeAction.kinetic != null &&
+                   roundTripTick.traineeAction.kinetic.targetAgentId == "agent-3" &&
+                   roundTripTick.traineeAction.kinetic.hit, "Expected kinetic event preserved");
+
+            // Verify SCENARIO_END payload round-trip and validation
+            JsonEnvelope endEnv = ScenarioEndPayload.CreateEnvelope(
+                "sess-20261004-143201",
+                55000,
+                ScenarioEndPayload.REASON_ALL_NEUTRALISED,
+                new SwarmAgentState[]
+                {
+                    new SwarmAgentState
+                    {
+                        agentId = "agent-3",
+                        isDecoy = false,
+                        isNeutralised = true,
+                        neutralisedAtMs = 45210,
+                        positionWorld = new Vector3(12.0f, 6.1f, -3.4f),
+                        velocityMs = Vector3.zero,
+                        headingDeg = 247.0f,
+                        altitudeM = 6.1f,
+                        rfEmitting = false,
+                        rfFreqGHz = 5.825f,
+                        rfPowerDbm = 0f,
+                        propellerRpm = 0f,
+                        rcs = 0.012f
+                    }
+                });
+            Assert(endEnv.type == JsonEnvelope.SCENARIO_END, "Expected envelope type SCENARIO_END");
+            ScenarioEndPayload parsedEnd = ScenarioEndPayload.Parse(endEnv.payload);
+            Assert(parsedEnd.reason == ScenarioEndPayload.REASON_ALL_NEUTRALISED, "Expected reason ALL_NEUTRALISED");
+            Assert(parsedEnd.t == 55000, "Expected t == 55000");
+            Assert(parsedEnd.finalSwarmSnapshot.Length == 1 && parsedEnd.finalSwarmSnapshot[0].neutralisedAtMs == 45210,
+                "Expected finalSwarmSnapshot agent neutralisedAtMs == 45210");
+
+            ScenarioTickPayload invalidTick;
+            ScenarioEndPayload invalidEnd;
+            string err;
+            Assert(!ScenarioTickPayload.TryParse(richTickJson.Replace("\"RED\"", "\"PURPLE\""), out invalidTick, out err),
+                "Unsupported threatState must fail ScenarioTickPayload.TryParse");
+            Assert(!ScenarioEndPayload.TryParse(endEnv.payload.Replace("\"ALL_NEUTRALISED\"", "\"UNKNOWN_REASON\""), out invalidEnd, out err),
+                "Unsupported reason must fail ScenarioEndPayload.TryParse");
         }
 
         private static async Task TestScenarioLaunchBroadcastSceneLoadAndErrorsAsync()
@@ -322,6 +482,285 @@ namespace TrishulSim.Scenarios
 #if !UNITY_5_3_OR_NEWER
                     Debug.OnLogWarning -= onWarn;
 #endif
+                }
+            }
+            finally
+            {
+#if !UNITY_5_3_OR_NEWER
+                Debug.OnLog -= onLog;
+#endif
+                traineeMgr.OnDestroy();
+                instructorMgr.OnDestroy();
+                client.Stop();
+                server.Stop();
+            }
+        }
+
+        private static async Task TestScenarioTickLoopAbortAndTerminalConditionsAsync()
+        {
+            List<string> logs = new List<string>();
+            object logLock = new object();
+
+#if !UNITY_5_3_OR_NEWER
+            Action<string> onLog = msg => { lock (logLock) { logs.Add(msg); } };
+            Debug.OnLog += onLog;
+#endif
+
+            WsServer server = new WsServer();
+            server.Port = WsServer.DefaultPort;
+            server.HeartbeatIntervalMs = 5000;
+            server.StaleThresholdMs = 15000;
+
+            WsClient client = new WsClient();
+            client.ServerUri = WsClient.DefaultServerUri;
+            client.HeartbeatIntervalMs = 5000;
+            client.StaleThresholdMs = 15000;
+
+            Dropdown dropdown = new Dropdown();
+            Button launchBtn = new Button();
+            Button abortBtn = new Button();
+
+            ScenarioManager instructorMgr = new ScenarioManager();
+            instructorMgr.Server = server;
+            instructorMgr.Client = null;
+            instructorMgr.ScenarioDropdown = dropdown;
+            instructorMgr.LaunchButton = launchBtn;
+            instructorMgr.AbortButton = abortBtn;
+            instructorMgr.LoadSceneOnScenarioStart = false;
+            instructorMgr.TickIntervalSeconds = 0.1f;
+            instructorMgr.TickStepMs = 100;
+            instructorMgr.AutoStartTickLoop = true;
+
+            ScenarioManager traineeMgr = new ScenarioManager();
+            traineeMgr.Server = null;
+            traineeMgr.Client = client;
+            traineeMgr.LoadSceneOnScenarioStart = false;
+
+            try
+            {
+                TaskCompletionSource<bool> linkConfirmedTcs = new TaskCompletionSource<bool>();
+                List<ScenarioTickPayload> receivedTicks = new List<ScenarioTickPayload>();
+                object tickLock = new object();
+                TaskCompletionSource<bool> threeTicksTcs = new TaskCompletionSource<bool>();
+                TaskCompletionSource<ScenarioTickPayload> injectedTickTcs = new TaskCompletionSource<ScenarioTickPayload>();
+                TaskCompletionSource<ScenarioEndPayload> abortEndTcs = new TaskCompletionSource<ScenarioEndPayload>();
+
+                client.OnLinkConfirmed += () => linkConfirmedTcs.TrySetResult(true);
+                traineeMgr.OnScenarioTickReceived += tick =>
+                {
+                    lock (tickLock)
+                    {
+                        receivedTicks.Add(tick);
+                        if (receivedTicks.Count >= 3)
+                            threeTicksTcs.TrySetResult(true);
+                        if (tick.swarmSnapshot != null && tick.swarmSnapshot.Length == 2)
+                            injectedTickTcs.TrySetResult(tick);
+                    }
+                };
+                traineeMgr.OnScenarioEndReceived += endPayload => abortEndTcs.TrySetResult(endPayload);
+
+                Assert(server.StartServer(), "WsServer must bind on port 9700 for US-P0-C test");
+                client.StartClient();
+
+                Assert(await WaitTaskAsync(linkConfirmedTcs.Task, 3000), "WsClient must connect before US-P0-C test");
+
+                instructorMgr.Start();
+                traineeMgr.Start();
+
+                // 1. Launch scenario -> TickLoop runs at 10 Hz (0.1s) with stub data
+                launchBtn.onClick.Invoke();
+                Assert(await WaitTaskAsync(threeTicksTcs.Task, 1500), "Trainee must receive >=3 SCENARIO_TICK messages at ~10 Hz");
+
+                ScenarioTickPayload firstTick;
+                ScenarioTickPayload secondTick;
+                ScenarioTickPayload thirdTick;
+                lock (tickLock)
+                {
+                    firstTick = receivedTicks[0];
+                    secondTick = receivedTicks[1];
+                    thirdTick = receivedTicks[2];
+                }
+
+                Assert(firstTick.t == 100 && secondTick.t == 200 && thirdTick.t == 300,
+                    "Expected t to increment by 100ms per tick (100, 200, 300), got: " +
+                    firstTick.t + ", " + secondTick.t + ", " + thirdTick.t);
+                Assert(firstTick.swarmSnapshot != null && firstTick.swarmSnapshot.Length == 0,
+                    "Expected P0 stub swarmSnapshot=[]");
+                Assert(Math.Abs(firstTick.sensorReadings.rfWaterfallPeakGHz) < 0.001f &&
+                       Math.Abs(firstTick.sensorReadings.rfWaterfallPeakDbm) < 0.001f &&
+                       Math.Abs(firstTick.sensorReadings.dopplerPeakHz) < 0.001f &&
+                       Math.Abs(firstTick.sensorReadings.acousticSplDb) < 0.001f &&
+                       firstTick.sensorReadings.radarDetectedCount == 0,
+                    "Expected P0 stub sensorReadings all zeros");
+                Assert(firstTick.threatState == ScenarioTickPayload.THREAT_GREEN,
+                    "Expected P0 stub threatState == GREEN");
+
+                // 2. InjectSwarmSnapshot(SwarmAgentState[]) -> appears in next SCENARIO_TICK
+                SwarmAgentState[] injectedAgents = new SwarmAgentState[]
+                {
+                    new SwarmAgentState
+                    {
+                        agentId = "agent-0",
+                        isDecoy = true,
+                        positionWorld = new Vector3(180f, 10f, -90f),
+                        velocityMs = new Vector3(-25f, 0f, 10f),
+                        headingDeg = 250f,
+                        altitudeM = 10f,
+                        rfEmitting = true,
+                        rfFreqGHz = 2.4f,
+                        rfPowerDbm = 20f,
+                        propellerRpm = 9800f,
+                        rcs = 0.08f,
+                        isNeutralised = false,
+                        neutralisedAtMs = null
+                    },
+                    new SwarmAgentState
+                    {
+                        agentId = "agent-1",
+                        isDecoy = false,
+                        positionWorld = new Vector3(140f, 8f, -75f),
+                        velocityMs = new Vector3(-28f, 0f, 12f),
+                        headingDeg = 247f,
+                        altitudeM = 8f,
+                        rfEmitting = true,
+                        rfFreqGHz = 5.825f,
+                        rfPowerDbm = 23f,
+                        propellerRpm = 11400f,
+                        rcs = 0.012f,
+                        isNeutralised = false,
+                        neutralisedAtMs = null
+                    }
+                };
+                instructorMgr.InjectSwarmSnapshot(injectedAgents);
+
+                Assert(await WaitTaskAsync(injectedTickTcs.Task, 1000),
+                    "Next SCENARIO_TICK must include injected SwarmAgentState[]");
+                ScenarioTickPayload injectedTick = injectedTickTcs.Task.Result;
+                Assert(injectedTick.swarmSnapshot.Length == 2 && injectedTick.swarmSnapshot[1].agentId == "agent-1",
+                    "Expected injected agent-1 in SCENARIO_TICK");
+
+                // 3. Click Abort button -> BroadcastScenarioEnd("INSTRUCTOR_ABORT"), stops TickLoop
+                abortBtn.onClick.Invoke();
+                Assert(await WaitTaskAsync(abortEndTcs.Task, 1500),
+                    "Clicking Abort button must broadcast SCENARIO_END to Trainee");
+                ScenarioEndPayload abortEnd = abortEndTcs.Task.Result;
+                Assert(abortEnd.reason == ScenarioEndPayload.REASON_INSTRUCTOR_ABORT,
+                    "Expected SCENARIO_END reason INSTRUCTOR_ABORT, got " + abortEnd.reason);
+                Assert(abortEnd.t >= injectedTick.t, "Expected SCENARIO_END t >= last tick t");
+                Assert(abortEnd.finalSwarmSnapshot != null && abortEnd.finalSwarmSnapshot.Length == 2,
+                    "Expected finalSwarmSnapshot in SCENARIO_END to carry last injected agents");
+                Assert(!instructorMgr.IsScenarioRunning && !traineeMgr.IsScenarioRunning,
+                    "Both Instructor and Trainee ScenarioManagers must stop running after SCENARIO_END");
+
+                int ticksAtEnd;
+                lock (tickLock) { ticksAtEnd = receivedTicks.Count; }
+                await Task.Delay(250);
+                int ticksAfterWait;
+                lock (tickLock) { ticksAfterWait = receivedTicks.Count; }
+                Assert(ticksAfterWait == ticksAtEnd,
+                    "TickLoop must stop after SCENARIO_END (expected " + ticksAtEnd + " ticks, got " + ticksAfterWait + ")");
+
+                // Verify Console logs contain SCENARIO_TICK and SCENARIO_END
+                bool sawTickLog = false;
+                bool sawEndLog = false;
+                lock (logLock)
+                {
+                    for (int i = 0; i < logs.Count; i++)
+                    {
+                        if (logs[i].Contains("SCENARIO_TICK"))
+                            sawTickLog = true;
+                        if (logs[i].Contains("SCENARIO_END") && logs[i].Contains("INSTRUCTOR_ABORT"))
+                            sawEndLog = true;
+                    }
+                }
+                Assert(sawTickLog, "Console must show SCENARIO_TICK logs");
+                Assert(sawEndLog, "Console must show SCENARIO_END broadcast with INSTRUCTOR_ABORT");
+
+                // 4. Test TIME_LIMIT terminal condition: t >= durationMaxSecs * 1000 -> SCENARIO_END ("TIME_LIMIT")
+                TaskCompletionSource<ScenarioEndPayload> timeLimitEndTcs = new TaskCompletionSource<ScenarioEndPayload>();
+                Action<ScenarioEndPayload> timeLimitHandler = p => timeLimitEndTcs.TrySetResult(p);
+                traineeMgr.OnScenarioEndReceived += timeLimitHandler;
+                try
+                {
+                    ScenarioConfig shortConfig = instructorMgr.Scenarios[0].Clone();
+                    shortConfig.durationMaxSecs = 1; // 1000 ms (10 ticks of 100 ms)
+                    instructorMgr.TickIntervalSeconds = 0.02f; // fast tick for test
+                    instructorMgr.TickStepMs = 250; // 4 ticks -> 1000 ms
+
+                    await instructorMgr.LaunchScenarioAsync(shortConfig);
+                    Assert(await WaitTaskAsync(timeLimitEndTcs.Task, 2000),
+                        "TickLoop must fire SCENARIO_END when t >= durationMaxSecs * 1000");
+                    ScenarioEndPayload timeLimitEnd = timeLimitEndTcs.Task.Result;
+                    Assert(timeLimitEnd.reason == ScenarioEndPayload.REASON_TIME_LIMIT,
+                        "Expected TIME_LIMIT reason, got " + timeLimitEnd.reason);
+                    Assert(timeLimitEnd.t == 1000, "Expected TIME_LIMIT at t == 1000ms, got " + timeLimitEnd.t);
+                }
+                finally
+                {
+                    traineeMgr.OnScenarioEndReceived -= timeLimitHandler;
+                }
+
+                // 5. Test ALL_NEUTRALISED and EXCLUSION_BREACH terminal conditions
+                instructorMgr.AutoStartTickLoop = false;
+                instructorMgr.TickStepMs = 100;
+                ScenarioConfig tacConfig = instructorMgr.Scenarios[0].Clone();
+                tacConfig.swarmProfile.attackerCount = 1;
+                tacConfig.swarmProfile.decoyCount = 0;
+                tacConfig.swarmProfile.agentCount = 1;
+
+                TaskCompletionSource<ScenarioEndPayload> neutralisedEndTcs = new TaskCompletionSource<ScenarioEndPayload>();
+                Action<ScenarioEndPayload> neutralisedHandler = p => neutralisedEndTcs.TrySetResult(p);
+                traineeMgr.OnScenarioEndReceived += neutralisedHandler;
+                try
+                {
+                    await instructorMgr.LaunchScenarioAsync(tacConfig);
+                    instructorMgr.InjectSwarmSnapshot(new SwarmAgentState[]
+                    {
+                        new SwarmAgentState
+                        {
+                            agentId = "agent-0",
+                            isDecoy = false,
+                            positionWorld = new Vector3(80f, 8f, -40f),
+                            isNeutralised = true,
+                            neutralisedAtMs = 100
+                        }
+                    });
+                    await instructorMgr.StepScenarioTickAsync();
+                    Assert(await WaitTaskAsync(neutralisedEndTcs.Task, 1500),
+                        "All attackers neutralised must trigger SCENARIO_END");
+                    Assert(neutralisedEndTcs.Task.Result.reason == ScenarioEndPayload.REASON_ALL_NEUTRALISED,
+                        "Expected ALL_NEUTRALISED reason");
+                }
+                finally
+                {
+                    traineeMgr.OnScenarioEndReceived -= neutralisedHandler;
+                }
+
+                TaskCompletionSource<ScenarioEndPayload> breachEndTcs = new TaskCompletionSource<ScenarioEndPayload>();
+                Action<ScenarioEndPayload> breachHandler = p => breachEndTcs.TrySetResult(p);
+                traineeMgr.OnScenarioEndReceived += breachHandler;
+                try
+                {
+                    await instructorMgr.LaunchScenarioAsync(tacConfig);
+                    instructorMgr.InjectSwarmSnapshot(new SwarmAgentState[]
+                    {
+                        new SwarmAgentState
+                        {
+                            agentId = "agent-0",
+                            isDecoy = false,
+                            positionWorld = new Vector3(10f, 5f, 5f), // within 20m radius of origin
+                            isNeutralised = false
+                        }
+                    });
+                    await instructorMgr.StepScenarioTickAsync();
+                    Assert(await WaitTaskAsync(breachEndTcs.Task, 1500),
+                        "Attacker within 20m exclusion zone must trigger SCENARIO_END");
+                    Assert(breachEndTcs.Task.Result.reason == ScenarioEndPayload.REASON_EXCLUSION_BREACH,
+                        "Expected EXCLUSION_BREACH reason");
+                }
+                finally
+                {
+                    traineeMgr.OnScenarioEndReceived -= breachHandler;
                 }
             }
             finally
