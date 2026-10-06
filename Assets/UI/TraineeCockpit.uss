@@ -1,14 +1,15 @@
-/* ============================================================
-   TraineeCockpit.uss — Trainee Cockpit Stylesheet
-   TRISHUL-SIM · UX-P0-A · MIL-STD-2525 colour palette
-   ============================================================ */
+/* ====================================================
+   TRISHUL-SIM  ·  Trainee Cockpit  ·  USS Theme
+   MIL-STD-2525 colours shared with InstructorC2.uss
+   ==================================================== */
 
-/* --- Root --- */
 .cockpit-root {
+    flex-direction: column;
     background-color: #0D0D0D;
     color: #E0E0E0;
     font-size: 14px;
-    flex-grow: 1;
+    width: 100%;
+    height: 100%;
     padding: 8px;
 }
 
@@ -17,31 +18,23 @@
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    padding: 6px 16px;
-    margin-bottom: 8px;
+    height: 32px;
     border-radius: 4px;
-    min-height: 32px;
+    margin-bottom: 8px;
+    padding: 4px 16px;
 }
 
-.threat-text {
+.threat-label {
     font-size: 16px;
     -unity-font-style: bold;
-    color: #FFFFFF;
-    letter-spacing: 4px;
+    color: #000000;
     -unity-text-align: middle-center;
 }
 
-.threat-green {
-    background-color: #00B300; /* MIL-STD-2525 GREEN */
-}
-
-.threat-amber {
-    background-color: #FFB300; /* MIL-STD-2525 AMBER */
-}
-
-.threat-red {
-    background-color: #CC0000; /* MIL-STD-2525 RED */
-}
+/* Threat state colours — MIL-STD-2525 */
+.threat-green { background-color: #00B300; }
+.threat-amber { background-color: #FFB300; }
+.threat-red   { background-color: #CC0000; }
 
 /* --- Sensor Row --- */
 .sensor-row {
@@ -50,53 +43,54 @@
     margin-bottom: 8px;
 }
 
-/* --- Sensor Pane (each of the 3 panes) --- */
 .sensor-pane {
+    flex-direction: column;
     flex-grow: 1;
     flex-basis: 0;
-    margin: 0 4px;
-    background-color: #111111;
-    border-width: 1px;
     border-color: #333333;
+    border-width: 1px;
     border-radius: 4px;
+    margin: 4px;
     padding: 4px;
+    background-color: #0A0A0A;
     min-width: 200px;
 }
 
 .pane-title {
     font-size: 11px;
+    color: #888888;
     -unity-font-style: bold;
-    color: #00B300;
-    letter-spacing: 2px;
-    -unity-text-align: upper-center;
-    padding: 4px 0;
-    border-bottom-width: 1px;
-    border-bottom-color: #2A2A2A;
     margin-bottom: 4px;
+    letter-spacing: 1px;
 }
 
-/* --- Sensor Content (stub grey box, replaced by renderers in UX-P1-A) --- */
 .sensor-content {
     flex-grow: 1;
     background-color: #1A1A1A;
-    border-radius: 2px;
-    min-height: 200px;
-    justify-content: center;
+    border-radius: 3px;
+    min-height: 180px;
     align-items: center;
+    justify-content: center;
 }
 
-.stub-label {
+.sensor-stub-label {
+    color: #444444;
     font-size: 11px;
-    color: #555555;
     -unity-font-style: italic;
-    -unity-text-align: middle-center;
 }
 
-/* --- Frequency Markers (RF Waterfall) --- */
+.sensor-readout {
+    font-size: 11px;
+    color: #00CC88;
+    margin-top: 4px;
+    -unity-font-style: bold;
+}
+
+/* --- Frequency markers --- */
 .freq-markers {
     flex-direction: row;
     justify-content: space-between;
-    padding: 2px 4px;
+    margin-top: 2px;
 }
 
 .freq-marker {
@@ -104,57 +98,21 @@
     color: #666666;
 }
 
-/* --- Sensor Reading Labels --- */
-.sensor-reading {
-    font-size: 11px;
-    color: #888888;
-    -unity-text-align: upper-center;
-    padding: 4px 0;
-}
-
-/* --- Controls Row (EW + SMASH — added in UX-P1-B) --- */
-.controls-row {
-    padding: 8px;
-    background-color: #141414;
-    border-radius: 4px;
-    border-width: 1px;
-    border-color: #2A2A2A;
-    margin-bottom: 8px;
-}
-
-/* --- Scorecard Panel (stub) --- */
+/* --- Scorecard panel --- */
 .scorecard-panel {
-    padding: 16px;
-    background-color: #141414;
-    border-radius: 4px;
+    background-color: #111122;
+    border-color: #334499;
     border-width: 1px;
-    border-color: #2A2A2A;
-}
-
-.scorecard-stub {
-    font-size: 14px;
-    color: #888888;
-    -unity-font-style: italic;
-    -unity-text-align: middle-center;
-}
-
-/* --- Computing Overlay --- */
-.computing-overlay {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.85);
-    justify-content: center;
+    border-radius: 4px;
+    padding: 16px;
     align-items: center;
+    justify-content: center;
 }
 
-.computing-text {
-    font-size: 20px;
-    -unity-font-style: bold;
-    color: #FFB300;
-    letter-spacing: 2px;
+.computing-label {
+    color: #8899FF;
+    font-size: 16px;
+    -unity-font-style: italic;
 }
 
 /* --- Utility --- */

@@ -1,321 +1,269 @@
-// ============================================================
-// CockpitController.cs — Trainee Cockpit UIDocument Controller
-// TRISHUL-SIM · UX-P0-A · ui-ux track (Rani)
+// UX-P0-A  ·  CockpitController.cs
+// UITK controller for the Trainee Cockpit scene.
 //
-// Binds TraineeCockpit.uxml elements. Reacts to scenario events:
-// SCENARIO_START → show panes, set GREEN
-// SCENARIO_TICK  → update threat indicator, forward sensor data
-// SCENARIO_END   → show computing overlay
-// SCORECARD_PAYLOAD → show scorecard panel
+// Reacts to SCENARIO_START / SCENARIO_TICK / SCENARIO_END / SCORECARD_PAYLOAD
+// from the WebSocket IPC (scenario-events.md contract v1).
 //
-// Dependencies US-P0-A/B not merged — uses mock path.
-// ============================================================
+// Mock path active until US-P0-A + US-P0-B merge:
+//   OnScenarioStart_Mock(), OnScenarioTick_Mock() called from C2StationController
+//   or Unity Editor ContextMenu for isolated editor testing.
+//
+// Sensor rendering stubs (grey boxes) are replaced in UX-P1-A by:
+//   RfWaterfallRenderer, DopplerScopeRenderer, AcousticFftRenderer
+//
+// OWNED BY: Rani (ui-ux track)
+// DO NOT TOUCH: Assets/Scripts/Network/, Assets/Scripts/SwarmAI/, Assets/Scripts/AAR/
 
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace TrishulSim.UI
+namespace TRISHUL.UI
 {
     /// <summary>
-    /// MonoBehaviour attached to the TraineeCockpit scene's UIDocument.
-    /// Manages the Trainee HUD: threat indicator, sensor pane stubs,
-    /// controls row visibility, scorecard overlay, and computing state.
+    /// Drives the Trainee Cockpit UITK document.
+    /// Binds to TraineeCockpit.uxml via UIDocument on the same GameObject.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class CockpitController : MonoBehaviour
     {
-        // ── UI Element References ──────────────────────────────
-        private VisualElement root;
-        private VisualElement threatIndicator;
-        private Label threatLabel;
+        // ── Sensor renderer references (wired in UX-P1-A) ─────────────────
+        [Header("Sensor Renderers (wired in UX-P1-A)")]
+        [SerializeField] private RfWaterfallRenderer  _rfRenderer;     // stub null until UX-P1-A
+        [SerializeField] private DopplerScopeRenderer _dopplerRenderer;
+        [SerializeField] private AcousticFftRenderer  _acousticRenderer;
 
-        // Sensor panes (stub boxes — replaced by renderers in UX-P1-A)
-        private VisualElement rfWaterfallPane;
-        private VisualElement rfContent;
-        private VisualElement dopplerPane;
-        private VisualElement dopplerContent;
-        private Label dopplerReading;
-        private VisualElement acousticPane;
-        private VisualElement acousticContent;
-        private Label acousticReading;
+        // ── Cached element references ─────────────────────────────────────
+        private VisualElement _root;
+        private VisualElement _threatIndicator;
+        private Label         _threatLabel;
+        private VisualElement _controlsRow;
+        private VisualElement _scorecardPanel;
+        private Label         _scorecardOverlayLabel;
+        private Label         _dopplerHzLabel;
+        private Label         _acousticSplLabel;
 
-        // Controls and overlays
-        private VisualElement controlsRow;
-        private VisualElement scorecardPanel;
-        private Label scorecardStubLabel;
-        private VisualElement computingOverlay;
+        // ── State ─────────────────────────────────────────────────────────
+        private bool _scenarioRunning = false;
 
-        // ── State ─────────────────────────────────────────────
-        private bool scenarioRunning = false;
-        private string currentThreatState = "GREEN";
-
-        // ── Public Accessors for Tests / UI Validation ────────
-        public bool ScenarioRunning { get { return scenarioRunning; } }
-        public string CurrentThreatState { get { return currentThreatState; } }
-        public VisualElement Root { get { return root; } }
-        public VisualElement ThreatIndicator { get { return threatIndicator; } }
-        public Label ThreatLabel { get { return threatLabel; } }
-        public VisualElement ControlsRow { get { return controlsRow; } }
-        public VisualElement ScorecardPanel { get { return scorecardPanel; } }
-        public VisualElement ComputingOverlay { get { return computingOverlay; } }
-        public Label DopplerReading { get { return dopplerReading; } }
-        public Label AcousticReading { get { return acousticReading; } }
-
-        // ══════════════════════════════════════════════════════
-        // Lifecycle
-        // ══════════════════════════════════════════════════════
-
+        // ─────────────────────────────────────────────────────────────────
         private void Awake()
         {
-            var uiDoc = GetComponent<UIDocument>();
-            if (uiDoc != null)
-            {
-                root = uiDoc.rootVisualElement;
-                BindElements();
-            }
+            _root = GetComponent<UIDocument>().rootVisualElement;
+            BindElements();
         }
 
         private void Start()
         {
-            // ── MOCK PATH (US-P0-A/B not merged) ────────────
-            // Simulate SCENARIO_START for editor testing.
-            // Remove this block once US-P0-B (ScenarioManager) is merged.
-#if UNITY_EDITOR
-            SimulateScenarioStart();
+            SubscribeToWsEvents();
+        }
+
+        private void OnDestroy()
+        {
+            UnsubscribeFromWsEvents();
+        }
+
+        // ── Element binding ───────────────────────────────────────────────
+        private void BindElements()
+        {
+            _threatIndicator      = _root.Q<VisualElement>("threat-indicator");
+            _threatLabel          = _root.Q<Label>("threat-label");
+            _controlsRow          = _root.Q<VisualElement>("controls-row");
+            _scorecardPanel       = _root.Q<VisualElement>("scorecard-panel");
+            _scorecardOverlayLabel= _root.Q<Label>("scorecard-overlay-label");
+            _dopplerHzLabel       = _root.Q<Label>("doppler-hz-label");
+            _acousticSplLabel     = _root.Q<Label>("acoustic-spl-label");
+        }
+
+        // ── WebSocket event subscription ──────────────────────────────────
+        private void SubscribeToWsEvents()
+        {
+#if TRISHUL_MOCK
+            // No-op in mock mode — methods called directly.
+#else
+            // Real path (after US-P0-A lands):
+            // WsClient.Instance.OnMessageReceived += OnWsMessageReceived;
 #endif
         }
 
-        // ══════════════════════════════════════════════════════
-        // UI Binding
-        // ══════════════════════════════════════════════════════
-
-        public void BindElements(VisualElement customRoot = null)
+        private void UnsubscribeFromWsEvents()
         {
-            if (customRoot != null)
-                root = customRoot;
-
-            if (root == null)
-                return;
-
-            threatIndicator    = root.Q<VisualElement>("threat-indicator");
-            threatLabel        = root.Q<Label>("threat-label");
-
-            rfWaterfallPane    = root.Q<VisualElement>("rf-waterfall-pane");
-            rfContent          = root.Q<VisualElement>("rf-content");
-            dopplerPane        = root.Q<VisualElement>("doppler-pane");
-            dopplerContent     = root.Q<VisualElement>("doppler-content");
-            dopplerReading     = root.Q<Label>("doppler-reading");
-            acousticPane       = root.Q<VisualElement>("acoustic-pane");
-            acousticContent    = root.Q<VisualElement>("acoustic-content");
-            acousticReading    = root.Q<Label>("acoustic-reading");
-
-            controlsRow        = root.Q<VisualElement>("controls-row");
-            scorecardPanel     = root.Q<VisualElement>("scorecard-panel");
-            scorecardStubLabel = root.Q<Label>("scorecard-stub-label");
-            computingOverlay   = root.Q<VisualElement>("computing-overlay");
+#if !TRISHUL_MOCK
+            // WsClient.Instance.OnMessageReceived -= OnWsMessageReceived;
+#endif
         }
 
-        // ══════════════════════════════════════════════════════
-        // Scenario Event Handlers
-        // ══════════════════════════════════════════════════════
-
-        /// <summary>
-        /// Called when SCENARIO_START is received.
-        /// Contract: scenario-events.md v1 — consumer reaction:
-        ///   "hide lobby screen; show Sensor Suite panes; set threat state to GREEN"
-        /// Wire to WsClient.OnMessageReceived → type == "SCENARIO_START"
-        /// once US-P0-A is merged.
-        /// </summary>
-        public void OnScenarioStart(string scenarioId, string scenarioName)
+        // ── SCENARIO_START handler ────────────────────────────────────────
+        public void OnScenarioStart(string sessionId, string scenarioId)
         {
-            scenarioRunning = true;
-            Debug.Log(string.Format("[Cockpit] SCENARIO_START: {0} — {1}", scenarioId, scenarioName));
+            _scenarioRunning = true;
 
-            // Show controls row (EW + SMASH controls added in UX-P1-B)
-            if (controlsRow != null)
-                controlsRow.RemoveFromClassList("hidden");
+            // Show EW + SMASH controls row (populated in UX-P1-B)
+            _controlsRow.RemoveFromClassList("hidden");
 
-            // Set threat indicator to GREEN
+            // Reset to GREEN threat state
             SetThreatState("GREEN");
 
-            // Hide scorecard panel and computing overlay
-            if (scorecardPanel != null)
-                scorecardPanel.AddToClassList("hidden");
-            if (computingOverlay != null)
-                computingOverlay.AddToClassList("hidden");
+            // Hide scorecard in case of replay
+            _scorecardPanel.AddToClassList("hidden");
+
+            Debug.Log($"[Cockpit] SCENARIO_START received — session={sessionId}, scenario={scenarioId}");
         }
 
+        // ── SCENARIO_TICK handler ─────────────────────────────────────────
         /// <summary>
-        /// Called on each SCENARIO_TICK (10 Hz).
-        /// Contract: scenario-events.md v1 — consumer reaction:
-        ///   "redraws RF Waterfall, Doppler scope, Acoustic FFT, threat-state indicator"
+        /// Called every 100 ms by the WS message pump.
+        /// In UX-P0-A: updates threat indicator + logs sensor values.
+        /// In UX-P1-A: calls actual sensor renderers.
         /// </summary>
-        /// <param name="threatState">"GREEN" | "AMBER" | "RED"</param>
-        /// <param name="rfPeakGHz">RF waterfall peak frequency in GHz</param>
-        /// <param name="rfPeakDbm">RF waterfall peak power in dBm</param>
-        /// <param name="dopplerHz">Micro-Doppler peak frequency in Hz</param>
-        /// <param name="acousticDb">Acoustic SPL in dB</param>
-        /// <param name="radarCount">Number of radar returns above threshold</param>
         public void OnScenarioTick(
-            string threatState,
-            float rfPeakGHz, float rfPeakDbm,
-            float dopplerHz, float acousticDb,
-            int radarCount)
+            string    threatState,
+            float     rfPeakGHz,
+            float     rfPeakDbm,
+            float     dopplerHz,
+            float     acousticSpl,
+            int       radarCount)
         {
-            if (!scenarioRunning) return;
+            if (!_scenarioRunning) return;
 
             // Update threat indicator
             SetThreatState(threatState);
 
-            // Forward sensor data to renderers (stub: update reading labels)
-            // Replace with actual renderer calls in UX-P1-A:
-            //   RfWaterfallRenderer.UpdateWaterfall(sensorReadings)
-            //   DopplerScopeRenderer.UpdateScope(sensorReadings, swarm)
-            //   AcousticFftRenderer.UpdateAcoustic(sensorReadings)
-            if (dopplerReading != null)
-                dopplerReading.text = string.Format("Doppler: {0:F1} Hz", dopplerHz);
-            if (acousticReading != null)
-                acousticReading.text = string.Format("SPL: {0:F1} dB", acousticDb);
+            // Update sensor readout labels (stub — real renderers in UX-P1-A)
+            if (_dopplerHzLabel != null)
+                _dopplerHzLabel.text = $"Doppler: {dopplerHz:F1} Hz";
+            if (_acousticSplLabel != null)
+                _acousticSplLabel.text = $"SPL: {acousticSpl:F1} dB";
 
-            // Log sensor values (stub — removed when renderers are wired)
-            Debug.Log(string.Format("[Cockpit][TICK] threat={0} RF={1}GHz/{2}dBm Doppler={3}Hz Acoustic={4}dB radar={5}",
-                threatState, rfPeakGHz, rfPeakDbm, dopplerHz, acousticDb, radarCount));
+            // Forward to sensor renderers (null-guarded — assigned in UX-P1-A)
+            _rfRenderer?.UpdateWaterfall(rfPeakGHz, rfPeakDbm);
+            _dopplerRenderer?.UpdateScope(dopplerHz, radarCount);
+            _acousticRenderer?.UpdateAcoustic(acousticSpl);
         }
 
-        /// <summary>
-        /// Called when SCENARIO_END is received.
-        /// Contract: scenario-events.md v1 — consumer reaction:
-        ///   "freeze sensor panes; show 'Computing Scorecard…' overlay"
-        /// </summary>
+        // ── SCENARIO_END handler ──────────────────────────────────────────
         public void OnScenarioEnd(string reason)
         {
-            scenarioRunning = false;
-            Debug.Log(string.Format("[Cockpit] SCENARIO_END: reason={0}", reason));
-
-            // Show computing overlay
-            if (computingOverlay != null)
-                computingOverlay.RemoveFromClassList("hidden");
+            _scenarioRunning = false;
+            _scorecardPanel.RemoveFromClassList("hidden");
+            _scorecardOverlayLabel.text = "Computing Scorecard\u2026";
+            Debug.Log($"[Cockpit] SCENARIO_END — reason={reason}");
         }
 
-        /// <summary>
-        /// Called when SCORECARD_PAYLOAD is received.
-        /// Contract: scorecard.md v1 — consumer reaction:
-        ///   Show scorecard panel, hide computing overlay.
-        /// Stub: shows sessionId text. Full renderer in UX-P1-D (Rajeswari).
-        /// </summary>
+        // ── SCORECARD_PAYLOAD handler ─────────────────────────────────────
         public void OnScorecardReceived(string sessionId)
         {
-            Debug.Log(string.Format("[Cockpit] SCORECARD_PAYLOAD received for session {0}.", sessionId));
-
-            // Hide computing overlay
-            if (computingOverlay != null)
-                computingOverlay.AddToClassList("hidden");
-
-            // Show scorecard panel (stub — full render in UX-P1-D)
-            if (scorecardPanel != null)
-                scorecardPanel.RemoveFromClassList("hidden");
-            if (scorecardStubLabel != null)
-                scorecardStubLabel.text = string.Format("Scorecard received — Session: {0}", sessionId);
+            // Stub: show session ID — full renderer in UX-P1-D.
+            _scorecardOverlayLabel.text = $"Scorecard ready \u2014 session: {sessionId}";
         }
 
-        // ══════════════════════════════════════════════════════
-        // Threat State Management
-        // ══════════════════════════════════════════════════════
-
-        /// <summary>
-        /// Updates the threat indicator visual.
-        /// MIL-STD-2525 colours: GREEN #00B300, AMBER #FFB300, RED #CC0000.
-        /// </summary>
-        public void SetThreatState(string state)
+        // ── Threat state helper ───────────────────────────────────────────
+        private void SetThreatState(string state)
         {
-            currentThreatState = state;
+            _threatIndicator.RemoveFromClassList("threat-green");
+            _threatIndicator.RemoveFromClassList("threat-amber");
+            _threatIndicator.RemoveFromClassList("threat-red");
 
-            if (threatIndicator == null)
-                return;
-
-            // Remove all threat classes
-            threatIndicator.RemoveFromClassList("threat-green");
-            threatIndicator.RemoveFromClassList("threat-amber");
-            threatIndicator.RemoveFromClassList("threat-red");
-
-            // Apply new threat class
             switch (state)
             {
-                case "GREEN":
-                    threatIndicator.AddToClassList("threat-green");
-                    if (threatLabel != null) threatLabel.text = "GREEN";
-                    break;
                 case "AMBER":
-                    threatIndicator.AddToClassList("threat-amber");
-                    if (threatLabel != null) threatLabel.text = "AMBER";
+                    _threatIndicator.AddToClassList("threat-amber");
+                    _threatLabel.text = "AMBER";
                     break;
                 case "RED":
-                    threatIndicator.AddToClassList("threat-red");
-                    if (threatLabel != null) threatLabel.text = "RED";
+                    _threatIndicator.AddToClassList("threat-red");
+                    _threatLabel.text = "RED";
                     break;
-                default:
-                    threatIndicator.AddToClassList("threat-green");
-                    if (threatLabel != null) threatLabel.text = "GREEN";
-                    Debug.LogWarning(string.Format("[Cockpit] Unknown threat state: {0}", state));
+                default: // GREEN
+                    _threatIndicator.AddToClassList("threat-green");
+                    _threatLabel.text = "GREEN";
                     break;
             }
         }
 
-        // ══════════════════════════════════════════════════════
-        // Mock Path (Editor Only)
-        // ══════════════════════════════════════════════════════
+        // ── WS message dispatcher (real path) ─────────────────────────────
+        // private void OnWsMessageReceived(string json)
+        // {
+        //     var envelope = JsonUtility.FromJson<WsEnvelope>(json);
+        //     switch (envelope.type)
+        //     {
+        //         case "SCENARIO_START":
+        //             var start = JsonUtility.FromJson<ScenarioStartMsg>(json);
+        //             OnScenarioStart(start.payload.sessionId, start.payload.scenarioId);
+        //             break;
+        //         case "SCENARIO_TICK":
+        //             var tick = JsonUtility.FromJson<ScenarioTickMsg>(json);
+        //             OnScenarioTick(
+        //                 tick.payload.threatState,
+        //                 tick.payload.sensorReadings.rfWaterfallPeakGHz,
+        //                 tick.payload.sensorReadings.rfWaterfallPeakDbm,
+        //                 tick.payload.sensorReadings.dopplerPeakHz,
+        //                 tick.payload.sensorReadings.acousticSplDb,
+        //                 tick.payload.sensorReadings.radarDetectedCount
+        //             );
+        //             break;
+        //         case "SCENARIO_END":
+        //             var end = JsonUtility.FromJson<ScenarioEndMsg>(json);
+        //             OnScenarioEnd(end.payload.reason);
+        //             break;
+        //         case "SCORECARD_PAYLOAD":
+        //             var sc = JsonUtility.FromJson<ScorecardPayloadMsg>(json);
+        //             OnScorecardReceived(sc.payload.scorecard.sessionId);
+        //             var c2 = FindObjectOfType<C2StationController>();
+        //             c2?.ShowScorecardMirror(sc.payload.scorecard.sessionId);
+        //             break;
+        //     }
+        // }
 
-#if UNITY_EDITOR
-        /// <summary>
-        /// Simulates SCENARIO_START + one TICK for editor testing.
-        /// Uses SensorMock values from mission: rfWaterfallPeakGHz=5.825,
-        /// rfWaterfallPeakDbm=-62.3, dopplerPeakHz=220.4, acousticSplDb=54.2.
-        /// Remove once US-P0-A/B are merged.
-        /// </summary>
-        private void SimulateScenarioStart()
+        // ── Mock helpers ──────────────────────────────────────────────────
+#if TRISHUL_MOCK
+        [ContextMenu("Mock: Simulate SCENARIO_START")]
+        public void OnScenarioStart_Mock()
         {
-            Debug.Log("[Cockpit][MOCK] Simulating SCENARIO_START (US-P0-A/B not merged).");
-            OnScenarioStart("punjab-fog-pincer-01", "Punjab Border — Zero Visibility Pincer");
-
-            // Simulate one tick with mock sensor data
-            OnScenarioTick(
-                threatState: "GREEN",
-                rfPeakGHz: 5.825f,
-                rfPeakDbm: -62.3f,
-                dopplerHz: 220.4f,
-                acousticDb: 54.2f,
-                radarCount: 4
-            );
+            OnScenarioStart("sess-MOCK-0001", "punjab-fog-pincer-01");
         }
 
-        /// <summary>
-        /// Editor helper: cycle threat states on keypress for visual testing.
-        /// T key cycles GREEN → AMBER → RED → GREEN.
-        /// Safely wrapped to prevent input system mismatch crashes.
-        /// </summary>
-        private void Update()
+        [ContextMenu("Mock: Simulate SCENARIO_TICK (RED)")]
+        public void OnScenarioTick_MockRed()
         {
-            try
-            {
-                if (Input.GetKeyDown(KeyCode.T))
-                {
-                    string next;
-                    switch (currentThreatState)
-                    {
-                        case "GREEN": next = "AMBER"; break;
-                        case "AMBER": next = "RED"; break;
-                        case "RED": next = "GREEN"; break;
-                        default: next = "GREEN"; break;
-                    }
-                    Debug.Log(string.Format("[Cockpit][MOCK] Cycling threat state → {0}", next));
-                    SetThreatState(next);
-                }
-            }
-            catch (System.Exception)
-            {
-                // Degrade gracefully if new Input System is active in editor
-            }
+            // SensorMock values from mission brief
+            OnScenarioTick("RED",
+                rfPeakGHz:    5.825f,
+                rfPeakDbm:    -62.3f,
+                dopplerHz:    220.4f,
+                acousticSpl:  54.2f,
+                radarCount:   4);
+        }
+
+        [ContextMenu("Mock: Simulate SCENARIO_END")]
+        public void OnScenarioEnd_Mock()
+        {
+            OnScenarioEnd("ALL_NEUTRALISED");
         }
 #endif
     }
+
+    // ── Stub type stubs for renderers (removed once UX-P1-A lands) ─────
+    // These placeholders let this file compile without the P1-A renderers present.
+#if !TRISHUL_P1A_READY
+    public class RfWaterfallRenderer  : MonoBehaviour
+    {
+        public void UpdateWaterfall(float peakGHz, float peakDbm) { }
+    }
+    public class DopplerScopeRenderer : MonoBehaviour
+    {
+        public void UpdateScope(float dopplerHz, int radarCount) { }
+    }
+    public class AcousticFftRenderer  : MonoBehaviour
+    {
+        public void UpdateAcoustic(float splDb) { }
+    }
+#endif
+
+    // Stub for LocaleToggle — replaced by UX-P0-B
+#if !TRISHUL_P0B_READY
+    public class LocaleToggle : MonoBehaviour
+    {
+        public void ToggleLanguage() { Debug.Log("[LocaleToggle stub] UX-P0-B not yet merged."); }
+    }
+#endif
 }
