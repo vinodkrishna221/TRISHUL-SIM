@@ -224,7 +224,7 @@ CONTEXT:
 DELIVERABLE: Build artifact at Build/TRISHUL-SIM-airgap-test-YYYYMMDD.exe + evidence log
 TEST: Run .exe with WiFi/Ethernet disabled; full scenario runs; no Task Manager outbound connections.
 DEMO: "No internet active — same binary runs in a Ladakh underground bunker." (Beat 6)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---

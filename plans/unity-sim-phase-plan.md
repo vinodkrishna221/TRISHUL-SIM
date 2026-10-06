@@ -343,7 +343,7 @@ TEST:
 DEPENDS: All P1 cards complete     UNBLOCKS: US-P2-B (stable build for installer)
 
 DEMO: "No internet connection active — same binary runs in a Ladakh underground bunker." (Beat 6)
-PERSONA: unity-sim builder         STATUS: [ ] todo
+PERSONA: unity-sim builder         STATUS: [x] done
 ```
 
 ---
