@@ -302,7 +302,7 @@ TEST:
 DEPENDS: US-P0-B, SA-P1-D       UNBLOCKS: SA-P1-D (swarm uses SwarmProfile from these JSONs)
 
 DEMO: "Scenario library shows 4 entries — no two runs identical." (Beat 1)
-PERSONA: unity-sim builder       STATUS: [ ] todo
+PERSONA: unity-sim builder       STATUS: [x] done
 ```
 
 ---

@@ -27,7 +27,7 @@ namespace TrishulSim.Scenarios
             {
                 WsIpcSelfTest.RunAllAsync().GetAwaiter().GetResult();
                 RunAllAsync().GetAwaiter().GetResult();
-                Console.WriteLine("[PASS] All US-P0-B + US-P0-C Scenario Library, SCENARIO_START, SCENARIO_TICK, and SCENARIO_END tests passed.");
+                Console.WriteLine("[PASS] All US-P0-B, US-P0-C, and US-P1-B Scenario Library, 4 Scenario Configs, SCENARIO_START, SCENARIO_TICK, and SCENARIO_END tests passed.");
                 return 0;
             }
             catch (Exception ex)
@@ -41,11 +41,13 @@ namespace TrishulSim.Scenarios
         public static async Task RunAllAsync()
         {
             TestPunjabScenarioFileAndSchemaValidation();
+            TestAllFourScenarioFilesAndSchemaValidation();
             TestScenarioLibraryLoadAllAndSeedRegeneration();
             TestSceneAndMetaGuidWiring();
             TestScenarioTickAndEndPayloadContracts();
             await TestScenarioLaunchBroadcastSceneLoadAndErrorsAsync();
             await TestScenarioTickLoopAbortAndTerminalConditionsAsync();
+            await TestAllFourScenariosDropdownAndSwarmProfileLogsAsync();
         }
 
         private static void TestPunjabScenarioFileAndSchemaValidation()
@@ -99,6 +101,74 @@ namespace TrishulSim.Scenarios
                 "Unsupported tacticTree must fail ScenarioConfig.TryParse");
             Assert(!ScenarioConfig.TryParse(rawJson.Replace("\"attackerCount\": 4", "\"attackerCount\": 5"), out invalid, out error),
                 "Mismatched decoyCount + attackerCount != agentCount must fail");
+        }
+
+        private static void TestAllFourScenarioFilesAndSchemaValidation()
+        {
+            string dir = Path.Combine("Assets", "StreamingAssets", "scenarios");
+
+            // 1. Punjab Border — Zero Visibility Pincer
+            string punjabPath = Path.Combine(dir, "punjab-fog-pincer-01.json");
+            Assert(File.Exists(punjabPath), "punjab-fog-pincer-01.json must exist");
+            ScenarioConfig punjab = ScenarioConfig.Parse(File.ReadAllText(punjabPath, Encoding.UTF8));
+            Assert(punjab.id == "punjab-fog-pincer-01", "Expected punjab id");
+            Assert(punjab.region == ScenarioConfig.REGION_PUNJAB_RIVERINE, "Expected PUNJAB_RIVERINE");
+            Assert(punjab.weatherPreset.isNight && Math.Abs(punjab.weatherPreset.visibility - 15.0f) < 0.01f, "Expected night fog");
+            Assert(punjab.swarmProfile.tacticTree == SwarmProfile.TACTIC_PINCER_LOW_FAST, "Expected PINCER_LOW_FAST");
+            Assert(punjab.swarmProfile.agentCount == 6 && punjab.swarmProfile.decoyCount == 2 && punjab.swarmProfile.attackerCount == 4, "Expected 6 agents (2+4)");
+            Assert(Math.Abs(punjab.swarmProfile.speedKmh - 120.0f) < 0.01f, "Expected 120 km/h speed");
+            Assert(Math.Abs(punjab.swarmProfile.altitudeM - 8.0f) < 0.01f, "Expected 8m altitude");
+
+            // 2. Ladakh LAC Ridge — High-Altitude Saturation
+            string ladakhPath = Path.Combine(dir, "ladakh-lac-ridge-01.json");
+            Assert(File.Exists(ladakhPath), "ladakh-lac-ridge-01.json must exist");
+            ScenarioConfig ladakh = ScenarioConfig.Parse(File.ReadAllText(ladakhPath, Encoding.UTF8));
+            Assert(ladakh.id == "ladakh-lac-ridge-01", "Expected ladakh id");
+            Assert(ladakh.name == "Ladakh LAC Ridge \u2014 High-Altitude Saturation", "Expected Ladakh English name");
+            Assert(ladakh.nameHindi == "\u0932\u0926\u094D\u0926\u093E\u0916 \u090F\u0932\u090F\u0938\u0940 \u0930\u093F\u091C \u2014 \u0909\u091a\u094D\u091a \u090a\u0902\u091a\u093E\u0908 \u0938\u0902\u0924\u0943\u092A\u094D\u0924\u093F", "Expected Ladakh Hindi name");
+            Assert(ladakh.region == ScenarioConfig.REGION_LADAKH_LAC, "Expected LADAKH_LAC region");
+            Assert(Math.Abs(ladakh.weatherPreset.visibility - 200.0f) < 0.01f, "Expected Ladakh 200m visibility");
+            Assert(Math.Abs(ladakh.weatherPreset.temperature - (-12.0f)) < 0.01f, "Expected Ladakh -12C temperature");
+            Assert(!ladakh.weatherPreset.isNight, "Expected day scenario for Ladakh");
+            Assert(ladakh.swarmProfile.agentCount == 8 && ladakh.swarmProfile.decoyCount == 4 && ladakh.swarmProfile.attackerCount == 4, "Expected 8 agents (4+4) for Ladakh");
+            Assert(ladakh.swarmProfile.tacticTree == SwarmProfile.TACTIC_SATURATION_DIVE, "Expected SATURATION_DIVE for Ladakh");
+            Assert(Math.Abs(ladakh.swarmProfile.speedKmh - 100.0f) < 0.01f, "Expected 100 km/h speed for Ladakh");
+            Assert(Math.Abs(ladakh.swarmProfile.altitudeM - 3800.0f) < 0.01f, "Expected 3800m altitude for Ladakh");
+            Assert(ladakh.swarmProfile.rfFreqGHz != null && ladakh.swarmProfile.rfFreqGHz.Length == 2, "Expected 2 RF freqs for Ladakh");
+
+            // 3. LoC Mountain Pass — Multi-Axis Split
+            string locPath = Path.Combine(dir, "loc-mountain-pass-01.json");
+            Assert(File.Exists(locPath), "loc-mountain-pass-01.json must exist");
+            ScenarioConfig loc = ScenarioConfig.Parse(File.ReadAllText(locPath, Encoding.UTF8));
+            Assert(loc.id == "loc-mountain-pass-01", "Expected loc id");
+            Assert(loc.name == "LoC Mountain Pass \u2014 Multi-Axis Split", "Expected LoC English name");
+            Assert(loc.nameHindi == "\u090F\u0932\u0913\u0938\u0940 \u092A\u0930\u094D\u0935\u0924\u0940\u092F \u0926\u0930\u094D\u0930\u093E \u2014 \u092C\u0939\u0941-\u0905\u0915\u094D\u0937 \u0935\u093F\u092D\u093E\u091C\u0928", "Expected LoC Hindi name");
+            Assert(loc.region == ScenarioConfig.REGION_LOC_MOUNTAIN, "Expected LOC_MOUNTAIN region");
+            Assert(Math.Abs(loc.weatherPreset.visibility - 80.0f) < 0.01f, "Expected LoC 80m visibility");
+            Assert(Math.Abs(loc.weatherPreset.windSpeedKmh - 35.0f) < 0.01f, "Expected crosswind 35 km/h for LoC");
+            Assert(loc.weatherPreset.isNight, "Expected night scenario for LoC");
+            Assert(loc.swarmProfile.agentCount == 5 && loc.swarmProfile.decoyCount == 1 && loc.swarmProfile.attackerCount == 4, "Expected 5 agents (1+4) for LoC");
+            Assert(loc.swarmProfile.tacticTree == SwarmProfile.TACTIC_MULTI_AXIS_SPLIT, "Expected MULTI-AXIS_SPLIT for LoC");
+            Assert(Math.Abs(loc.swarmProfile.speedKmh - 80.0f) < 0.01f, "Expected 80 km/h speed for LoC");
+            Assert(loc.swarmProfile.rfFreqGHz != null && loc.swarmProfile.rfFreqGHz.Length == 1 && Math.Abs(loc.swarmProfile.rfFreqGHz[0] - 0.915f) < 0.001f,
+                "Expected 915 MHz ELRS only for LoC");
+
+            // 4. Desert FOB — Dust Storm Saturation Dive
+            string desertPath = Path.Combine(dir, "desert-fob-01.json");
+            Assert(File.Exists(desertPath), "desert-fob-01.json must exist");
+            ScenarioConfig desert = ScenarioConfig.Parse(File.ReadAllText(desertPath, Encoding.UTF8));
+            Assert(desert.id == "desert-fob-01", "Expected desert id");
+            Assert(desert.name == "Desert FOB \u2014 Dust Storm Saturation Dive", "Expected Desert English name");
+            Assert(desert.nameHindi == "\u0930\u0947\u0917\u093F\u0938\u094D\u0924\u093E\u0928\u0940 \u090F\u092B\u0913\u092C\u0940 \u2014 \u0927\u0942\u0932 \u092D\u0930\u0940 \u0906\u0902\u0927\u0940 \u0939\u092E\u0932\u093E", "Expected Desert Hindi name");
+            Assert(desert.region == ScenarioConfig.REGION_DESERT_FOB, "Expected DESERT_FOB region");
+            Assert(Math.Abs(desert.weatherPreset.visibility - 5000.0f) < 0.01f, "Expected Desert 5000m visibility");
+            Assert(Math.Abs(desert.weatherPreset.windSpeedKmh - 55.0f) < 0.01f, "Expected dust storm wind 55 km/h for Desert");
+            Assert(Math.Abs(desert.weatherPreset.temperature - 38.0f) < 0.01f, "Expected 38C temperature for Desert");
+            Assert(!desert.weatherPreset.isNight, "Expected day scenario for Desert");
+            Assert(desert.swarmProfile.agentCount == 8 && desert.swarmProfile.decoyCount == 2 && desert.swarmProfile.attackerCount == 6, "Expected 8 agents (2+6) for Desert");
+            Assert(desert.swarmProfile.tacticTree == SwarmProfile.TACTIC_SATURATION_DIVE, "Expected SATURATION_DIVE for Desert");
+            Assert(Math.Abs(desert.swarmProfile.speedKmh - 110.0f) < 0.01f, "Expected 110 km/h speed for Desert");
+            Assert(Math.Abs(desert.swarmProfile.altitudeM - 15.0f) < 0.01f, "Expected 15m altitude for Desert");
         }
 
         private static void TestScenarioLibraryLoadAllAndSeedRegeneration()
@@ -761,6 +831,176 @@ namespace TrishulSim.Scenarios
                 finally
                 {
                     traineeMgr.OnScenarioEndReceived -= breachHandler;
+                }
+            }
+            finally
+            {
+#if !UNITY_5_3_OR_NEWER
+                Debug.OnLog -= onLog;
+#endif
+                traineeMgr.OnDestroy();
+                instructorMgr.OnDestroy();
+                client.Stop();
+                server.Stop();
+            }
+        }
+
+        private static async Task TestAllFourScenariosDropdownAndSwarmProfileLogsAsync()
+        {
+            List<string> logs = new List<string>();
+            object logLock = new object();
+
+#if !UNITY_5_3_OR_NEWER
+            Action<string> onLog = msg => { lock (logLock) { logs.Add(msg); } };
+            Debug.OnLog += onLog;
+#endif
+
+            Dropdown dropdown = new Dropdown();
+            Button launchBtn = new Button();
+
+            WsServer server = new WsServer();
+            server.Port = 9704;
+            server.HeartbeatIntervalMs = 5000;
+            server.StaleThresholdMs = 15000;
+
+            WsClient client = new WsClient();
+            client.ServerUri = "ws://127.0.0.1:9704/";
+            client.HeartbeatIntervalMs = 5000;
+            client.StaleThresholdMs = 15000;
+
+            ScenarioManager instructorMgr = new ScenarioManager();
+            instructorMgr.Server = server;
+            instructorMgr.Client = null;
+            instructorMgr.ScenarioDropdown = dropdown;
+            instructorMgr.LaunchButton = launchBtn;
+            instructorMgr.LoadSceneOnScenarioStart = false;
+            instructorMgr.AutoStartTickLoop = false;
+
+            ScenarioManager traineeMgr = new ScenarioManager();
+            traineeMgr.Server = null;
+            traineeMgr.Client = client;
+            traineeMgr.LoadSceneOnScenarioStart = false;
+            traineeMgr.AutoStartTickLoop = false;
+
+            try
+            {
+                instructorMgr.Start();
+                traineeMgr.Start();
+
+                // 1. Verify Dropdown has 4 options and each contains English and Hindi names
+                Assert(dropdown.options.Count == 4, "Dropdown must have exactly 4 scenario options, got " + dropdown.options.Count);
+                List<ScenarioConfig> allConfigs = ScenarioLibrary.LoadAll();
+                Assert(allConfigs.Count == 4, "ScenarioLibrary.LoadAll() must return 4 configs");
+
+                for (int i = 0; i < allConfigs.Count; i++)
+                {
+                    ScenarioConfig cfg = allConfigs[i];
+                    string optionText = dropdown.options[i].text;
+                    Assert(optionText.Contains(cfg.name), "Dropdown option " + i + " must contain English name '" + cfg.name + "', got: " + optionText);
+                    Assert(optionText.Contains(cfg.nameHindi), "Dropdown option " + i + " must contain Hindi name '" + cfg.nameHindi + "', got: " + optionText);
+                    Assert(optionText.Contains(" / "), "Dropdown option " + i + " must format as 'English / Hindi', got: " + optionText);
+                }
+
+                // 2. Verify SelectScenarioByName selects by English name, Hindi name, id, or bilingual string
+                for (int i = 0; i < allConfigs.Count; i++)
+                {
+                    ScenarioConfig cfg = allConfigs[i];
+                    Assert(instructorMgr.SelectScenarioByName(cfg.name), "Must select scenario by English name: " + cfg.name);
+                    Assert(instructorMgr.SelectedScenario.id == cfg.id, "SelectedScenario must match id " + cfg.id);
+
+                    Assert(instructorMgr.SelectScenarioByName(cfg.nameHindi), "Must select scenario by Hindi name: " + cfg.nameHindi);
+                    Assert(instructorMgr.SelectedScenario.id == cfg.id, "SelectedScenario must match id " + cfg.id);
+
+                    Assert(instructorMgr.SelectScenarioByName(cfg.id), "Must select scenario by id: " + cfg.id);
+                    Assert(instructorMgr.SelectedScenario.id == cfg.id, "SelectedScenario must match id " + cfg.id);
+
+                    string bilingual = ScenarioManager.FormatScenarioOption(cfg);
+                    Assert(instructorMgr.SelectScenarioByName(bilingual), "Must select scenario by bilingual string: " + bilingual);
+                    Assert(instructorMgr.SelectedScenario.id == cfg.id, "SelectedScenario must match id " + cfg.id);
+                }
+
+                // 3. Connect WS server/client and launch each scenario to verify distinct SwarmProfile logs
+                TaskCompletionSource<bool> linkConfirmedTcs = new TaskCompletionSource<bool>();
+                client.OnLinkConfirmed += () => linkConfirmedTcs.TrySetResult(true);
+
+                Assert(server.StartServer(), "WsServer must bind on port 9704");
+                client.StartClient();
+                Assert(await WaitTaskAsync(linkConfirmedTcs.Task, 3000), "WsClient must connect to WsServer on 9704");
+
+                string[] scenarioIds = new string[]
+                {
+                    "punjab-fog-pincer-01",
+                    "ladakh-lac-ridge-01",
+                    "loc-mountain-pass-01",
+                    "desert-fob-01"
+                };
+
+                for (int s = 0; s < scenarioIds.Length; s++)
+                {
+                    string targetId = scenarioIds[s];
+                    ScenarioConfig targetCfg = ScenarioLibrary.FindById(targetId);
+                    Assert(targetCfg != null, "Scenario config must exist: " + targetId);
+
+                    TaskCompletionSource<ScenarioStartPayload> startReceivedTcs = new TaskCompletionSource<ScenarioStartPayload>();
+                    Action<ScenarioStartPayload> onStart = p =>
+                    {
+                        if (string.Equals(p.scenarioId, targetId, StringComparison.Ordinal))
+                            startReceivedTcs.TrySetResult(p);
+                    };
+                    traineeMgr.OnScenarioStartReceived += onStart;
+
+                    try
+                    {
+                        instructorMgr.ResetScenarioState();
+                        traineeMgr.ResetScenarioState();
+
+                        instructorMgr.SelectScenarioByName(targetId);
+                        launchBtn.onClick.Invoke();
+
+                        bool ok = await WaitTaskAsync(startReceivedTcs.Task, 2000);
+                        Assert(ok, "Trainee must receive SCENARIO_START for scenario: " + targetId);
+
+                        ScenarioStartPayload receivedPayload = startReceivedTcs.Task.Result;
+                        Assert(receivedPayload.scenarioId == targetId, "ScenarioId mismatch in SCENARIO_START");
+                        Assert(receivedPayload.scenarioConfig != null, "scenarioConfig must not be null");
+                        Assert(receivedPayload.scenarioConfig.swarmProfile != null, "swarmProfile must not be null");
+
+                        // Verify distinct SwarmProfile data logged to Console
+                        string expectedTactic = targetCfg.swarmProfile.tacticTree;
+                        int expectedAgents = targetCfg.swarmProfile.agentCount;
+
+                        bool sawServerLog = false;
+                        bool sawClientLog = false;
+                        lock (logLock)
+                        {
+                            for (int k = 0; k < logs.Count; k++)
+                            {
+                                string log = logs[k];
+                                if (log.Contains("SCENARIO_START broadcast") &&
+                                    log.Contains("scenarioId: " + targetId) &&
+                                    log.Contains("tactic=" + expectedTactic) &&
+                                    log.Contains("agents=" + expectedAgents))
+                                {
+                                    sawServerLog = true;
+                                }
+
+                                if (log.Contains("SCENARIO_START received") &&
+                                    log.Contains("scenarioId: " + targetId) &&
+                                    log.Contains("tactic=" + expectedTactic) &&
+                                    log.Contains("agents=" + expectedAgents))
+                                {
+                                    sawClientLog = true;
+                                }
+                            }
+                        }
+
+                        Assert(sawServerLog, "Console must contain SCENARIO_START broadcast log with SwarmProfile for " + targetId);
+                        Assert(sawClientLog, "Console must contain SCENARIO_START received log with SwarmProfile for " + targetId);
+                    }
+                    finally
+                    {
+                        traineeMgr.OnScenarioStartReceived -= onStart;
+                    }
                 }
             }
             finally
