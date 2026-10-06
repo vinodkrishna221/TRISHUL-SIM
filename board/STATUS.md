@@ -1,4 +1,4 @@
-# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-06T22:10 IST by Rani (UX-P1-A)
+# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-06T22:30 IST by Rani (UX-P1-B)
 
 > The single glance-source. Every session reads this first, appends one line at end.
 > Standup blocks replace the top section; history accumulates below.
@@ -7,7 +7,7 @@
 
 **Clock:** Hour 24 / 384h (15 days to 20 Oct 2026) · **Skeleton:** 🟡 in progress (deadline 09 Oct 2026)
 **Deploy:** 🔴 not yet · last smoke — none
-**Rubric (Oracle):** I 9.6 · T 9.8 · Im 9.7 · P 9.5 → **9.65/10** (baseline) · FIX-THIS-HOUR: wire sensor suite into Cockpit HUD; unblock Beat 2 & 3 visuals
+**Rubric (Oracle):** I 9.6 · T 9.8 · Im 9.7 · P 9.5 → **9.65/10** (baseline) · FIX-THIS-HOUR: wire sensor suite and EW/SMASH controls into Cockpit HUD; unblock Beat 2, 3 & 4 visuals
 
 ## Tracks
 
@@ -16,7 +16,7 @@
 | unity-sim | — | — | Walking skeleton: sensor panes + WebSocket IPC |
 | swarm-ai | — | — | Reynolds Boids + HBT scaffold |
 | aar-engine | — | — | 10 Hz telemetry logger + Scorecard renderer |
-| ui-ux | UX-P0-A (UITK shell), UX-P1-A (live sensor suite) | — | UX-P0-B (localization), UX-P1-B (EW/SMASH controls) |
+| ui-ux | UX-P0-A (UITK shell), UX-P1-A (live sensor suite), UX-P1-B (EW/SMASH controls) | — | UX-P0-B (localization), UX-P1-C (split-screen) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
 
@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-06T22:30 IST · Rani: UX-P1-B done — EW Jammer controls + SMASH 2000 fire-control reticle (azimuth/elevation/band, ROE blackout warning, dynamic lead-angle, kinetic hit/miss feedback); UiShellSelfTest PASSED
 - 2026-10-06T22:10 IST · Rani: UX-P1-A done — live sensor suite (RF Waterfall scrolling spectrogram, Doppler circular PPI radar with 6 swarm blips, 8-band Acoustic FFT with blade-tip harmonic); UiShellSelfTest PASSED
 - 2026-10-05T22:45 IST · Rani: UX-P0-A done — UITK shell (C2 + Cockpit), status icon, 3 sensor stubs, threat indicator, dropdown, null safety; UiShellSelfTest PASSED
 - 2026-10-04T11:03 IST · Orion: /blueprint complete — ARCHITECTURE.md · SCHEMA.md · 4× contracts · FIT-AUDIT (clean) · BUILD-PLAN.md written; 4 tracks confirmed; ready for /phase-plan

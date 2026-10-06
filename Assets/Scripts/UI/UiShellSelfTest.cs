@@ -39,7 +39,15 @@ namespace UnityEngine
         public float x;
         public float y;
         public float z;
+        public float magnitude { get { return (float)Math.Sqrt(x * x + y * y + z * z); } }
+        public Vector3 normalized { get { float mag = magnitude; return mag > 1e-5f ? new Vector3(x / mag, y / mag, z / mag) : new Vector3(0, 0, 0); } }
         public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
+
+        public static Vector3 operator +(Vector3 a, Vector3 b) { return new Vector3(a.x + b.x, a.y + b.y, a.z + b.z); }
+        public static Vector3 operator -(Vector3 a, Vector3 b) { return new Vector3(a.x - b.x, a.y - b.y, a.z - b.z); }
+        public static Vector3 operator *(Vector3 a, float d) { return new Vector3(a.x * d, a.y * d, a.z * d); }
+        public static Vector3 operator *(float d, Vector3 a) { return new Vector3(a.x * d, a.y * d, a.z * d); }
+        public static float Dot(Vector3 lhs, Vector3 rhs) { return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z; }
     }
 
     public struct Color
@@ -260,6 +268,28 @@ namespace UnityEngine
         {
             return Math.Min(a, b);
         }
+
+        public static float DeltaAngle(float current, float target)
+        {
+            float num = Mathf.Repeat(target - current, 360f);
+            if (num > 180f) num -= 360f;
+            return num;
+        }
+
+        public static float Repeat(float t, float length)
+        {
+            return (float)(t - Math.Floor(t / length) * length);
+        }
+
+        public static float Asin(float val)
+        {
+            return (float)Math.Asin(Clamp(val, -1f, 1f));
+        }
+
+        public static float Dot(Vector3 lhs, Vector3 rhs)
+        {
+            return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
+        }
     }
 
     public class MonoBehaviour
@@ -418,6 +448,11 @@ namespace UnityEngine.UIElements
         public string value { get; set; }
         public event Action<ChangeEvent<string>> ValueChanged;
 
+        public DropdownField()
+        {
+            choices = new List<string>();
+        }
+
         public void RegisterValueChangedCallback(Action<ChangeEvent<string>> callback)
         {
             ValueChanged += callback;
@@ -433,6 +468,54 @@ namespace UnityEngine.UIElements
             if (choices != null) index = choices.IndexOf(newVal);
             if (ValueChanged != null)
                 ValueChanged(new ChangeEvent<string> { previousValue = old, newValue = newVal });
+        }
+    }
+
+    public class SliderInt : VisualElement
+    {
+        public int lowValue { get; set; }
+        public int highValue { get; set; }
+        public int value { get; set; }
+        public string label { get; set; }
+        public event Action<ChangeEvent<int>> ValueChanged;
+
+        public void RegisterValueChangedCallback(Action<ChangeEvent<int>> callback)
+        {
+            ValueChanged += callback;
+        }
+        public void UnregisterValueChangedCallback(Action<ChangeEvent<int>> callback)
+        {
+            ValueChanged -= callback;
+        }
+        public void SimulateChange(int newVal)
+        {
+            int old = value;
+            value = newVal;
+            if (ValueChanged != null)
+                ValueChanged(new ChangeEvent<int> { previousValue = old, newValue = newVal });
+        }
+    }
+
+    public class Toggle : VisualElement
+    {
+        public bool value { get; set; }
+        public string label { get; set; }
+        public event Action<ChangeEvent<bool>> ValueChanged;
+
+        public void RegisterValueChangedCallback(Action<ChangeEvent<bool>> callback)
+        {
+            ValueChanged += callback;
+        }
+        public void UnregisterValueChangedCallback(Action<ChangeEvent<bool>> callback)
+        {
+            ValueChanged -= callback;
+        }
+        public void SimulateChange(bool newVal)
+        {
+            bool old = value;
+            value = newVal;
+            if (ValueChanged != null)
+                ValueChanged(new ChangeEvent<bool> { previousValue = old, newValue = newVal });
         }
     }
 
@@ -458,7 +541,7 @@ namespace TrishulSim.UI
             try
             {
                 RunAll();
-                Console.WriteLine("[PASS] All UX-P0-A & UX-P1-A tests passed successfully!");
+                Console.WriteLine("[PASS] All UX-P0-A, UX-P1-A & UX-P1-B tests passed successfully!");
                 return 0;
             }
             catch (Exception ex)
@@ -481,6 +564,9 @@ namespace TrishulSim.UI
             TestDopplerScopeRenderer();
             TestAcousticFftRenderer();
             TestCockpitControllerSensorIntegration();
+            TestEwJammerController();
+            TestSmashReticleController();
+            TestCockpitControllerEwAndSmashIntegration();
         }
 
         private static string FindRepoRoot()
@@ -543,6 +629,22 @@ namespace TrishulSim.UI
             Assert(cockpitContent.Contains("name=\"scorecard-panel\""), "TraineeCockpit must contain scorecard-panel");
             Assert(cockpitContent.Contains("name=\"computing-overlay\""), "TraineeCockpit must contain computing-overlay");
 
+            // EW Jammer & SMASH 2000 UXML Elements (UX-P1-B)
+            Assert(cockpitContent.Contains("name=\"ew-panel\""), "TraineeCockpit must contain ew-panel");
+            Assert(cockpitContent.Contains("name=\"ew-azimuth\""), "TraineeCockpit must contain ew-azimuth");
+            Assert(cockpitContent.Contains("name=\"ew-elevation\""), "TraineeCockpit must contain ew-elevation");
+            Assert(cockpitContent.Contains("name=\"ew-band\""), "TraineeCockpit must contain ew-band");
+            Assert(cockpitContent.Contains("name=\"ew-engage\""), "TraineeCockpit must contain ew-engage");
+            Assert(cockpitContent.Contains("name=\"ew-roe-warning\""), "TraineeCockpit must contain ew-roe-warning");
+
+            Assert(cockpitContent.Contains("name=\"smash-panel\""), "TraineeCockpit must contain smash-panel");
+            Assert(cockpitContent.Contains("name=\"smash-lock-label\""), "TraineeCockpit must contain smash-lock-label");
+            Assert(cockpitContent.Contains("name=\"smash-lead-label\""), "TraineeCockpit must contain smash-lead-label");
+            Assert(cockpitContent.Contains("name=\"fire-btn\""), "TraineeCockpit must contain fire-btn");
+            Assert(cockpitContent.Contains("name=\"smash-feedback-label\""), "TraineeCockpit must contain smash-feedback-label");
+            Assert(cockpitContent.Contains("name=\"smash-reticle-overlay\""), "TraineeCockpit must contain smash-reticle-overlay");
+            Assert(cockpitContent.Contains("name=\"smash-crosshair\""), "TraineeCockpit must contain smash-crosshair");
+
             Assert(cockpitContent.Contains("915 MHz"), "TraineeCockpit must have 915 MHz marker");
             Assert(cockpitContent.Contains("2.4 GHz"), "TraineeCockpit must have 2.4 GHz marker");
             Assert(cockpitContent.Contains("5.8 GHz"), "TraineeCockpit must have 5.8 GHz marker");
@@ -573,6 +675,14 @@ namespace TrishulSim.UI
 
             Assert(c2Uss.Contains("display: none"), "InstructorC2.uss must contain .hidden display: none rule");
             Assert(cockpitUss.Contains("display: none"), "TraineeCockpit.uss must contain .hidden display: none rule");
+
+            // EW & SMASH USS Styles (UX-P1-B)
+            Assert(cockpitUss.Contains(".roe-warning"), "TraineeCockpit.uss must style .roe-warning");
+            Assert(cockpitUss.Contains(".fire-btn"), "TraineeCockpit.uss must style .fire-btn");
+            Assert(cockpitUss.Contains(".smash-reticle-overlay"), "TraineeCockpit.uss must style .smash-reticle-overlay");
+            Assert(cockpitUss.Contains(".reticle-ring"), "TraineeCockpit.uss must style .reticle-ring");
+            Assert(cockpitUss.Contains(".feedback-hit"), "TraineeCockpit.uss must style .feedback-hit");
+            Assert(cockpitUss.Contains(".feedback-miss"), "TraineeCockpit.uss must style .feedback-miss");
         }
 
         public static void TestC2StationControllerLifecycleAndEvents()
@@ -886,6 +996,240 @@ namespace TrishulSim.UI
             Assert(controller.CurrentThreatState == "RED", "Threat state must be RED");
             Assert(dopplerReading.text == "Doppler: 220.4 Hz", "Doppler label must update");
             Assert(acousticReading.text == "SPL: 54.2 dB", "Acoustic label must update");
+        }
+
+        public static void TestEwJammerController()
+        {
+            var controller = new EwJammerController();
+            var mockContainer = new VisualElement { name = "controls-row" };
+
+            var ewPanel = new VisualElement { name = "ew-panel" };
+            var sliderAzimuth = new SliderInt { name = "ew-azimuth", lowValue = 0, highValue = 359, value = 0 };
+            var sliderElevation = new SliderInt { name = "ew-elevation", lowValue = -90, highValue = 90, value = 0 };
+            var dropdownBand = new DropdownField { name = "ew-band" };
+            var toggleEngage = new Toggle { name = "ew-engage", value = false };
+            var labelRoeWarning = new Label { name = "ew-roe-warning", text = "⚠ ROE VIOLATION — FRIENDLY BLACKOUT" };
+            labelRoeWarning.AddToClassList("hidden");
+
+            ewPanel.Add(sliderAzimuth);
+            ewPanel.Add(sliderElevation);
+            ewPanel.Add(dropdownBand);
+            ewPanel.Add(toggleEngage);
+            ewPanel.Add(labelRoeWarning);
+            mockContainer.Add(ewPanel);
+
+            controller.Initialize(mockContainer);
+            Assert(controller.IsInitialized, "EwJammerController must be initialized");
+            Assert(controller.SliderAzimuth != null, "SliderAzimuth must be bound");
+            Assert(controller.DropdownBand != null, "DropdownBand must be bound");
+            Assert(controller.DropdownBand.choices.Count == 3, "Must have 3 jam frequency bands");
+
+            // Test setting Azimuth & Elevation
+            controller.SetAzimuth(90);
+            Assert(controller.AzimuthDeg == 90, "Azimuth must be 90°");
+            Assert(sliderAzimuth.value == 90, "SliderAzimuth value must update");
+
+            controller.SetElevation(-5);
+            Assert(controller.ElevationDeg == -5, "Elevation must be -5°");
+            Assert(sliderElevation.value == -5, "SliderElevation value must update");
+
+            // Test ROE Violation on 90° azimuth + 0.915 GHz band
+            controller.SetBand("0.915 GHz");
+            Assert(controller.FriendlyBlackoutRisk, "Azimuth 90° + Band 0.915 GHz must trigger ROE blackout risk");
+            Assert(!labelRoeWarning.ClassListContains("hidden"), "ROE warning label must be visible (hidden class removed)");
+
+            // Test clearing ROE Warning on 247° attack axis + 5.825 GHz band
+            controller.SetAzimuth(247);
+            controller.SetBand("5.825 GHz");
+            Assert(!controller.FriendlyBlackoutRisk, "Azimuth 247° + Band 5.825 GHz must clear ROE blackout risk");
+            Assert(labelRoeWarning.ClassListContains("hidden"), "ROE warning label must be hidden");
+
+            // Test Engage Toggle and BuildTraineeAction
+            controller.SetEngaged(true);
+            Assert(controller.IsEngaged, "EW must be engaged");
+            var action = controller.BuildTraineeAction();
+            Assert(action.antennaBearingDeg == 247f, "Action antennaBearingDeg must be 247");
+            Assert(action.antennaElevationDeg == -5f, "Action antennaElevationDeg must be -5");
+            Assert(action.ewEngaged == true, "Action ewEngaged must be true");
+            Assert(action.ewBandGHz.HasValue && Math.Abs(action.ewBandGHz.Value - 5.825f) < 0.05f, "Action ewBandGHz must be 5.825");
+        }
+
+        public static void TestSmashReticleController()
+        {
+            var controller = new SmashReticleController();
+            var mockContainer = new VisualElement { name = "controls-row" };
+            var mockOverlay = new VisualElement { name = "smash-reticle-overlay" };
+
+            var smashPanel = new VisualElement { name = "smash-panel" };
+            var lockLabel = new Label { name = "smash-lock-label", text = "STANDBY" };
+            var leadLabel = new Label { name = "smash-lead-label", text = "Lead: ---°" };
+            var fireBtn = new Button { name = "fire-btn", text = "FIRE — 7.62mm" };
+            var feedbackLabel = new Label { name = "smash-feedback-label", text = "" };
+            feedbackLabel.AddToClassList("hidden");
+
+            smashPanel.Add(lockLabel);
+            smashPanel.Add(leadLabel);
+            smashPanel.Add(fireBtn);
+            smashPanel.Add(feedbackLabel);
+            mockContainer.Add(smashPanel);
+
+            var crosshair = new VisualElement { name = "smash-crosshair" };
+            var leadVector = new VisualElement { name = "smash-lead-vector" };
+            var targetTag = new Label { name = "smash-target-tag", text = "" };
+            mockOverlay.Add(crosshair);
+            mockOverlay.Add(leadVector);
+            mockOverlay.Add(targetTag);
+
+            controller.Initialize(mockContainer, mockOverlay);
+            Assert(controller.IsInitialized, "SmashReticleController must be initialized");
+
+            var swarm = SensorMock.GetPunjabSwarmFixture();
+
+            // Test target lock with antenna bearing aimed at attack axis (247°)
+            var actionLocked = new TraineeAction(247.0f, -5.0f, true, 5.825f);
+            controller.UpdateReticle(swarm, actionLocked);
+
+            Assert(controller.IsLocked, "Reticle must lock when antenna bearing matches agent bearing within 10°");
+            Assert(controller.LockedAgent != null, "LockedAgent must not be null");
+            Assert(lockLabel.text.StartsWith("LOCKED:"), "Lock label must show LOCKED: agent-X");
+            Assert(controller.CurrentLeadAngleDeg > 0.5f && controller.CurrentLeadAngleDeg < 10.0f, "Lead angle must be non-zero and realistic");
+            Assert(leadLabel.text.StartsWith("Lead:"), "Lead label must format lead angle");
+
+            // Test firing when locked -> Hit feedback
+            var hitEvent = controller.TriggerFire(45200);
+            Assert(hitEvent != null, "TriggerFire must return KineticEvent");
+            Assert(hitEvent.hit == true, "KineticEvent hit must be true for locked target with lead <= 5.0°");
+            Assert(hitEvent.targetAgentId == controller.LockedAgent.agentId, "KineticEvent targetAgentId must match locked agent");
+            Assert(hitEvent.firedAtMs == 45200, "KineticEvent firedAtMs must match timestamp");
+            Assert(feedbackLabel.text.StartsWith("HIT:"), "Feedback label must show HIT");
+            Assert(!feedbackLabel.ClassListContains("hidden"), "Feedback label must be visible");
+
+            // Test consuming kinetic trigger (1-tick lifetime)
+            var consumed = controller.ConsumeKineticTrigger();
+            Assert(consumed != null && consumed.hit, "ConsumeKineticTrigger must return event on first call");
+            var consumedAgain = controller.ConsumeKineticTrigger();
+            Assert(consumedAgain == null, "ConsumeKineticTrigger must return null on subsequent call (single-tick contract)");
+
+            // Test unlocking when aimed away (45°) -> Miss feedback
+            var actionUnlocked = new TraineeAction(45.0f, 0f, false, null);
+            controller.UpdateReticle(swarm, actionUnlocked);
+            Assert(!controller.IsLocked, "Reticle must unlock when aimed away from swarm");
+            Assert(lockLabel.text == "STANDBY", "Lock label must show STANDBY");
+
+            var missEvent = controller.TriggerFire(45300);
+            Assert(missEvent.hit == false, "KineticEvent hit must be false when unlocked");
+            Assert(feedbackLabel.text.Contains("MISS"), "Feedback label must show MISS");
+        }
+
+        public static void TestCockpitControllerEwAndSmashIntegration()
+        {
+            var controller = new CockpitController();
+            var mockRoot = new VisualElement { name = "cockpit-root" };
+
+            var threatIndicator = new VisualElement { name = "threat-indicator" };
+            var threatLabel = new Label { name = "threat-label", text = "GREEN" };
+            var rfWaterfallPane = new VisualElement { name = "rf-waterfall-pane" };
+            var rfContent = new VisualElement { name = "rf-content" };
+            var dopplerPane = new VisualElement { name = "doppler-pane" };
+            var dopplerContent = new VisualElement { name = "doppler-content" };
+            var dopplerReading = new Label { name = "doppler-reading", text = "Doppler: --- Hz" };
+            var acousticPane = new VisualElement { name = "acoustic-pane" };
+            var acousticContent = new VisualElement { name = "acoustic-content" };
+            var acousticReading = new Label { name = "acoustic-reading", text = "SPL: --- dB" };
+
+            var controlsRow = new VisualElement { name = "controls-row" };
+            controlsRow.AddToClassList("hidden");
+
+            var ewPanel = new VisualElement { name = "ew-panel" };
+            var sliderAzimuth = new SliderInt { name = "ew-azimuth", lowValue = 0, highValue = 359, value = 0 };
+            var sliderElevation = new SliderInt { name = "ew-elevation", lowValue = -90, highValue = 90, value = 0 };
+            var dropdownBand = new DropdownField { name = "ew-band" };
+            var toggleEngage = new Toggle { name = "ew-engage", value = false };
+            var labelRoeWarning = new Label { name = "ew-roe-warning", text = "⚠ ROE VIOLATION — FRIENDLY BLACKOUT" };
+            labelRoeWarning.AddToClassList("hidden");
+            ewPanel.Add(sliderAzimuth);
+            ewPanel.Add(sliderElevation);
+            ewPanel.Add(dropdownBand);
+            ewPanel.Add(toggleEngage);
+            ewPanel.Add(labelRoeWarning);
+            controlsRow.Add(ewPanel);
+
+            var smashPanel = new VisualElement { name = "smash-panel" };
+            var lockLabel = new Label { name = "smash-lock-label", text = "STANDBY" };
+            var leadLabel = new Label { name = "smash-lead-label", text = "Lead: ---°" };
+            var fireBtn = new Button { name = "fire-btn", text = "FIRE — 7.62mm" };
+            var feedbackLabel = new Label { name = "smash-feedback-label", text = "" };
+            feedbackLabel.AddToClassList("hidden");
+            smashPanel.Add(lockLabel);
+            smashPanel.Add(leadLabel);
+            smashPanel.Add(fireBtn);
+            smashPanel.Add(feedbackLabel);
+            controlsRow.Add(smashPanel);
+
+            var reticleOverlay = new VisualElement { name = "smash-reticle-overlay" };
+            var crosshair = new VisualElement { name = "smash-crosshair" };
+            var leadVector = new VisualElement { name = "smash-lead-vector" };
+            var targetTag = new Label { name = "smash-target-tag", text = "" };
+            reticleOverlay.Add(crosshair);
+            reticleOverlay.Add(leadVector);
+            reticleOverlay.Add(targetTag);
+            dopplerContent.Add(reticleOverlay);
+
+            var scorecardPanel = new VisualElement { name = "scorecard-panel" };
+            var scorecardStubLabel = new Label { name = "scorecard-stub-label", text = "Scorecard received" };
+            var computingOverlay = new VisualElement { name = "computing-overlay" };
+
+            mockRoot.Add(threatIndicator);
+            mockRoot.Add(threatLabel);
+            mockRoot.Add(rfWaterfallPane);
+            mockRoot.Add(rfContent);
+            mockRoot.Add(dopplerPane);
+            mockRoot.Add(dopplerContent);
+            mockRoot.Add(dopplerReading);
+            mockRoot.Add(acousticPane);
+            mockRoot.Add(acousticContent);
+            mockRoot.Add(acousticReading);
+            mockRoot.Add(controlsRow);
+            mockRoot.Add(scorecardPanel);
+            mockRoot.Add(scorecardStubLabel);
+            mockRoot.Add(computingOverlay);
+
+            controller.BindElements(mockRoot);
+
+            Assert(controller.EwController != null && controller.EwController.IsInitialized, "EwController must be initialized");
+            Assert(controller.SmashController != null && controller.SmashController.IsInitialized, "SmashController must be initialized");
+
+            // Start Scenario
+            controller.OnScenarioStart("punjab-fog-pincer-01", "Punjab Border — Zero Visibility Pincer");
+            Assert(!controlsRow.ClassListContains("hidden"), "Controls row must be un-hidden on SCENARIO_START");
+
+            // Set EW controls to Beat 4 parameters (247° azimuth, -5° elevation, 5.825 GHz, engaged)
+            controller.SetEwParameters(247, -5, 5.825f, true);
+
+            var punjabReadings = SensorMock.GetPunjabFixture();
+            var punjabSwarm = SensorMock.GetPunjabSwarmFixture();
+
+            // Tick 1: Threat state RED, Swarm updated, EW active on attack axis
+            controller.OnScenarioTick("RED", punjabReadings, punjabSwarm, friendlyVhfActive: false, elapsedMs: 45000);
+
+            Assert(controller.CurrentEwState.engaged == true, "EW must be engaged");
+            Assert(controller.CurrentEwState.friendlyBlackoutRisk == false, "Attack axis on 5.825 GHz must have zero blackout risk");
+            Assert(controller.CurrentTraineeAction.antennaBearingDeg == 247f, "TraineeAction antenna bearing must be 247°");
+            Assert(controller.CurrentTraineeAction.ewEngaged == true, "TraineeAction ewEngaged must be true");
+            Assert(controller.SmashController.IsLocked, "SMASH reticle must lock on Punjab swarm agent");
+
+            // Trainee pulls trigger on SMASH 2000
+            var firedEv = controller.TriggerFireKinetic();
+            Assert(firedEv != null && firedEv.hit, "Kinetic shot must hit locked target");
+
+            // Tick 2: TraineeAction includes kinetic hit event
+            controller.OnScenarioTick("RED", punjabReadings, punjabSwarm, friendlyVhfActive: false, elapsedMs: 45100);
+            Assert(controller.CurrentTraineeAction.kinetic != null, "TraineeAction.kinetic must contain KineticEvent on firing tick");
+            Assert(controller.CurrentTraineeAction.kinetic.hit == true, "Kinetic event hit must be true");
+
+            // Tick 3: TraineeAction.kinetic resets to null (single-tick event)
+            controller.OnScenarioTick("RED", punjabReadings, punjabSwarm, friendlyVhfActive: false, elapsedMs: 45200);
+            Assert(controller.CurrentTraineeAction.kinetic == null, "TraineeAction.kinetic must be null on subsequent ticks");
         }
 
         private static void Assert(bool condition, string message)

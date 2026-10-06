@@ -49,10 +49,17 @@ namespace TrishulSim.UI
         private DopplerScopeRenderer dopplerScopeRenderer;
         private AcousticFftRenderer acousticFftRenderer;
 
+        // ── EW & Fire-Control Controllers (UX-P1-B) ───────────
+        private EwJammerController ewJammerController;
+        private SmashReticleController smashReticleController;
+        private TraineeAction currentTraineeAction = new TraineeAction();
+        private EWJammerState currentEwState = new EWJammerState();
+
         // ── State ─────────────────────────────────────────────
         private bool scenarioRunning = false;
         private string currentThreatState = "GREEN";
         private SwarmAgentState[] lastSwarmSnapshot = null;
+        private long scenarioElapsedMs = 0;
 
         // ── Public Accessors for Tests / UI Validation ────────
         public bool ScenarioRunning { get { return scenarioRunning; } }
@@ -72,6 +79,10 @@ namespace TrishulSim.UI
         public RfWaterfallRenderer RfRenderer { get { return rfWaterfallRenderer; } }
         public DopplerScopeRenderer DopplerRenderer { get { return dopplerScopeRenderer; } }
         public AcousticFftRenderer AcousticRenderer { get { return acousticFftRenderer; } }
+        public EwJammerController EwController { get { return ewJammerController; } }
+        public SmashReticleController SmashController { get { return smashReticleController; } }
+        public TraineeAction CurrentTraineeAction { get { return currentTraineeAction; } }
+        public EWJammerState CurrentEwState { get { return currentEwState; } }
 
         // ══════════════════════════════════════════════════════
         // Lifecycle
@@ -126,6 +137,7 @@ namespace TrishulSim.UI
             computingOverlay   = root.Q<VisualElement>("computing-overlay");
 
             InitializeRenderers();
+            InitializeControllers();
         }
 
         /// <summary>
@@ -170,6 +182,37 @@ namespace TrishulSim.UI
             }
         }
 
+        /// <summary>
+        /// Instantiates and initializes the EW Jammer and SMASH 2000 controllers (UX-P1-B).
+        /// </summary>
+        private void InitializeControllers()
+        {
+            // 1. EW Jammer Controller
+            if (ewJammerController == null)
+            {
+                ewJammerController = GetComponent<EwJammerController>();
+                if (ewJammerController == null)
+                    ewJammerController = new EwJammerController();
+            }
+            if (controlsRow != null)
+            {
+                ewJammerController.Initialize(controlsRow);
+            }
+
+            // 2. SMASH 2000 Reticle Controller
+            if (smashReticleController == null)
+            {
+                smashReticleController = GetComponent<SmashReticleController>();
+                if (smashReticleController == null)
+                    smashReticleController = new SmashReticleController();
+            }
+            if (controlsRow != null)
+            {
+                var reticleOverlay = root != null ? root.Q<VisualElement>("smash-reticle-overlay") : null;
+                smashReticleController.Initialize(controlsRow, reticleOverlay);
+            }
+        }
+
         // ══════════════════════════════════════════════════════
         // Scenario Event Handlers
         // ══════════════════════════════════════════════════════
@@ -181,11 +224,21 @@ namespace TrishulSim.UI
         public void OnScenarioStart(string scenarioId, string scenarioName)
         {
             scenarioRunning = true;
+            scenarioElapsedMs = 0;
             Debug.Log(string.Format("[Cockpit] SCENARIO_START: {0} — {1}", scenarioId, scenarioName));
 
             // Show controls row (EW + SMASH controls)
             if (controlsRow != null)
                 controlsRow.RemoveFromClassList("hidden");
+
+            // Reset EW and SMASH controllers
+            if (ewJammerController != null)
+                ewJammerController.ResetState();
+            if (smashReticleController != null)
+                smashReticleController.ResetState();
+
+            currentTraineeAction = new TraineeAction();
+            currentEwState = new EWJammerState();
 
             // Set initial threat indicator to GREEN (peace/quiet)
             SetThreatState("GREEN");
@@ -209,32 +262,119 @@ namespace TrishulSim.UI
             string threatState,
             float rfPeakGHz, float rfPeakDbm,
             float dopplerHz, float acousticDb,
-            int radarCount)
+            int radarCount,
+            bool friendlyVhfActive = false,
+            long elapsedMs = 0)
         {
             if (!scenarioRunning) return;
 
+            scenarioElapsedMs = elapsedMs > 0 ? elapsedMs : scenarioElapsedMs + 100;
             SetThreatState(threatState);
 
+            // 1. Process EW and SMASH controls
+            if (ewJammerController != null)
+            {
+                ewJammerController.OnScenarioTick(threatState, friendlyVhfActive);
+                currentEwState = ewJammerController.CurrentState;
+            }
+
+            KineticEvent kineticEv = null;
+            if (smashReticleController != null)
+            {
+                kineticEv = smashReticleController.ConsumeKineticTrigger();
+            }
+
+            if (ewJammerController != null)
+            {
+                currentTraineeAction = ewJammerController.BuildTraineeAction(kineticEv);
+            }
+            else
+            {
+                currentTraineeAction = new TraineeAction(0f, 0f, false, null, kineticEv);
+            }
+
+            if (smashReticleController != null)
+            {
+                smashReticleController.UpdateReticle(lastSwarmSnapshot, currentTraineeAction);
+            }
+
+            // 2. Update sensor suite
             var sr = new SensorReadings(rfPeakGHz, rfPeakDbm, dopplerHz, acousticDb, radarCount);
             UpdateSensors(sr, lastSwarmSnapshot);
 
-            Debug.Log(string.Format("[Cockpit][TICK] threat={0} RF={1:F3}GHz/{2:F1}dBm Doppler={3:F1}Hz Acoustic={4:F1}dB radar={5}",
-                threatState, rfPeakGHz, rfPeakDbm, dopplerHz, acousticDb, radarCount));
+            Debug.Log(string.Format("[Cockpit][TICK] threat={0} RF={1:F3}GHz/{2:F1}dBm Doppler={3:F1}Hz Acoustic={4:F1}dB radar={5} ewEngaged={6} roeRisk={7}",
+                threatState, rfPeakGHz, rfPeakDbm, dopplerHz, acousticDb, radarCount, currentEwState.engaged, currentEwState.friendlyBlackoutRisk));
         }
 
         /// <summary>
         /// Overload taking full contract SensorReadings and SwarmAgentState snapshots.
         /// </summary>
-        public void OnScenarioTick(string threatState, SensorReadings sr, SwarmAgentState[] swarm = null)
+        public void OnScenarioTick(string threatState, SensorReadings sr, SwarmAgentState[] swarm = null, bool friendlyVhfActive = false, long elapsedMs = 0)
         {
             if (!scenarioRunning) return;
 
+            scenarioElapsedMs = elapsedMs > 0 ? elapsedMs : scenarioElapsedMs + 100;
             SetThreatState(threatState);
             if (swarm != null)
             {
                 lastSwarmSnapshot = swarm;
             }
+
+            // 1. Process EW and SMASH controls
+            if (ewJammerController != null)
+            {
+                ewJammerController.OnScenarioTick(threatState, friendlyVhfActive);
+                currentEwState = ewJammerController.CurrentState;
+            }
+
+            KineticEvent kineticEv = null;
+            if (smashReticleController != null)
+            {
+                kineticEv = smashReticleController.ConsumeKineticTrigger();
+            }
+
+            if (ewJammerController != null)
+            {
+                currentTraineeAction = ewJammerController.BuildTraineeAction(kineticEv);
+            }
+            else
+            {
+                currentTraineeAction = new TraineeAction(0f, 0f, false, null, kineticEv);
+            }
+
+            if (smashReticleController != null)
+            {
+                smashReticleController.UpdateReticle(swarm ?? lastSwarmSnapshot, currentTraineeAction);
+            }
+
+            // 2. Update sensor suite
             UpdateSensors(sr, swarm ?? lastSwarmSnapshot);
+        }
+
+        /// <summary>
+        /// Helper to trigger SMASH 2000 kinetic firing at current scenario timestamp.
+        /// </summary>
+        public KineticEvent TriggerFireKinetic()
+        {
+            if (smashReticleController != null)
+            {
+                return smashReticleController.TriggerFire(scenarioElapsedMs);
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Helper to configure EW Jammer controls.
+        /// </summary>
+        public void SetEwParameters(int azimuth, int elevation, float bandGHz, bool engaged)
+        {
+            if (ewJammerController != null)
+            {
+                ewJammerController.SetAzimuth(azimuth);
+                ewJammerController.SetElevation(elevation);
+                ewJammerController.SetBandGHz(bandGHz);
+                ewJammerController.SetEngaged(engaged);
+            }
         }
 
         /// <summary>

@@ -21,11 +21,21 @@
                 </ui:VisualElement>
             </ui:VisualElement>
 
-            <!-- Micro-Doppler Radar Pane -->
+            <!-- Micro-Doppler Radar Pane with Reticle Overlay -->
             <ui:VisualElement name="doppler-pane" class="sensor-pane">
                 <ui:Label class="pane-title" text="MICRO-DOPPLER RADAR" />
                 <ui:VisualElement name="doppler-content" class="sensor-content">
                     <ui:Label text="[PPI Scope — awaiting data]" class="stub-label" />
+                    <!-- SMASH 2000 Reticle Overlay -->
+                    <ui:VisualElement name="smash-reticle-overlay" class="smash-reticle-overlay">
+                        <ui:VisualElement name="smash-crosshair" class="smash-crosshair">
+                            <ui:VisualElement class="reticle-ring" />
+                            <ui:VisualElement class="reticle-h-bar" />
+                            <ui:VisualElement class="reticle-v-bar" />
+                            <ui:VisualElement name="smash-lead-vector" class="smash-lead-vector" />
+                        </ui:VisualElement>
+                        <ui:Label name="smash-target-tag" class="smash-target-tag hidden" text="" />
+                    </ui:VisualElement>
                 </ui:VisualElement>
                 <ui:Label name="doppler-reading" text="Doppler: --- Hz" class="sensor-reading" />
             </ui:VisualElement>
@@ -40,8 +50,29 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <!-- Controls Row (EW + SMASH — hidden until SCENARIO_START, added in UX-P1-B) -->
-        <ui:VisualElement name="controls-row" class="controls-row hidden" />
+        <!-- Controls Row (EW + SMASH — unhidden on SCENARIO_START) -->
+        <ui:VisualElement name="controls-row" class="controls-row hidden">
+            <!-- EW Jammer Controls Panel -->
+            <ui:VisualElement name="ew-panel" class="controls-panel ew-panel">
+                <ui:Label text="EW JAMMER" class="panel-label" />
+                <ui:SliderInt name="ew-azimuth" label="Azimuth" low-value="0" high-value="359" value="0" class="control-slider" />
+                <ui:SliderInt name="ew-elevation" label="Elevation" low-value="-90" high-value="90" value="0" class="control-slider" />
+                <ui:DropdownField name="ew-band" label="Jam Band" class="control-dropdown" />
+                <ui:Toggle name="ew-engage" label="ENGAGE" class="control-toggle" />
+                <ui:Label name="ew-roe-warning" class="roe-warning hidden" text="⚠ ROE VIOLATION — FRIENDLY BLACKOUT" />
+            </ui:VisualElement>
+
+            <!-- SMASH 2000 Fire Control Panel -->
+            <ui:VisualElement name="smash-panel" class="controls-panel smash-panel">
+                <ui:Label text="SMASH 2000 FIRE CONTROL" class="panel-label" />
+                <ui:VisualElement class="smash-status-row">
+                    <ui:Label name="smash-lock-label" text="STANDBY" class="smash-lock-label" />
+                    <ui:Label name="smash-lead-label" text="Lead: ---°" class="smash-lead-label" />
+                </ui:VisualElement>
+                <ui:Button name="fire-btn" text="FIRE — 7.62mm" class="fire-btn" />
+                <ui:Label name="smash-feedback-label" text="" class="smash-feedback-label hidden" />
+            </ui:VisualElement>
+        </ui:VisualElement>
 
         <!-- Scorecard Panel (hidden until SCORECARD_PAYLOAD) -->
         <ui:VisualElement name="scorecard-panel" class="scorecard-panel hidden">
