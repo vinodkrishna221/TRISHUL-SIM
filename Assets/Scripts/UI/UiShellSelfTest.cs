@@ -1,13 +1,17 @@
 // ============================================================
-// UiShellSelfTest.cs — Runnable Self-Test for UX-P0-A (UITK Shell)
+// UiShellSelfTest.cs — Runnable Self-Test for UX-P0-A & UX-P1-A
 // TRISHUL-SIM · ui-ux track (Rani)
 //
 // Validates:
-// 1. InstructorC2.uxml & TraineeCockpit.uxml schema, tags, and element IDs
-// 2. InstructorC2.uss & TraineeCockpit.uss MIL-STD-2525 colors and layout
+// 1. InstructorC2.uxml & TraineeCockpit.uxml schema and elements
+// 2. InstructorC2.uss & TraineeCockpit.uss MIL-STD-2525 colors & layout
 // 3. C2StationController lifecycle, mock connection, scenario dropdown
-// 4. CockpitController lifecycle, threat indicator cycling, sensor readings
-// 5. 1920x1080 resolution constraints & responsive flexbox rules
+// 4. CockpitController lifecycle, threat indicator cycling
+// 5. RfWaterfallRenderer: 256x128 spectrogram, false-color dBm mapping, scrolling
+// 6. DopplerScopeRenderer: 200x200 circular PPI radar, range rings, 6 swarm blips
+// 7. AcousticFftRenderer: 8-band audio spectrum, blade-tip 220 Hz spike, amber/red thresholds
+// 8. End-to-end CockpitController sensor suite integration on SCENARIO_TICK
+// 9. 1920x1080 resolution scalability and responsive flexbox rules
 //
 // Compiles directly with csc.exe or inside Unity Editor tests.
 // ============================================================
@@ -22,6 +26,242 @@ using System.Xml;
 #if !UNITY_5_3_OR_NEWER
 namespace UnityEngine
 {
+    public struct Vector2
+    {
+        public float x;
+        public float y;
+        public float magnitude { get { return (float)Math.Sqrt(x * x + y * y); } }
+        public Vector2(float x, float y) { this.x = x; this.y = y; }
+    }
+
+    public struct Vector3
+    {
+        public float x;
+        public float y;
+        public float z;
+        public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
+    }
+
+    public struct Color
+    {
+        public float r;
+        public float g;
+        public float b;
+        public float a;
+
+        public Color(float r, float g, float b, float a = 1.0f)
+        {
+            this.r = r;
+            this.g = g;
+            this.b = b;
+            this.a = a;
+        }
+
+        public static Color black { get { return new Color(0, 0, 0, 1); } }
+        public static Color white { get { return new Color(1, 1, 1, 1); } }
+        public static Color red { get { return new Color(1, 0, 0, 1); } }
+        public static Color green { get { return new Color(0, 1, 0, 1); } }
+        public static Color cyan { get { return new Color(0, 1, 1, 1); } }
+        public static Color yellow { get { return new Color(1, 1, 0, 1); } }
+        public static Color clear { get { return new Color(0, 0, 0, 0); } }
+
+        public static Color Lerp(Color a, Color b, float t)
+        {
+            t = Mathf.Clamp01(t);
+            return new Color(
+                a.r + (b.r - a.r) * t,
+                a.g + (b.g - a.g) * t,
+                a.b + (b.b - a.b) * t,
+                a.a + (b.a - a.a) * t
+            );
+        }
+
+        public static bool operator ==(Color a, Color b)
+        {
+            return Math.Abs(a.r - b.r) < 0.005f &&
+                   Math.Abs(a.g - b.g) < 0.005f &&
+                   Math.Abs(a.b - b.b) < 0.005f &&
+                   Math.Abs(a.a - b.a) < 0.005f;
+        }
+
+        public static bool operator !=(Color a, Color b)
+        {
+            return !(a == b);
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (!(obj is Color)) return false;
+            return this == (Color)obj;
+        }
+
+        public override int GetHashCode()
+        {
+            return r.GetHashCode() ^ g.GetHashCode() ^ b.GetHashCode();
+        }
+
+        public override string ToString()
+        {
+            return string.Format("RGBA({0:F2},{1:F2},{2:F2},{3:F2})", r, g, b, a);
+        }
+    }
+
+    public enum TextureFormat
+    {
+        RGB24,
+        RGBA32
+    }
+
+    public class Texture2D
+    {
+        public int width { get; private set; }
+        public int height { get; private set; }
+        private Color[] pixelBuffer;
+
+        public Texture2D(int width, int height, TextureFormat format = TextureFormat.RGBA32, bool mipChain = false)
+        {
+            this.width = width;
+            this.height = height;
+            pixelBuffer = new Color[width * height];
+        }
+
+        public void SetPixels(Color[] colors)
+        {
+            Array.Copy(colors, pixelBuffer, Math.Min(colors.Length, pixelBuffer.Length));
+        }
+
+        public void SetPixels(int x, int y, int blockWidth, int blockHeight, Color[] colors)
+        {
+            for (int r = 0; r < blockHeight; r++)
+            {
+                int targetIndex = (y + r) * width + x;
+                int sourceIndex = r * blockWidth;
+                int count = Math.Min(blockWidth, width - x);
+                if (count > 0 && targetIndex >= 0 && (targetIndex + count) <= pixelBuffer.Length)
+                {
+                    Array.Copy(colors, sourceIndex, pixelBuffer, targetIndex, count);
+                }
+            }
+        }
+
+        public Color[] GetPixels(int x, int y, int blockWidth, int blockHeight)
+        {
+            Color[] result = new Color[blockWidth * blockHeight];
+            for (int r = 0; r < blockHeight; r++)
+            {
+                int srcIndex = (y + r) * width + x;
+                int dstIndex = r * blockWidth;
+                int count = Math.Min(blockWidth, width - x);
+                if (count > 0 && srcIndex >= 0 && (srcIndex + count) <= pixelBuffer.Length)
+                {
+                    Array.Copy(pixelBuffer, srcIndex, result, dstIndex, count);
+                }
+            }
+            return result;
+        }
+
+        public void SetPixel(int x, int y, Color color)
+        {
+            if (x >= 0 && x < width && y >= 0 && y < height)
+            {
+                pixelBuffer[y * width + x] = color;
+            }
+        }
+
+        public Color GetPixel(int x, int y)
+        {
+            if (x >= 0 && x < width && y >= 0 && y < height)
+            {
+                return pixelBuffer[y * width + x];
+            }
+            return Color.black;
+        }
+
+        public void Apply() { }
+    }
+
+    public static class Mathf
+    {
+        public const float Deg2Rad = (float)(Math.PI / 180.0);
+        public const float Rad2Deg = (float)(180.0 / Math.PI);
+
+        public static float Clamp01(float val)
+        {
+            if (val < 0f) return 0f;
+            if (val > 1f) return 1f;
+            return val;
+        }
+
+        public static float Clamp(float val, float min, float max)
+        {
+            if (val < min) return min;
+            if (val > max) return max;
+            return val;
+        }
+
+        public static int Clamp(int val, int min, int max)
+        {
+            if (val < min) return min;
+            if (val > max) return max;
+            return val;
+        }
+
+        public static int RoundToInt(float val)
+        {
+            return (int)Math.Round(val);
+        }
+
+        public static float Sqrt(float val)
+        {
+            return (float)Math.Sqrt(val);
+        }
+
+        public static float Abs(float val)
+        {
+            return Math.Abs(val);
+        }
+
+        public static float Sin(float rad)
+        {
+            return (float)Math.Sin(rad);
+        }
+
+        public static float Cos(float rad)
+        {
+            return (float)Math.Cos(rad);
+        }
+
+        public static float Atan2(float y, float x)
+        {
+            return (float)Math.Atan2(y, x);
+        }
+
+        public static float Exp(float power)
+        {
+            return (float)Math.Exp(power);
+        }
+
+        public static float Lerp(float a, float b, float t)
+        {
+            return a + (b - a) * Clamp01(t);
+        }
+
+        public static float Min(float a, float b)
+        {
+            return Math.Min(a, b);
+        }
+
+        public static float Max(float a, float b)
+        {
+            return Math.Max(a, b);
+        }
+
+        public static int Min(int a, int b)
+        {
+            return Math.Min(a, b);
+        }
+    }
+
     public class MonoBehaviour
     {
         public T GetComponent<T>() where T : class { return null; }
@@ -56,13 +296,74 @@ namespace UnityEngine.UIElements
         public VisualElement rootVisualElement { get; set; }
     }
 
+    public enum FlexDirection { Column, ColumnReverse, Row, RowReverse }
+    public enum Justify { FlexStart, Center, FlexEnd, SpaceBetween, SpaceAround }
+    public enum Align { Auto, FlexStart, Center, FlexEnd, Stretch }
+
+    public struct Length
+    {
+        public float value;
+        public bool isPercent;
+
+        public static Length Percent(float val)
+        {
+            return new Length { value = val, isPercent = true };
+        }
+
+        public static implicit operator Length(float val)
+        {
+            return new Length { value = val, isPercent = false };
+        }
+
+        public static implicit operator Length(int val)
+        {
+            return new Length { value = val, isPercent = false };
+        }
+    }
+
+    public class StyleBackground
+    {
+        public Texture2D texture { get; set; }
+        public StyleBackground(Texture2D tex) { this.texture = tex; }
+    }
+
+    public class IStyle
+    {
+        public StyleBackground backgroundImage { get; set; }
+        public FlexDirection flexDirection { get; set; }
+        public Justify justifyContent { get; set; }
+        public Align alignItems { get; set; }
+        public Length width { get; set; }
+        public Length height { get; set; }
+        public Length flexBasis { get; set; }
+        public float flexGrow { get; set; }
+        public Length paddingLeft { get; set; }
+        public Length paddingRight { get; set; }
+        public Length paddingTop { get; set; }
+        public Length paddingBottom { get; set; }
+        public Length marginRight { get; set; }
+        public Color backgroundColor { get; set; }
+        public Length borderTopLeftRadius { get; set; }
+        public Length borderTopRightRadius { get; set; }
+    }
+
     public class VisualElement
     {
         public string name { get; set; }
         private readonly List<string> classes = new List<string>();
         private readonly List<VisualElement> children = new List<VisualElement>();
+        public IStyle style { get; set; }
+
+        public VisualElement()
+        {
+            style = new IStyle();
+        }
+
+        public int childCount { get { return children.Count; } }
 
         public void Add(VisualElement child) { children.Add(child); }
+        public void Clear() { children.Clear(); }
+
         public void AddToClassList(string className)
         {
             if (!classes.Contains(className)) classes.Add(className);
@@ -157,7 +458,7 @@ namespace TrishulSim.UI
             try
             {
                 RunAll();
-                Console.WriteLine("[PASS] All UX-P0-A UITK Shell tests passed.");
+                Console.WriteLine("[PASS] All UX-P0-A & UX-P1-A tests passed successfully!");
                 return 0;
             }
             catch (Exception ex)
@@ -176,6 +477,10 @@ namespace TrishulSim.UI
             TestC2StationControllerLifecycleAndEvents();
             TestCockpitControllerLifecycleAndEvents();
             TestResolutionScalability1920x1080();
+            TestRfWaterfallRenderer();
+            TestDopplerScopeRenderer();
+            TestAcousticFftRenderer();
+            TestCockpitControllerSensorIntegration();
         }
 
         private static string FindRepoRoot()
@@ -202,7 +507,6 @@ namespace TrishulSim.UI
             Assert(File.Exists(c2UxmlPath), "Assets/UI/InstructorC2.uxml must exist");
             Assert(File.Exists(cockpitUxmlPath), "Assets/UI/TraineeCockpit.uxml must exist");
 
-            // Validate XML structure for InstructorC2
             XmlDocument c2Xml = new XmlDocument();
             c2Xml.Load(c2UxmlPath);
             Assert(c2Xml.DocumentElement != null, "InstructorC2.uxml must be valid XML");
@@ -220,7 +524,6 @@ namespace TrishulSim.UI
             Assert(c2Content.Contains("name=\"scorecard-mirror\""), "InstructorC2 must contain scorecard-mirror");
             Assert(c2Content.Contains("name=\"scorecard-stub-label\""), "InstructorC2 must contain scorecard-stub-label");
 
-            // Validate XML structure for TraineeCockpit
             XmlDocument cockpitXml = new XmlDocument();
             cockpitXml.Load(cockpitUxmlPath);
             Assert(cockpitXml.DocumentElement != null, "TraineeCockpit.uxml must be valid XML");
@@ -240,7 +543,6 @@ namespace TrishulSim.UI
             Assert(cockpitContent.Contains("name=\"scorecard-panel\""), "TraineeCockpit must contain scorecard-panel");
             Assert(cockpitContent.Contains("name=\"computing-overlay\""), "TraineeCockpit must contain computing-overlay");
 
-            // Verify RF frequency markers
             Assert(cockpitContent.Contains("915 MHz"), "TraineeCockpit must have 915 MHz marker");
             Assert(cockpitContent.Contains("2.4 GHz"), "TraineeCockpit must have 2.4 GHz marker");
             Assert(cockpitContent.Contains("5.8 GHz"), "TraineeCockpit must have 5.8 GHz marker");
@@ -258,7 +560,6 @@ namespace TrishulSim.UI
             string c2Uss = File.ReadAllText(c2UssPath);
             string cockpitUss = File.ReadAllText(cockpitUssPath);
 
-            // MIL-STD-2525 Threat State Hex Colors: GREEN #00B300, AMBER #FFB300, RED #CC0000
             Assert(c2Uss.Contains("#00B300"), "InstructorC2.uss must define MIL-STD-2525 GREEN #00B300");
             Assert(c2Uss.Contains("#FFB300"), "InstructorC2.uss must define MIL-STD-2525 AMBER #FFB300");
             Assert(c2Uss.Contains("#CC0000"), "InstructorC2.uss must define MIL-STD-2525 RED #CC0000");
@@ -267,11 +568,9 @@ namespace TrishulSim.UI
             Assert(cockpitUss.Contains("#FFB300"), "TraineeCockpit.uss must define MIL-STD-2525 AMBER #FFB300");
             Assert(cockpitUss.Contains("#CC0000"), "TraineeCockpit.uss must define MIL-STD-2525 RED #CC0000");
 
-            // Dark theme backgrounds
             Assert(c2Uss.Contains("#0D0D0D"), "InstructorC2.uss must use #0D0D0D dark background");
             Assert(cockpitUss.Contains("#0D0D0D"), "TraineeCockpit.uss must use #0D0D0D dark background");
 
-            // Display none for hidden utility
             Assert(c2Uss.Contains("display: none"), "InstructorC2.uss must contain .hidden display: none rule");
             Assert(cockpitUss.Contains("display: none"), "TraineeCockpit.uss must contain .hidden display: none rule");
         }
@@ -280,7 +579,6 @@ namespace TrishulSim.UI
         {
             var controller = new C2StationController();
 
-            // Construct mock hierarchy matching InstructorC2.uxml
             var mockRoot = new VisualElement { name = "c2-root" };
             var appTitle = new Label { name = "app-title", text = "TRISHUL-SIM · C2 STATION" };
             var statusIcon = new VisualElement { name = "link-status-icon" };
@@ -306,17 +604,14 @@ namespace TrishulSim.UI
             mockRoot.Add(scorecardMirror);
             mockRoot.Add(scorecardStub);
 
-            // Bind elements
             controller.BindElements(mockRoot);
             controller.PopulateScenarioDropdown();
             controller.RegisterCallbacks();
 
-            // Verify scenario dropdown choices
             Assert(dropdown.choices != null && dropdown.choices.Count == 4, "Dropdown must contain 4 scenarios");
             Assert(dropdown.choices[0] == "Punjab Border — Zero Visibility Pincer", "First scenario must be Punjab Border");
             Assert(controller.SelectedScenarioId == "punjab-fog-pincer-01", "Initial selected scenario must be punjab-fog-pincer-01");
 
-            // Verify connection event
             Assert(!controller.IsConnected, "Initially not connected");
             controller.OnClientConnected();
             Assert(controller.IsConnected, "Must be connected after OnClientConnected");
@@ -324,22 +619,18 @@ namespace TrishulSim.UI
             Assert(!statusIcon.ClassListContains("status-waiting"), "Status icon must not have status-waiting class");
             Assert(statusLabel.text.Contains("LAN LINK CONFIRMED"), "Status label must confirm LAN link");
 
-            // Verify scenario change
             dropdown.SimulateChange("Rajasthan Desert FOB — Saturation Dive");
             Assert(controller.SelectedScenarioId == "rajasthan-desert-fob-01", "Selected scenario ID must update on dropdown change");
 
-            // Verify disconnect event
             controller.OnClientDisconnected();
             Assert(!controller.IsConnected, "Must not be connected after OnClientDisconnected");
             Assert(statusIcon.ClassListContains("status-lost"), "Status icon must have status-lost class");
             Assert(statusLabel.text.Contains("LINK LOST"), "Status label must indicate link lost");
 
-            // Verify scorecard mirror
             controller.OnScorecardReceived("sess-test-20261005");
             Assert(!scorecardMirror.ClassListContains("hidden"), "Scorecard mirror must unhide on SCORECARD_PAYLOAD");
             Assert(scorecardStub.text.Contains("sess-test-20261005"), "Scorecard stub must display sessionId");
 
-            // Verify defensive cleanup
             controller.UnregisterCallbacks();
         }
 
@@ -347,7 +638,6 @@ namespace TrishulSim.UI
         {
             var controller = new CockpitController();
 
-            // Construct mock hierarchy matching TraineeCockpit.uxml
             var mockRoot = new VisualElement { name = "cockpit-root" };
             var threatIndicator = new VisualElement { name = "threat-indicator" };
             threatIndicator.AddToClassList("threat-green");
@@ -385,10 +675,8 @@ namespace TrishulSim.UI
             mockRoot.Add(scorecardStubLabel);
             mockRoot.Add(computingOverlay);
 
-            // Bind elements
             controller.BindElements(mockRoot);
 
-            // Test SCENARIO_START
             controller.OnScenarioStart("punjab-fog-pincer-01", "Punjab Border — Zero Visibility Pincer");
             Assert(controller.ScenarioRunning, "Scenario must be running after OnScenarioStart");
             Assert(!controlsRow.ClassListContains("hidden"), "Controls row must unhide on SCENARIO_START");
@@ -396,7 +684,6 @@ namespace TrishulSim.UI
             Assert(threatIndicator.ClassListContains("threat-green"), "Threat indicator must have threat-green class");
             Assert(threatLabel.text == "GREEN", "Threat label must display GREEN");
 
-            // Test SCENARIO_TICK threat state transition to AMBER
             controller.OnScenarioTick(
                 threatState: "AMBER",
                 rfPeakGHz: 5.825f,
@@ -412,7 +699,6 @@ namespace TrishulSim.UI
             Assert(dopplerReading.text == "Doppler: 180.5 Hz", "Doppler reading must format correctly");
             Assert(acousticReading.text == "SPL: 48.0 dB", "Acoustic reading must format correctly");
 
-            // Test SCENARIO_TICK threat state transition to RED
             controller.OnScenarioTick(
                 threatState: "RED",
                 rfPeakGHz: 5.825f,
@@ -426,12 +712,10 @@ namespace TrishulSim.UI
             Assert(!threatIndicator.ClassListContains("threat-amber"), "Threat indicator must remove threat-amber class");
             Assert(threatLabel.text == "RED", "Threat label must display RED");
 
-            // Test SCENARIO_END
             controller.OnScenarioEnd("ALL_NEUTRALISED");
             Assert(!controller.ScenarioRunning, "ScenarioRunning must be false after OnScenarioEnd");
             Assert(!computingOverlay.ClassListContains("hidden"), "Computing overlay must unhide on SCENARIO_END");
 
-            // Test SCORECARD_PAYLOAD
             controller.OnScorecardReceived("sess-test-20261005");
             Assert(computingOverlay.ClassListContains("hidden"), "Computing overlay must hide on SCORECARD_PAYLOAD");
             Assert(!scorecardPanel.ClassListContains("hidden"), "Scorecard panel must unhide on SCORECARD_PAYLOAD");
@@ -444,17 +728,164 @@ namespace TrishulSim.UI
             string c2Uss = File.ReadAllText(Path.Combine(root, "Assets", "UI", "InstructorC2.uss"));
             string cockpitUss = File.ReadAllText(Path.Combine(root, "Assets", "UI", "TraineeCockpit.uss"));
 
-            // Check root element flex-grow
             Assert(c2Uss.Contains("flex-grow: 1"), "InstructorC2 root must have flex-grow: 1 for full viewport scaling");
             Assert(cockpitUss.Contains("flex-grow: 1"), "TraineeCockpit root must have flex-grow: 1 for full viewport scaling");
 
-            // Check sensor row layout
             Assert(cockpitUss.Contains("flex-direction: row"), "TraineeCockpit sensor row must use horizontal flex-direction");
             Assert(cockpitUss.Contains("flex-basis: 0"), "TraineeCockpit sensor panes must distribute space evenly (flex-basis: 0)");
 
-            // Verify no fixed absolute pixel widths on root containers that would cause clipping at 1920x1080
             Assert(!Regex.IsMatch(c2Uss, @"\.c2-root\s*\{[^}]*width:\s*\d+px"), "c2-root must not have fixed width in px");
             Assert(!Regex.IsMatch(cockpitUss, @"\.cockpit-root\s*\{[^}]*width:\s*\d+px"), "cockpit-root must not have fixed width in px");
+        }
+
+        public static void TestRfWaterfallRenderer()
+        {
+            var renderer = new RfWaterfallRenderer();
+            var container = new VisualElement { name = "rf-content" };
+
+            renderer.Initialize(container);
+            Assert(renderer.IsInitialized, "RfWaterfallRenderer must be initialized");
+            Assert(renderer.Texture != null, "Texture must be allocated");
+            Assert(renderer.Texture.width == 256, "Waterfall texture width must be 256");
+            Assert(renderer.Texture.height == 128, "Waterfall texture height must be 128");
+
+            // Test color mapping thresholds
+            Color cNoise = RfWaterfallRenderer.MapDbmToColor(-90f);
+            Assert(cNoise == Color.black, "-90 dBm must map to Color.black");
+
+            Color cCyan = RfWaterfallRenderer.MapDbmToColor(-70f);
+            Assert(cCyan == Color.cyan, "-70 dBm must map to Color.cyan");
+
+            Color cYellow = RfWaterfallRenderer.MapDbmToColor(-50f);
+            Assert(cYellow == Color.yellow, "-50 dBm must map to Color.yellow");
+
+            Color cRed = RfWaterfallRenderer.MapDbmToColor(-30f);
+            Assert(cRed == Color.red, "-30 dBm must map to Color.red");
+
+            // Test incursion peak at 5.825 GHz
+            var sr = new SensorReadings(5.825f, -40.0f, 220.4f, 54.2f, 6);
+            renderer.UpdateWaterfall(sr);
+
+            // 5.825 GHz out of 6.0 GHz maps to approx pixel X = 248
+            int expectedX = Mathf.RoundToInt((5.825f / 6.0f) * 255);
+            Color peakPixel = renderer.Texture.GetPixel(expectedX, 0);
+            Assert(peakPixel.r > 0.5f, "Pixel at 5.825 GHz must show strong signal intensity (red/yellow)");
+
+            // Test scrolling: update again and check that row 0 moves to row 1
+            renderer.UpdateWaterfall(new SensorReadings(0f, -90f, 0f, 30f, 0));
+            Color scrolledPixel = renderer.Texture.GetPixel(expectedX, 1);
+            Assert(scrolledPixel.r > 0.5f, "Previous peak row must scroll up to Y = 1");
+        }
+
+        public static void TestDopplerScopeRenderer()
+        {
+            var renderer = new DopplerScopeRenderer();
+            var container = new VisualElement { name = "doppler-content" };
+            var label = new Label("Doppler: --- Hz");
+
+            renderer.Initialize(container, label);
+            Assert(renderer.IsInitialized, "DopplerScopeRenderer must be initialized");
+            Assert(renderer.Texture != null, "Doppler texture must be allocated");
+            Assert(renderer.Texture.width == 200, "Scope texture width must be 200");
+            Assert(renderer.Texture.height == 200, "Scope texture height must be 200");
+
+            // Check center graticule crosshair pixel is non-black
+            Color centerColor = renderer.Texture.GetPixel(100, 100);
+            Assert(centerColor != Color.black, "Scope center must have radar graticule or grid");
+
+            // Update with 6-agent swarm
+            var swarm = SensorMock.GetPunjabSwarmFixture();
+            var sr = SensorMock.GetPunjabFixture();
+            renderer.UpdateScope(sr, swarm);
+
+            Assert(label.text == "Doppler: 220.4 Hz", "Doppler label must reflect 220.4 Hz");
+        }
+
+        public static void TestAcousticFftRenderer()
+        {
+            var renderer = new AcousticFftRenderer();
+            var container = new VisualElement { name = "acoustic-content" };
+            var label = new Label("SPL: --- dB");
+
+            renderer.Initialize(container, label);
+            Assert(renderer.IsInitialized, "AcousticFftRenderer must be initialized");
+            Assert(renderer.BarElements != null, "BarElements array must not be null");
+            Assert(renderer.BarElements.Length == 8, "Must generate exactly 8 FFT bar columns");
+
+            // Test quiet baseline (< 40 dB)
+            var quietSr = new SensorReadings(0f, -90f, 0f, 32.0f, 0);
+            renderer.UpdateAcoustic(quietSr);
+            Assert(label.text == "SPL: 32.0 dB", "Acoustic label must format SPL correctly");
+            var bladeBar = renderer.BarElements[AcousticFftRenderer.BladeTipBandIndex];
+            Assert(bladeBar.style.height.value <= 15.0f, "Quiet blade bar height must be <= 15% (noise floor)");
+
+            // Test Amber threat level (40–55 dB)
+            var amberSr = new SensorReadings(5.825f, -62.3f, 220.4f, 48.0f, 6);
+            renderer.UpdateAcoustic(amberSr);
+            Assert(label.text == "SPL: 48.0 dB", "Acoustic label must show 48.0 dB");
+            Assert(bladeBar.style.height.value >= 25.0f && bladeBar.style.height.value <= 65.0f, "Amber bar height must be between 25% and 65%");
+            Assert(bladeBar.style.backgroundColor.r == 1.0f && bladeBar.style.backgroundColor.g > 0.6f, "Amber bar must use #FFB300");
+
+            // Test Red alert (> 55 dB)
+            var redSr = new SensorReadings(5.825f, -40.0f, 220.4f, 65.0f, 6);
+            renderer.UpdateAcoustic(redSr);
+            Assert(label.text == "SPL: 65.0 dB", "Acoustic label must show 65.0 dB");
+            Assert(bladeBar.style.height.value > 65.0f, "Red alert bar height must be > 65%");
+            Assert(bladeBar.style.backgroundColor.r >= 0.75f && bladeBar.style.backgroundColor.g < 0.1f, "Red alert bar must use #CC0000");
+        }
+
+        public static void TestCockpitControllerSensorIntegration()
+        {
+            var controller = new CockpitController();
+            var mockRoot = new VisualElement { name = "cockpit-root" };
+
+            var threatIndicator = new VisualElement { name = "threat-indicator" };
+            var threatLabel = new Label { name = "threat-label", text = "GREEN" };
+            var rfWaterfallPane = new VisualElement { name = "rf-waterfall-pane" };
+            var rfContent = new VisualElement { name = "rf-content" };
+            var dopplerPane = new VisualElement { name = "doppler-pane" };
+            var dopplerContent = new VisualElement { name = "doppler-content" };
+            var dopplerReading = new Label { name = "doppler-reading", text = "Doppler: --- Hz" };
+            var acousticPane = new VisualElement { name = "acoustic-pane" };
+            var acousticContent = new VisualElement { name = "acoustic-content" };
+            var acousticReading = new Label { name = "acoustic-reading", text = "SPL: --- dB" };
+            var controlsRow = new VisualElement { name = "controls-row" };
+            var scorecardPanel = new VisualElement { name = "scorecard-panel" };
+            var scorecardStubLabel = new Label { name = "scorecard-stub-label", text = "Scorecard received" };
+            var computingOverlay = new VisualElement { name = "computing-overlay" };
+
+            mockRoot.Add(threatIndicator);
+            mockRoot.Add(threatLabel);
+            mockRoot.Add(rfWaterfallPane);
+            mockRoot.Add(rfContent);
+            mockRoot.Add(dopplerPane);
+            mockRoot.Add(dopplerContent);
+            mockRoot.Add(dopplerReading);
+            mockRoot.Add(acousticPane);
+            mockRoot.Add(acousticContent);
+            mockRoot.Add(acousticReading);
+            mockRoot.Add(controlsRow);
+            mockRoot.Add(scorecardPanel);
+            mockRoot.Add(scorecardStubLabel);
+            mockRoot.Add(computingOverlay);
+
+            controller.BindElements(mockRoot);
+
+            Assert(controller.RfRenderer != null && controller.RfRenderer.IsInitialized, "RfRenderer must be initialized");
+            Assert(controller.DopplerRenderer != null && controller.DopplerRenderer.IsInitialized, "DopplerRenderer must be initialized");
+            Assert(controller.AcousticRenderer != null && controller.AcousticRenderer.IsInitialized, "AcousticRenderer must be initialized");
+
+            controller.OnScenarioStart("punjab-fog-pincer-01", "Punjab Border — Zero Visibility Pincer");
+            Assert(controller.ScenarioRunning, "Scenario must be running");
+
+            // Tick with Punjab incursion telemetry
+            var punjabReadings = SensorMock.GetPunjabFixture();
+            var punjabSwarm = SensorMock.GetPunjabSwarmFixture();
+            controller.OnScenarioTick("RED", punjabReadings, punjabSwarm);
+
+            Assert(controller.CurrentThreatState == "RED", "Threat state must be RED");
+            Assert(dopplerReading.text == "Doppler: 220.4 Hz", "Doppler label must update");
+            Assert(acousticReading.text == "SPL: 54.2 dB", "Acoustic label must update");
         }
 
         private static void Assert(bool condition, string message)
