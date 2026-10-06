@@ -13,7 +13,7 @@
 
 | Track | Done | In flight | Next |
 |---|---|---|---|
-| unity-sim | — | — | Walking skeleton: sensor panes + WebSocket IPC |
+| unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A | — | US-P1-B (author all 4 scenario JSON configs) |
 | swarm-ai | — | — | Reynolds Boids + HBT scaffold |
 | aar-engine | — | — | 10 Hz telemetry logger + Scorecard renderer |
 | ui-ux | — | — | Bilingual UI shell + MIL-STD-2525 symbology |
@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-06T18:42 IST · Vinod (unity-sim): [US-P1-A] ✅ Split-screen fallback live (`Assets/Scenes/SplitScreen.unity`, `InstructorC2Root.prefab`, `TraineeCockpitRoot.prefab`, Camera.rect [0,0,0.5,1]/[0.5,0,0.5,1], single AudioListener, mode toggle, loopback bind safety, 6-Boid swarm + 10 Hz NDJSON telemetry + scorecard relay) — self-test green on `feat/unity-sim-split-screen`
 - 2026-10-05T20:15 IST · Vinod (unity-sim): [US-P0-C] ✅ 10 Hz `SCENARIO_TICK` + `SCENARIO_END` broadcast loop live (`ScenarioManager.TickLoop`, `BroadcastScenarioEnd`, `InjectSwarmSnapshot`, C2 Abort button wired in `InstructorC2.unity`) — self-test green on `feat/unity-sim-tick-loop`
 - 2026-10-05T19:52 IST · Vinod (unity-sim): [US-P0-B] ✅ Scenario Library loader + `SCENARIO_START` broadcast live (`ScenarioConfig`, `ScenarioLibrary`, `ScenarioManager`, 4× `StreamingAssets/scenarios/*.json`, C2 Launch UI + Trainee scene transition) — self-test green on `feat/unity-sim-scenario-library`
 - 2026-10-05T18:58 IST · Vinod (unity-sim): [US-P0-A] ✅ WS IPC bootstrap live (`WsServer`, `WsClient`, `JsonEnvelope`, `ConnectionStatusUI`, `InstructorC2.unity`, `TraineeCockpit.unity`) — self-test green on `feat/unity-sim-ws-ipc`

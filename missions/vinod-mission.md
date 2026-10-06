@@ -183,7 +183,7 @@ DELIVERABLE:
 
 TEST: Launch SplitScreen → click Launch (left) → Boids in right pane → Scorecard on both.
 DEMO: "Single laptop running full demo." (Beat 6)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---

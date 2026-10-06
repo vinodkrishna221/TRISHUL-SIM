@@ -257,7 +257,7 @@ TEST:
 DEPENDS: US-P0-C, SA-P0-A, AA-P0-A     UNBLOCKS: UX-P1-C (ui-ux split-screen layout)
 
 DEMO: "Single laptop running full demo — no second machine needed." (Beat 6)
-PERSONA: unity-sim builder               STATUS: [ ] todo
+PERSONA: unity-sim builder               STATUS: [x] done
 ```
 
 ---
