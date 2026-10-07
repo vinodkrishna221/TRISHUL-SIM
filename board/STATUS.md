@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-07T20:08 IST · Rani: UX-P2-D partial smoke — Beats 1–4 PASS (LAN icon, 4-scenario dropdown, RF Waterfall, Doppler scope, Acoustic FFT, EW+SMASH controls); Beats 5–6 BLOCKED on Rajeswari UX-P1-D/P2-A/P2-B/P2-C + Sohail AA-P1-A/B; PR#11 open feat/ui-ux-demo-smoke; Warden review pending
 - 2026-10-05T23:26 IST · Rani: UX-P0-B done — Unity Localization setup, Hindi/English CSVs, LocaleToggle singleton, C2 & Cockpit controllers fully localized; UiShellSelfTest PASSED
 
 - 2026-10-05T22:45 IST · Rani: UX-P0-A done — UITK shell (C2 + Cockpit), status icon, 3 sensor stubs, threat indicator, dropdown, null safety; UiShellSelfTest PASSED
