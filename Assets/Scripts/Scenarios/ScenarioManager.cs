@@ -2,6 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using TrishulSim.Network;
@@ -53,9 +55,27 @@ namespace TrishulSim.Scenarios
     /// SCENARIO_TICK + SCENARIO_END simulation loop (US-P0-C).
     /// Implements board/contracts/scenario-events.md v1 (SCENARIO_START, SCENARIO_TICK, SCENARIO_END).
     /// </summary>
+    public enum OperationMode
+    {
+        TwoLaptop = 0,
+        SingleLaptopSplit = 1
+    }
+
+    /// <summary>
+    /// Manages Scenario Library selection, SCENARIO_START broadcast from Instructor C2,
+    /// Trainee Cockpit scene transition + 1s ACK handling (US-P0-B), the 10 Hz
+    /// SCENARIO_TICK + SCENARIO_END simulation loop (US-P0-C), and the Single-Laptop
+    /// split-screen fallback mode (US-P1-A).
+    /// Implements board/contracts/scenario-events.md v1 (SCENARIO_START, SCENARIO_TICK, SCENARIO_END)
+    /// and board/contracts/scorecard.md v1 (SCORECARD_PAYLOAD).
+    /// </summary>
     public class ScenarioManager : MonoBehaviour
     {
         public const string DefaultTraineeSceneName = "TraineeCockpit";
+        public const string DefaultTwoLaptopSceneName = "InstructorC2";
+        public const string DefaultSplitScreenSceneName = "SplitScreen";
+        public const string ModeTwoLaptopText = "Two-Laptop";
+        public const string ModeSplitScreenText = "Single-Laptop (Split)";
         public const int DefaultAckTimeoutMs = 1000;
         public const float DefaultTickIntervalSeconds = 0.1f;
         public const int DefaultTickStepMs = 100;
@@ -66,24 +86,33 @@ namespace TrishulSim.Scenarios
         [SerializeField] private WsServer server;
         [SerializeField] private WsClient client;
         [SerializeField] private Dropdown scenarioDropdown;
+        [SerializeField] private Dropdown modeDropdown;
         [SerializeField] private Button launchButton;
         [SerializeField] private Button abortButton;
         [SerializeField] private GameObject traineeCockpitRoot;
         [SerializeField] private string traineeCockpitSceneName = DefaultTraineeSceneName;
+        [SerializeField] private string twoLaptopSceneName = DefaultTwoLaptopSceneName;
+        [SerializeField] private string splitScreenSceneName = DefaultSplitScreenSceneName;
+        [SerializeField] private OperationMode currentMode = OperationMode.TwoLaptop;
         [SerializeField] private bool loadSceneOnScenarioStart = true;
         [SerializeField] private int ackTimeoutMs = DefaultAckTimeoutMs;
         [SerializeField] private float tickIntervalSeconds = DefaultTickIntervalSeconds;
         [SerializeField] private int tickStepMs = DefaultTickStepMs;
         [SerializeField] private bool autoStartTickLoop = true;
+        [SerializeField] private bool autoLogTelemetryToDisk = true;
+        [SerializeField] private bool spawnDefaultSwarmIfEmpty = false;
+        [SerializeField] private string telemetryDirectoryOverride;
 
         private readonly List<ScenarioConfig> _scenarios = new List<ScenarioConfig>();
         private readonly object _tickStateLock = new object();
         private WsServer _subscribedServer;
         private WsClient _subscribedClient;
+        private Dropdown _subscribedModeDropdown;
         private Button _subscribedButton;
         private Button _subscribedAbortButton;
         private Coroutine _tickCoroutine;
         private string _scenariosDirectoryOverride;
+        private string _sessionTelemetryFilePath;
         private volatile bool _isServerScenarioRunning;
         private volatile bool _isClientScenarioRunning;
         private volatile bool _lastScenarioStartAcked;
@@ -104,6 +133,11 @@ namespace TrishulSim.Scenarios
         public event Action<ScenarioTickPayload> OnScenarioTickReceived;
         public event Action<ScenarioEndPayload> OnScenarioEndBroadcast;
         public event Action<ScenarioEndPayload> OnScenarioEndReceived;
+        public event Action<OperationMode> OnOperationModeChanged;
+        public event Action<JsonEnvelope> OnScorecardReceived;
+
+        public JsonEnvelope LastScorecardEnvelope { get; private set; }
+        public string LastTelemetrySessionFilePath { get; private set; }
 
         public WsServer Server
         {
@@ -185,6 +219,56 @@ namespace TrishulSim.Scenarios
         {
             get { return traineeCockpitRoot; }
             set { traineeCockpitRoot = value; }
+        }
+
+        public Dropdown ModeDropdown
+        {
+            get { return modeDropdown; }
+            set
+            {
+                if (!ReferenceEquals(modeDropdown, value))
+                {
+                    UnsubscribeModeDropdown();
+                    modeDropdown = value;
+                    SubscribeModeDropdown();
+                }
+            }
+        }
+
+        public OperationMode CurrentMode
+        {
+            get { return currentMode; }
+            set { SetOperationMode(value, notifyListeners: true); }
+        }
+
+        public string TwoLaptopSceneName
+        {
+            get { return twoLaptopSceneName; }
+            set { twoLaptopSceneName = string.IsNullOrWhiteSpace(value) ? DefaultTwoLaptopSceneName : value; }
+        }
+
+        public string SplitScreenSceneName
+        {
+            get { return splitScreenSceneName; }
+            set { splitScreenSceneName = string.IsNullOrWhiteSpace(value) ? DefaultSplitScreenSceneName : value; }
+        }
+
+        public bool AutoLogTelemetryToDisk
+        {
+            get { return autoLogTelemetryToDisk; }
+            set { autoLogTelemetryToDisk = value; }
+        }
+
+        public string TelemetryDirectoryOverride
+        {
+            get { return telemetryDirectoryOverride; }
+            set { telemetryDirectoryOverride = value; }
+        }
+
+        public bool SpawnDefaultSwarmIfEmpty
+        {
+            get { return spawnDefaultSwarmIfEmpty; }
+            set { spawnDefaultSwarmIfEmpty = value; }
         }
 
         public string TraineeCockpitSceneName
@@ -301,6 +385,7 @@ namespace TrishulSim.Scenarios
             SubscribeClient();
             SubscribeButton();
             SubscribeAbortButton();
+            SubscribeModeDropdown();
         }
 
         public void OnDestroy()
@@ -310,6 +395,7 @@ namespace TrishulSim.Scenarios
             UnsubscribeClient();
             UnsubscribeButton();
             UnsubscribeAbortButton();
+            UnsubscribeModeDropdown();
             if (ReferenceEquals(Instance, this))
                 Instance = null;
         }
@@ -484,7 +570,14 @@ namespace TrishulSim.Scenarios
             {
                 _currentElapsedMs = 0;
                 _tickCount = 0;
-                _injectedSwarmSnapshot = new SwarmAgentState[0];
+                if (currentMode == OperationMode.SingleLaptopSplit || spawnDefaultSwarmIfEmpty)
+                {
+                    _injectedSwarmSnapshot = CreateDefaultBoidSwarm(launchConfig);
+                }
+                else
+                {
+                    _injectedSwarmSnapshot = new SwarmAgentState[0];
+                }
                 _injectedSensorReadings = new SensorReadings();
                 _injectedThreatState = ScenarioTickPayload.THREAT_GREEN;
                 _injectedTraineeAction = new TraineeAction();
@@ -495,6 +588,11 @@ namespace TrishulSim.Scenarios
             _lastScenarioStartAcked = false;
             _pendingAckSessionId = sessionId;
             int generation = Interlocked.Increment(ref _launchGeneration);
+
+            if (autoLogTelemetryToDisk)
+            {
+                InitSessionTelemetryFile(sessionId);
+            }
 
             WsServer activeServer = Server;
             if (activeServer != null && activeServer.IsRunning)
@@ -604,6 +702,11 @@ namespace TrishulSim.Scenarios
             JsonEnvelope tickEnvelope = ScenarioTickPayload.CreateEnvelope(tickPayload);
             LastTickPayload = tickPayload;
 
+            if (autoLogTelemetryToDisk && !string.IsNullOrWhiteSpace(_sessionTelemetryFilePath))
+            {
+                AppendTelemetryRecord(tickPayload);
+            }
+
             WsServer activeServer = Server;
             if (activeServer != null && activeServer.IsRunning)
             {
@@ -644,6 +747,7 @@ namespace TrishulSim.Scenarios
 
             _isServerScenarioRunning = false;
             _pendingAckSessionId = null;
+            _sessionTelemetryFilePath = null;
             StopTickLoop();
 
             string resolvedReason = ScenarioEndPayload.IsValidReason(reason)
@@ -911,18 +1015,41 @@ namespace TrishulSim.Scenarios
 
         private void HandleServerMessageReceived(JsonEnvelope envelope)
         {
-            if (_pendingAckSessionId == null)
+            if (string.IsNullOrEmpty(envelope.type))
                 return;
 
-            if (string.Equals(envelope.type, JsonEnvelope.CLIENT_HEARTBEAT, StringComparison.Ordinal) ||
-                string.Equals(envelope.type, JsonEnvelope.CLIENT_READY, StringComparison.Ordinal))
+            if (string.Equals(envelope.type, JsonEnvelope.SCORECARD_PAYLOAD, StringComparison.Ordinal))
             {
-                _lastScenarioStartAcked = true;
+                LastScorecardEnvelope = envelope;
+                Action<JsonEnvelope> scHandler = OnScorecardReceived;
+                if (scHandler != null)
+                    scHandler(envelope);
+            }
+
+            if (_pendingAckSessionId != null)
+            {
+                if (string.Equals(envelope.type, JsonEnvelope.CLIENT_HEARTBEAT, StringComparison.Ordinal) ||
+                    string.Equals(envelope.type, JsonEnvelope.CLIENT_READY, StringComparison.Ordinal))
+                {
+                    _lastScenarioStartAcked = true;
+                }
             }
         }
 
         private void HandleClientMessageReceived(JsonEnvelope envelope)
         {
+            if (string.IsNullOrEmpty(envelope.type))
+                return;
+
+            if (string.Equals(envelope.type, JsonEnvelope.SCORECARD_PAYLOAD, StringComparison.Ordinal))
+            {
+                LastScorecardEnvelope = envelope;
+                Action<JsonEnvelope> scHandler = OnScorecardReceived;
+                if (scHandler != null)
+                    scHandler(envelope);
+                return;
+            }
+
             if (string.Equals(envelope.type, JsonEnvelope.SCENARIO_START, StringComparison.Ordinal))
             {
                 HandleClientScenarioStart(envelope);
@@ -997,6 +1124,11 @@ namespace TrishulSim.Scenarios
             }
             _isClientScenarioRunning = true;
 
+            if (autoLogTelemetryToDisk && Server == null)
+            {
+                InitSessionTelemetryFile(startPayload.sessionId);
+            }
+
             Debug.Log("[WsClient] SCENARIO_START received \u2014 sessionId: " + startPayload.sessionId);
 
             // Immediate ACK within 1s per board/contracts/scenario-events.md using registered CLIENT_HEARTBEAT frame.
@@ -1044,6 +1176,11 @@ namespace TrishulSim.Scenarios
             }
             LastTickPayload = tickPayload;
 
+            if (autoLogTelemetryToDisk && Server == null && !string.IsNullOrWhiteSpace(_sessionTelemetryFilePath))
+            {
+                AppendTelemetryRecord(tickPayload);
+            }
+
             Debug.Log("[WsClient] SCENARIO_TICK received \u2014 sessionId: " + tickPayload.sessionId + ", t: " + tickPayload.t);
 
             Action<ScenarioTickPayload> handler = OnScenarioTickReceived;
@@ -1068,6 +1205,7 @@ namespace TrishulSim.Scenarios
             }
 
             _isClientScenarioRunning = false;
+            _sessionTelemetryFilePath = null;
             lock (_tickStateLock)
             {
                 _currentElapsedMs = endPayload.t;
@@ -1081,6 +1219,201 @@ namespace TrishulSim.Scenarios
             Action<ScenarioEndPayload> handler = OnScenarioEndReceived;
             if (handler != null)
                 handler(endPayload);
+        }
+
+        public void SetOperationMode(OperationMode mode, bool notifyListeners = true)
+        {
+            if (currentMode == mode)
+                return;
+
+            currentMode = mode;
+            if (modeDropdown != null && modeDropdown.value != (int)mode)
+            {
+                modeDropdown.value = (int)mode;
+                modeDropdown.RefreshShownValue();
+            }
+
+            Action<OperationMode> handler = OnOperationModeChanged;
+            if (handler != null)
+                handler(mode);
+
+            if (notifyListeners)
+            {
+                string targetScene = mode == OperationMode.SingleLaptopSplit
+                    ? splitScreenSceneName
+                    : twoLaptopSceneName;
+
+                if (!string.IsNullOrWhiteSpace(targetScene))
+                {
+                    Debug.Log("[ScenarioManager] Switching operation mode to " +
+                              (mode == OperationMode.SingleLaptopSplit ? ModeSplitScreenText : ModeTwoLaptopText) +
+                              " \u2014 loading scene: " + targetScene);
+                    SceneLoader.LoadAsync(targetScene);
+                }
+            }
+        }
+
+        public void SwitchToSplitScreen()
+        {
+            SetOperationMode(OperationMode.SingleLaptopSplit, notifyListeners: true);
+        }
+
+        public void SwitchToTwoLaptop()
+        {
+            SetOperationMode(OperationMode.TwoLaptop, notifyListeners: true);
+        }
+
+        private void SubscribeModeDropdown()
+        {
+            if (modeDropdown == null)
+                return;
+
+            if (modeDropdown.options == null || modeDropdown.options.Count < 2)
+            {
+                modeDropdown.ClearOptions();
+                modeDropdown.AddOptions(new List<string> { ModeTwoLaptopText, ModeSplitScreenText });
+            }
+
+            modeDropdown.value = (int)currentMode;
+            modeDropdown.RefreshShownValue();
+
+            if (ReferenceEquals(_subscribedModeDropdown, modeDropdown))
+                return;
+
+            UnsubscribeModeDropdown();
+            modeDropdown.onValueChanged.AddListener(HandleModeDropdownValueChanged);
+            _subscribedModeDropdown = modeDropdown;
+        }
+
+        private void UnsubscribeModeDropdown()
+        {
+            if (_subscribedModeDropdown != null)
+            {
+                _subscribedModeDropdown.onValueChanged.RemoveListener(HandleModeDropdownValueChanged);
+                _subscribedModeDropdown = null;
+            }
+        }
+
+        private void HandleModeDropdownValueChanged(int index)
+        {
+            OperationMode mode = (OperationMode)index;
+            if (mode != currentMode)
+            {
+                SetOperationMode(mode, notifyListeners: true);
+            }
+        }
+
+        public static SwarmAgentState[] CreateDefaultBoidSwarm(ScenarioConfig config = null)
+        {
+            int totalAgents = 6;
+            int decoys = 2;
+            float freq1 = 5.825f;
+            float freq2 = 2.4f;
+
+            if (config != null && config.swarmProfile != null)
+            {
+                if (config.swarmProfile.agentCount > 0)
+                    totalAgents = config.swarmProfile.agentCount;
+                decoys = config.swarmProfile.decoyCount;
+                if (config.swarmProfile.rfFreqGHz != null && config.swarmProfile.rfFreqGHz.Length > 0)
+                {
+                    freq1 = config.swarmProfile.rfFreqGHz[0];
+                    if (config.swarmProfile.rfFreqGHz.Length > 1)
+                        freq2 = config.swarmProfile.rfFreqGHz[1];
+                }
+            }
+
+            SwarmAgentState[] swarm = new SwarmAgentState[totalAgents];
+            for (int i = 0; i < totalAgents; i++)
+            {
+                bool isDecoy = i < decoys;
+                swarm[i] = new SwarmAgentState
+                {
+                    agentId = "agent-" + i,
+                    isDecoy = isDecoy,
+                    positionWorld = new Vector3(140.0f + (i * 12.0f), 8.0f + (i * 0.4f), -85.0f + (i * 10.0f)),
+                    velocityMs = new Vector3(-28.0f, 0.0f, 12.0f),
+                    headingDeg = 247.0f,
+                    altitudeM = 8.0f + (i * 0.4f),
+                    rfEmitting = true,
+                    rfFreqGHz = isDecoy ? freq2 : freq1,
+                    rfPowerDbm = isDecoy ? 20.0f : 23.0f,
+                    propellerRpm = isDecoy ? 9800f : 11400f,
+                    rcs = isDecoy ? 0.08f : 0.012f,
+                    isNeutralised = false,
+                    neutralisedAtMs = null
+                };
+            }
+            return swarm;
+        }
+
+        public async Task SendScorecardPayloadAsync(string scorecardJson)
+        {
+            JsonEnvelope env = JsonEnvelope.Create(JsonEnvelope.SCORECARD_PAYLOAD, scorecardJson);
+            WsClient activeClient = Client;
+            if (activeClient != null && activeClient.IsConnected)
+            {
+                await activeClient.SendEnvelopeAsync(env).ConfigureAwait(false);
+            }
+            else
+            {
+                WsServer activeServer = Server;
+                if (activeServer != null && activeServer.IsRunning)
+                {
+                    await activeServer.BroadcastAsync(env.ToJson()).ConfigureAwait(false);
+                }
+            }
+        }
+
+        public string GetTelemetryDirectory()
+        {
+            if (!string.IsNullOrWhiteSpace(telemetryDirectoryOverride))
+                return telemetryDirectoryOverride;
+
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            if (string.IsNullOrWhiteSpace(appData))
+                appData = Directory.GetCurrentDirectory();
+            return Path.Combine(appData, "TRISHUL-SIM", "sessions");
+        }
+
+        private void InitSessionTelemetryFile(string sessionId)
+        {
+            if (string.IsNullOrWhiteSpace(sessionId))
+                return;
+
+            try
+            {
+                string dir = GetTelemetryDirectory();
+                Directory.CreateDirectory(dir);
+                _sessionTelemetryFilePath = Path.Combine(dir, sessionId + ".ndjson");
+                using (FileStream fs = new FileStream(_sessionTelemetryFilePath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite))
+                {
+                }
+                LastTelemetrySessionFilePath = _sessionTelemetryFilePath;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[ScenarioManager] Could not initialize telemetry file: " + ex.Message);
+            }
+        }
+
+        private void AppendTelemetryRecord(ScenarioTickPayload tick)
+        {
+            if (tick == null || string.IsNullOrWhiteSpace(_sessionTelemetryFilePath))
+                return;
+
+            try
+            {
+                using (FileStream fs = new FileStream(_sessionTelemetryFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+                using (StreamWriter sw = new StreamWriter(fs, Encoding.UTF8))
+                {
+                    sw.WriteLine(tick.ToJson());
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[ScenarioManager] Could not append telemetry record: " + ex.Message);
+            }
         }
     }
 }

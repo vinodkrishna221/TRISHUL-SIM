@@ -111,6 +111,37 @@ namespace UnityEngine
         public float progress = 1f;
     }
 
+    [Serializable]
+    public struct Rect
+    {
+        public float x;
+        public float y;
+        public float width;
+        public float height;
+
+        public Rect(float x, float y, float width, float height)
+        {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+        }
+
+        public override string ToString()
+        {
+            return string.Format("(x:{0:F2}, y:{1:F2}, width:{2:F2}, height:{3:F2})", x, y, width, height);
+        }
+    }
+
+    public class Camera : MonoBehaviour
+    {
+        public Rect rect = new Rect(0f, 0f, 1f, 1f);
+    }
+
+    public class AudioListener : MonoBehaviour
+    {
+    }
+
     namespace Events
     {
         public delegate void UnityAction();
