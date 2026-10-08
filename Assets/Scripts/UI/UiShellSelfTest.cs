@@ -292,9 +292,34 @@ namespace UnityEngine
         }
     }
 
-    public class MonoBehaviour
+    public static class Resources
+    {
+        public static T Load<T>(string path) where T : class { return null; }
+    }
+
+    public class Object { }
+    
+    public class GameObject : Object
+    {
+        public GameObject(string name) { }
+        public T AddComponent<T>() where T : Component, new() { return new T(); }
+    }
+
+    public class Component : Object
+    {
+        public GameObject gameObject { get { return new GameObject("mock"); } }
+    }
+
+    public class MonoBehaviour : Component
     {
         public T GetComponent<T>() where T : class { return null; }
+        public static void DontDestroyOnLoad(Object target) { }
+        public static void Destroy(Object obj) { }
+    }
+
+    public class TextAsset : Object
+    {
+        public string text { get; set; }
     }
 
     [AttributeUsage(AttributeTargets.Class)]
@@ -439,6 +464,7 @@ namespace UnityEngine.UIElements
     public class TextField : VisualElement
     {
         public string value { get; set; }
+        public string label { get; set; }
     }
 
     public class DropdownField : VisualElement
@@ -446,6 +472,7 @@ namespace UnityEngine.UIElements
         public List<string> choices { get; set; }
         public int index { get; set; }
         public string value { get; set; }
+        public string label { get; set; }
         public event Action<ChangeEvent<string>> ValueChanged;
 
         public DropdownField()
