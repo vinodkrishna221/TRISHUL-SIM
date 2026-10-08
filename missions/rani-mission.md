@@ -267,7 +267,7 @@ TEST:
   Acoustic FFT: bar at ~220 Hz lights amber/red as agents approach.
   All 3 update smoothly at ~10 Hz.
 DEMO: ⭐ "Beat 2 and Beat 3 fully visual — sensors alive." (Beat 2 + 3)
-STATUS: [ ] todo
+STATUS: [x] done — 2026-10-06 (verified with UiShellSelfTest PASS: 3 live renderers, spectrogram scroll, PPI scope blips, 8-band FFT)
 ```
 
 ---

@@ -1,13 +1,13 @@
-# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-06T18:42 IST by Vinod (unity-sim)
+# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-06T22:10 IST by Rani (UX-P1-A)
 
 > The single glance-source. Every session reads this first, appends one line at end.
 > Standup blocks replace the top section; history accumulates below.
 
 ## Now
 
-**Clock:** Hour 1 / 384h (16 days to 20 Oct 2026) · **Skeleton:** 🔴 not started (deadline 09 Oct 2026)
+**Clock:** Hour 24 / 384h (15 days to 20 Oct 2026) · **Skeleton:** 🟡 in progress (deadline 09 Oct 2026)
 **Deploy:** 🔴 not yet · last smoke — none
-**Rubric (Oracle):** I 9.6 · T 9.8 · Im 9.7 · P 9.5 → **9.65/10** (baseline) · FIX-THIS-HOUR: run /phase-plan per track; assign builders; start unity-sim WS IPC (P0 critical path)
+**Rubric (Oracle):** I 9.6 · T 9.8 · Im 9.7 · P 9.5 → **9.65/10** (baseline) · FIX-THIS-HOUR: wire sensor suite into Cockpit HUD; unblock Beat 2 & 3 visuals
 
 ## Tracks
 
@@ -16,7 +16,7 @@
 | unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B | — | US-P2-A (air-gap validation pass) |
 | swarm-ai | — | — | Reynolds Boids + HBT scaffold |
 | aar-engine | — | — | 10 Hz telemetry logger + Scorecard renderer |
-| ui-ux | UX-P0-A, UX-P0-B | — | UX-P1-A |
+| ui-ux | UX-P0-A, UX-P0-B, UX-P1-A | — | UX-P1-B (EW/SMASH controls) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
 
@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-06T22:10 IST · Rani: UX-P1-A done — live sensor suite (RF Waterfall scrolling spectrogram, Doppler circular PPI radar with 6 swarm blips, 8-band Acoustic FFT with blade-tip harmonic); UiShellSelfTest PASSED
 - 2026-10-06T19:12 IST · Vinod (unity-sim): [US-P1-B] ✅ All 4 tactical scenario JSON configs authored & validated (Punjab riverine fog, Ladakh LAC ridge, LoC mountain pass, Desert FOB) + bilingual English/Hindi dropdown and SwarmProfile console logging — self-test green on `feat/unity-sim-scenario-configs`
 - 2026-10-06T18:42 IST · Vinod (unity-sim): [US-P1-A] ✅ Split-screen fallback live (`Assets/Scenes/SplitScreen.unity`, `InstructorC2Root.prefab`, `TraineeCockpitRoot.prefab`, Camera.rect [0,0,0.5,1]/[0.5,0,0.5,1], single AudioListener, mode toggle, loopback bind safety, 6-Boid swarm + 10 Hz NDJSON telemetry + scorecard relay) — self-test green on `feat/unity-sim-split-screen`
 - 2026-10-05T23:26 IST · Rani: UX-P0-B done — Unity Localization setup, Hindi/English CSVs, LocaleToggle singleton, C2 & Cockpit controllers fully localized; UiShellSelfTest PASSED
