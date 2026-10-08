@@ -242,7 +242,7 @@ CONTEXT:
 DELIVERABLE: dist/TRISHUL-SIM-installer-<date>.exe · trishulsim.iss
 TEST: Clean install on target machine → both demo paths complete. FPS ≥60.
 DEMO: "One .exe installs, runs, hits 60 FPS." (Beat 6)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
