@@ -86,7 +86,7 @@ TEST:
   band=5.825, any bearing: false.
   band=0.915, bearing=180°: false (out of beam).
 DEMO: "EW engaged without friendly blackout → roeCompliance=1.0." (Beat 4 ROE proof)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
