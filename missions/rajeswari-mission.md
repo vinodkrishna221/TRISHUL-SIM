@@ -210,7 +210,7 @@ TEST:
   Run scenario to end. Click "Export PDF". Windows PDF viewer opens within 3s.
   PDF contains all 6 sections (check visually). Spinner visible during generation.
 DEMO: "Judge gets a PDF in one click." (Beat 6)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---

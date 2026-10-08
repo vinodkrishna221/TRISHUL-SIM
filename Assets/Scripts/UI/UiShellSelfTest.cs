@@ -68,6 +68,11 @@ namespace UnityEngine
         public static void LogError(string msg) { }
     }
 
+    public static class GUIUtility
+    {
+        public static string systemCopyBuffer { get; set; }
+    }
+
     public enum KeyCode { T }
 
     public static class Input
