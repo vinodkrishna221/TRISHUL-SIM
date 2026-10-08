@@ -159,7 +159,7 @@ TEST:
 DEPENDS: AA-P0-A, unity-sim P0-C     UNBLOCKS: UX-P0-A (SCORECARD_PAYLOAD shape frozen)
 
 DEMO: "'Scorecard received' log line on both screens." (P0 checklist item #6)
-PERSONA: aar-engine builder           STATUS: [ ] todo
+PERSONA: aar-engine builder           STATUS: [x] done
 ```
 
 ---

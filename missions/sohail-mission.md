@@ -149,7 +149,7 @@ TEST:
   scorecard.json exists — open; valid JSON, all metrics=0.
   Instructor C2 Console: "[WsServer] SCORECARD_PAYLOAD received — routing to all clients"
   Trainee Console: "[AAREngine] SCORECARD_PAYLOAD sent"
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
