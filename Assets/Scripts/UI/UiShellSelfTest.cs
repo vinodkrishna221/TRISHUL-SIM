@@ -33,16 +33,18 @@ namespace UnityEngine
     {
         public GameObject(string name) { }
         public T AddComponent<T>() where T : Component, new() { return new T(); }
+        public T GetComponent<T>() where T : Component { return null; }
     }
 
     public class Component : Object
     {
         public GameObject gameObject { get { return new GameObject("mock"); } }
+        public T GetComponent<T>() where T : Component { return null; }
+        public T AddComponent<T>() where T : Component, new() { return new T(); }
     }
 
     public class MonoBehaviour : Component
     {
-        public T GetComponent<T>() where T : class { return null; }
         public static void DontDestroyOnLoad(Object target) { }
         public static void Destroy(Object obj) { }
     }
@@ -72,6 +74,14 @@ namespace UnityEngine
     {
         public static bool GetKeyDown(KeyCode key) { return false; }
     }
+    public static class Mathf
+    {
+        public static float Clamp01(float val) { return val < 0f ? 0f : (val > 1f ? 1f : val); }
+        public static float Clamp(float val, float min, float max) { return val < min ? min : (val > max ? max : val); }
+        public static float Lerp(float a, float b, float t) { return a + (b - a) * Clamp01(t); }
+        public static int Max(int a, int b) { return a > b ? a : b; }
+        public static int RoundToInt(float val) { return (int)Math.Round(val); }
+    }
 }
 
 namespace UnityEngine.UIElements
@@ -81,13 +91,37 @@ namespace UnityEngine.UIElements
         public VisualElement rootVisualElement { get; set; }
     }
 
+    public enum LengthUnit { Pixel, Percent }
+
+    public struct Length
+    {
+        public float value;
+        public LengthUnit unit;
+        public Length(float value, LengthUnit unit = LengthUnit.Pixel) { this.value = value; this.unit = unit; }
+    }
+
+    public class IStyle
+    {
+        public Length left { get; set; }
+        public Length top { get; set; }
+        public Length width { get; set; }
+        public Length height { get; set; }
+    }
+
     public class VisualElement
     {
         public string name { get; set; }
         private readonly List<string> classes = new List<string>();
         private readonly List<VisualElement> children = new List<VisualElement>();
+        public IStyle style { get; set; }
 
-        public void Add(VisualElement child) { children.Add(child); }
+        public VisualElement() { style = new IStyle(); }
+
+        public int childCount { get { return children.Count; } }
+
+        public void Add(VisualElement child) { if (child != null) children.Add(child); }
+        public void Clear() { children.Clear(); }
+        public List<VisualElement> Children() { return new List<VisualElement>(children); }
         public void AddToClassList(string className)
         {
             if (!classes.Contains(className)) classes.Add(className);
@@ -159,6 +193,30 @@ namespace UnityEngine.UIElements
             if (choices != null) index = choices.IndexOf(newVal);
             if (ValueChanged != null)
                 ValueChanged(new ChangeEvent<string> { previousValue = old, newValue = newVal });
+        }
+    }
+
+    public class Slider : VisualElement
+    {
+        public float lowValue { get; set; }
+        public float highValue { get; set; }
+        public float value { get; set; }
+        public event Action<ChangeEvent<float>> ValueChanged;
+
+        public void RegisterValueChangedCallback(Action<ChangeEvent<float>> callback)
+        {
+            ValueChanged += callback;
+        }
+        public void UnregisterValueChangedCallback(Action<ChangeEvent<float>> callback)
+        {
+            ValueChanged -= callback;
+        }
+        public void SimulateChange(float newVal)
+        {
+            float old = value;
+            value = newVal;
+            if (ValueChanged != null)
+                ValueChanged(new ChangeEvent<float> { previousValue = old, newValue = newVal });
         }
     }
 

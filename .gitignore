@@ -12,3 +12,5 @@ dist/
 .claude/
 .opencode/
 .mcp.json
+*.exe
+powershell.cmd

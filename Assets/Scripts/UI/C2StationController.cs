@@ -37,6 +37,7 @@ namespace TrishulSim.UI
         private Button langToggle;
         private VisualElement scorecardMirror;
         private Label scorecardStubLabel;
+        private ScorecardPanelController scorecardController;
 
         // ── State ─────────────────────────────────────────────
         private bool isConnected = false;
@@ -52,6 +53,7 @@ namespace TrishulSim.UI
         public VisualElement LinkStatusIcon { get { return linkStatusIcon; } }
         public DropdownField ScenarioDropdown { get { return scenarioDropdown; } }
         public VisualElement ScorecardMirror { get { return scorecardMirror; } }
+        public ScorecardPanelController ScorecardController { get { return scorecardController; } }
         public Label ScorecardStubLabel { get { return scorecardStubLabel; } }
 
         // ══════════════════════════════════════════════════════
@@ -116,6 +118,18 @@ namespace TrishulSim.UI
             langToggle         = root.Q<Button>("lang-toggle");
             scorecardMirror    = root.Q<VisualElement>("scorecard-mirror");
             scorecardStubLabel = root.Q<Label>("scorecard-stub-label");
+
+            if (scorecardMirror != null)
+            {
+                var scorecardRoot = scorecardMirror.Q<VisualElement>("scorecard-root") ?? scorecardMirror;
+                if (scorecardController == null)
+                {
+                    scorecardController = gameObject.GetComponent<ScorecardPanelController>();
+                    if (scorecardController == null)
+                        scorecardController = gameObject.AddComponent<ScorecardPanelController>();
+                }
+                scorecardController.BindElements(scorecardRoot);
+            }
         }
 
         // ══════════════════════════════════════════════════════
@@ -357,21 +371,37 @@ namespace TrishulSim.UI
         // ══════════════════════════════════════════════════════
 
         /// <summary>
-        /// Called when SCORECARD_PAYLOAD is received via WebSocket.
-        /// Shows the scorecard mirror panel on the C2 screen.
-        /// Stub: displays sessionId text. Full renderer in UX-P1-D (Rajeswari).
+        /// Called when SCORECARD_PAYLOAD is received via WebSocket with full Scorecard object.
+        /// Shows the scorecard mirror panel on the C2 screen and binds the data.
         /// </summary>
-        public void OnScorecardReceived(string sessionId)
+        public void OnScorecardReceived(Scorecard scorecard)
         {
+            if (scorecard == null) return;
+            Debug.Log(string.Format("[C2] SCORECARD_PAYLOAD received for session {0}.", scorecard.sessionId));
+
             if (scorecardMirror != null)
             {
                 scorecardMirror.RemoveFromClassList("hidden");
             }
             if (scorecardStubLabel != null)
             {
-                scorecardStubLabel.text = LocaleToggle.Instance.GetFormatted("SCORECARD_RECEIVED", sessionId);
+                scorecardStubLabel.text = LocaleToggle.Instance.GetFormatted("SCORECARD_RECEIVED", scorecard.sessionId);
             }
-            Debug.Log(string.Format("[C2] SCORECARD_PAYLOAD received for session {0}.", sessionId));
+            if (scorecardController != null)
+            {
+                scorecardController.Bind(scorecard);
+            }
+        }
+
+        /// <summary>
+        /// Backward-compatible overload receiving sessionId string (or mock data).
+        /// </summary>
+        public void OnScorecardReceived(string sessionId)
+        {
+            var fixture = ScorecardMock.GetPunjabFixture();
+            if (!string.IsNullOrEmpty(sessionId))
+                fixture.sessionId = sessionId;
+            OnScorecardReceived(fixture);
         }
 
         // ══════════════════════════════════════════════════════

@@ -16,7 +16,7 @@
 | unity-sim | — | — | Walking skeleton: sensor panes + WebSocket IPC |
 | swarm-ai | — | — | Reynolds Boids + HBT scaffold |
 | aar-engine | — | — | 10 Hz telemetry logger + Scorecard renderer |
-| ui-ux | UX-P0-A (UITK shell) | — | UX-P0-B (localization) |
+| ui-ux | UX-P0-A, UX-P0-B, UX-P1-D (Scorecard Renderer) | — | UX-P2-A (PDF export button) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
 
@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-08T18:15 IST · Rajeswari: UX-P1-D done — ScorecardPanel UXML/USS, ScorecardPanelController, ScorecardMock fixtures, interactive timeline scrubber with 6-agent spatial radar overlay, bilingual pass; ScorecardSelfTest & UiShellSelfTest PASSED
 - 2026-10-07T20:08 IST · Rani: UX-P2-D partial smoke — Beats 1–4 PASS (LAN icon, 4-scenario dropdown, RF Waterfall, Doppler scope, Acoustic FFT, EW+SMASH controls); Beats 5–6 BLOCKED on Rajeswari UX-P1-D/P2-A/P2-B/P2-C + Sohail AA-P1-A/B; PR#11 open feat/ui-ux-demo-smoke; Warden review pending
 - 2026-10-05T23:26 IST · Rani: UX-P0-B done — Unity Localization setup, Hindi/English CSVs, LocaleToggle singleton, C2 & Cockpit controllers fully localized; UiShellSelfTest PASSED
 
