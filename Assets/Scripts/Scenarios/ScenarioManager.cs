@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
@@ -48,13 +49,17 @@ namespace TrishulSim.Scenarios
 
     /// <summary>
     /// Manages Scenario Library selection, SCENARIO_START broadcast from Instructor C2,
-    /// and Trainee Cockpit scene transition + 1s ACK handling (US-P0-B).
-    /// Implements board/contracts/scenario-events.md v1 (SCENARIO_START).
+    /// Trainee Cockpit scene transition + 1s ACK handling (US-P0-B), and the 10 Hz
+    /// SCENARIO_TICK + SCENARIO_END simulation loop (US-P0-C).
+    /// Implements board/contracts/scenario-events.md v1 (SCENARIO_START, SCENARIO_TICK, SCENARIO_END).
     /// </summary>
     public class ScenarioManager : MonoBehaviour
     {
         public const string DefaultTraineeSceneName = "TraineeCockpit";
         public const int DefaultAckTimeoutMs = 1000;
+        public const float DefaultTickIntervalSeconds = 0.1f;
+        public const int DefaultTickStepMs = 100;
+        public const float ExclusionZoneRadiusMeters = 20.0f;
 
         public static ScenarioManager Instance { get; private set; }
 
@@ -62,24 +67,43 @@ namespace TrishulSim.Scenarios
         [SerializeField] private WsClient client;
         [SerializeField] private Dropdown scenarioDropdown;
         [SerializeField] private Button launchButton;
+        [SerializeField] private Button abortButton;
         [SerializeField] private GameObject traineeCockpitRoot;
         [SerializeField] private string traineeCockpitSceneName = DefaultTraineeSceneName;
         [SerializeField] private bool loadSceneOnScenarioStart = true;
         [SerializeField] private int ackTimeoutMs = DefaultAckTimeoutMs;
+        [SerializeField] private float tickIntervalSeconds = DefaultTickIntervalSeconds;
+        [SerializeField] private int tickStepMs = DefaultTickStepMs;
+        [SerializeField] private bool autoStartTickLoop = true;
 
         private readonly List<ScenarioConfig> _scenarios = new List<ScenarioConfig>();
+        private readonly object _tickStateLock = new object();
         private WsServer _subscribedServer;
         private WsClient _subscribedClient;
         private Button _subscribedButton;
+        private Button _subscribedAbortButton;
+        private Coroutine _tickCoroutine;
         private string _scenariosDirectoryOverride;
         private volatile bool _isServerScenarioRunning;
         private volatile bool _isClientScenarioRunning;
         private volatile bool _lastScenarioStartAcked;
         private string _pendingAckSessionId;
         private int _launchGeneration;
+        private long _currentElapsedMs;
+        private int _tickCount;
+        private SwarmAgentState[] _injectedSwarmSnapshot = new SwarmAgentState[0];
+        private SensorReadings _injectedSensorReadings = new SensorReadings();
+        private string _injectedThreatState = ScenarioTickPayload.THREAT_GREEN;
+        private TraineeAction _injectedTraineeAction = new TraineeAction();
+        private EWJammerState _injectedEwJammerState = new EWJammerState();
+        private bool _injectedFriendlyVhfActive;
 
         public event Action<ScenarioStartPayload> OnScenarioStartBroadcast;
         public event Action<ScenarioStartPayload> OnScenarioStartReceived;
+        public event Action<ScenarioTickPayload> OnScenarioTickBroadcast;
+        public event Action<ScenarioTickPayload> OnScenarioTickReceived;
+        public event Action<ScenarioEndPayload> OnScenarioEndBroadcast;
+        public event Action<ScenarioEndPayload> OnScenarioEndReceived;
 
         public WsServer Server
         {
@@ -143,6 +167,20 @@ namespace TrishulSim.Scenarios
             }
         }
 
+        public Button AbortButton
+        {
+            get { return abortButton; }
+            set
+            {
+                if (!ReferenceEquals(abortButton, value))
+                {
+                    UnsubscribeAbortButton();
+                    abortButton = value;
+                    SubscribeAbortButton();
+                }
+            }
+        }
+
         public GameObject TraineeCockpitRoot
         {
             get { return traineeCockpitRoot; }
@@ -165,6 +203,24 @@ namespace TrishulSim.Scenarios
         {
             get { return ackTimeoutMs; }
             set { ackTimeoutMs = Math.Max(50, value); }
+        }
+
+        public float TickIntervalSeconds
+        {
+            get { return tickIntervalSeconds; }
+            set { tickIntervalSeconds = Math.Max(0.001f, value); }
+        }
+
+        public int TickStepMs
+        {
+            get { return tickStepMs; }
+            set { tickStepMs = Math.Max(1, value); }
+        }
+
+        public bool AutoStartTickLoop
+        {
+            get { return autoStartTickLoop; }
+            set { autoStartTickLoop = value; }
         }
 
         public string ScenariosDirectoryOverride
@@ -200,6 +256,20 @@ namespace TrishulSim.Scenarios
         public ScenarioConfig CurrentScenario { get; private set; }
         public long CurrentStartedAtMs { get; private set; }
 
+        public long CurrentElapsedMs
+        {
+            get { lock (_tickStateLock) { return _currentElapsedMs; } }
+        }
+
+        public int TickCount
+        {
+            get { lock (_tickStateLock) { return _tickCount; } }
+        }
+
+        public string LastScenarioEndReason { get; private set; }
+        public ScenarioTickPayload LastTickPayload { get; private set; }
+        public ScenarioEndPayload LastEndPayload { get; private set; }
+
         public bool IsScenarioRunning
         {
             get { return _isServerScenarioRunning || _isClientScenarioRunning; }
@@ -230,13 +300,16 @@ namespace TrishulSim.Scenarios
             SubscribeServer();
             SubscribeClient();
             SubscribeButton();
+            SubscribeAbortButton();
         }
 
         public void OnDestroy()
         {
+            StopTickLoop();
             UnsubscribeServer();
             UnsubscribeClient();
             UnsubscribeButton();
+            UnsubscribeAbortButton();
             if (ReferenceEquals(Instance, this))
                 Instance = null;
         }
@@ -283,10 +356,75 @@ namespace TrishulSim.Scenarios
 
         public void ResetScenarioState()
         {
+            StopTickLoop();
             _isServerScenarioRunning = false;
             _isClientScenarioRunning = false;
             _pendingAckSessionId = null;
+            lock (_tickStateLock)
+            {
+                _currentElapsedMs = 0;
+                _tickCount = 0;
+                _injectedSwarmSnapshot = new SwarmAgentState[0];
+                _injectedSensorReadings = new SensorReadings();
+                _injectedThreatState = ScenarioTickPayload.THREAT_GREEN;
+                _injectedTraineeAction = new TraineeAction();
+                _injectedEwJammerState = new EWJammerState();
+                _injectedFriendlyVhfActive = false;
+            }
             Interlocked.Increment(ref _launchGeneration);
+        }
+
+        /// <summary>
+        /// Stub interface for swarm-ai to inject current agent states for the next SCENARIO_TICK (US-P0-C).
+        /// </summary>
+        public void InjectSwarmSnapshot(SwarmAgentState[] s)
+        {
+            lock (_tickStateLock)
+            {
+                _injectedSwarmSnapshot = SwarmAgentState.CloneArray(s);
+            }
+        }
+
+        public void InjectSensorReadings(SensorReadings readings)
+        {
+            lock (_tickStateLock)
+            {
+                _injectedSensorReadings = readings != null ? readings.Clone() : new SensorReadings();
+            }
+        }
+
+        public void InjectThreatState(string threatState)
+        {
+            lock (_tickStateLock)
+            {
+                _injectedThreatState = ScenarioTickPayload.IsValidThreatState(threatState)
+                    ? threatState
+                    : ScenarioTickPayload.THREAT_GREEN;
+            }
+        }
+
+        public void InjectTraineeAction(TraineeAction action)
+        {
+            lock (_tickStateLock)
+            {
+                _injectedTraineeAction = action != null ? action.Clone() : new TraineeAction();
+            }
+        }
+
+        public void InjectEWJammerState(EWJammerState state)
+        {
+            lock (_tickStateLock)
+            {
+                _injectedEwJammerState = state != null ? state.Clone() : new EWJammerState();
+            }
+        }
+
+        public void InjectFriendlyVhfActive(bool active)
+        {
+            lock (_tickStateLock)
+            {
+                _injectedFriendlyVhfActive = active;
+            }
         }
 
         public void LaunchSelectedScenario()
@@ -325,6 +463,7 @@ namespace TrishulSim.Scenarios
                 return null;
             }
 
+            StopTickLoop();
             SubscribeServer();
 
             ScenarioConfig launchConfig = config.Clone();
@@ -340,6 +479,18 @@ namespace TrishulSim.Scenarios
             CurrentSessionId = sessionId;
             CurrentScenario = launchConfig;
             CurrentStartedAtMs = startedAtMs;
+            LastScenarioEndReason = null;
+            lock (_tickStateLock)
+            {
+                _currentElapsedMs = 0;
+                _tickCount = 0;
+                _injectedSwarmSnapshot = new SwarmAgentState[0];
+                _injectedSensorReadings = new SensorReadings();
+                _injectedThreatState = ScenarioTickPayload.THREAT_GREEN;
+                _injectedTraineeAction = new TraineeAction();
+                _injectedEwJammerState = new EWJammerState();
+                _injectedFriendlyVhfActive = false;
+            }
             _isServerScenarioRunning = true;
             _lastScenarioStartAcked = false;
             _pendingAckSessionId = sessionId;
@@ -371,8 +522,281 @@ namespace TrishulSim.Scenarios
             if (broadcastHandler != null)
                 broadcastHandler(payload);
 
+            if (autoStartTickLoop)
+            {
+                StartTickLoop();
+            }
+
             return sessionId;
         }
+
+        public void StartTickLoop()
+        {
+            StopTickLoop();
+            if (!_isServerScenarioRunning)
+                return;
+
+            _tickCoroutine = StartCoroutine(TickLoop());
+        }
+
+        public void StopTickLoop()
+        {
+            Coroutine running = _tickCoroutine;
+            _tickCoroutine = null;
+            if (running != null)
+            {
+                StopCoroutine(running);
+            }
+        }
+
+        /// <summary>
+        /// 10 Hz simulation heartbeat coroutine (US-P0-C).
+        /// Runs every 0.1 s (WaitForSeconds), increments t by 100 ms, broadcasts SCENARIO_TICK,
+        /// and fires SCENARIO_END when terminal conditions are met.
+        /// </summary>
+        public IEnumerator TickLoop()
+        {
+            int generation = _launchGeneration;
+            while (_isServerScenarioRunning && _launchGeneration == generation)
+            {
+                yield return new WaitForSeconds(tickIntervalSeconds);
+                if (!_isServerScenarioRunning || _launchGeneration != generation)
+                    yield break;
+
+                StepScenarioTickAsync().GetAwaiter().GetResult();
+            }
+        }
+
+        public ScenarioTickPayload StepScenarioTick()
+        {
+            return StepScenarioTickAsync().GetAwaiter().GetResult();
+        }
+
+        public async Task<ScenarioTickPayload> StepScenarioTickAsync()
+        {
+            if (!_isServerScenarioRunning || string.IsNullOrWhiteSpace(CurrentSessionId))
+                return null;
+
+            ScenarioTickPayload tickPayload;
+            long elapsedMs;
+            SwarmAgentState[] snapshotCopy;
+
+            lock (_tickStateLock)
+            {
+                _currentElapsedMs += tickStepMs;
+                _tickCount++;
+                elapsedMs = _currentElapsedMs;
+                snapshotCopy = SwarmAgentState.CloneArray(_injectedSwarmSnapshot);
+
+                tickPayload = new ScenarioTickPayload
+                {
+                    sessionId = CurrentSessionId,
+                    t = elapsedMs,
+                    swarmSnapshot = snapshotCopy,
+                    sensorReadings = _injectedSensorReadings != null ? _injectedSensorReadings.Clone() : new SensorReadings(),
+                    threatState = _injectedThreatState ?? ScenarioTickPayload.THREAT_GREEN,
+                    traineeAction = _injectedTraineeAction != null ? _injectedTraineeAction.Clone() : new TraineeAction(),
+                    ewJammerState = _injectedEwJammerState != null ? _injectedEwJammerState.Clone() : new EWJammerState(),
+                    friendlyVhfActive = _injectedFriendlyVhfActive
+                };
+            }
+
+            JsonEnvelope tickEnvelope = ScenarioTickPayload.CreateEnvelope(tickPayload);
+            LastTickPayload = tickPayload;
+
+            WsServer activeServer = Server;
+            if (activeServer != null && activeServer.IsRunning)
+            {
+                await activeServer.BroadcastAsync(tickEnvelope.ToJson()).ConfigureAwait(false);
+            }
+
+            Debug.Log("[ScenarioManager] SCENARIO_TICK broadcast \u2014 sessionId: " + tickPayload.sessionId +
+                      ", t: " + tickPayload.t + ", agents: " + tickPayload.swarmSnapshot.Length +
+                      ", threatState: " + tickPayload.threatState);
+
+            Action<ScenarioTickPayload> tickHandler = OnScenarioTickBroadcast;
+            if (tickHandler != null)
+                tickHandler(tickPayload);
+
+            string terminalReason;
+            if (EvaluateTerminalCondition(elapsedMs, snapshotCopy, CurrentScenario, out terminalReason))
+            {
+                await BroadcastScenarioEndAsync(terminalReason).ConfigureAwait(false);
+            }
+
+            return tickPayload;
+        }
+
+        public void AbortScenario()
+        {
+            BroadcastScenarioEnd(ScenarioEndPayload.REASON_INSTRUCTOR_ABORT);
+        }
+
+        public void BroadcastScenarioEnd(string reason)
+        {
+            BroadcastScenarioEndAsync(reason).GetAwaiter().GetResult();
+        }
+
+        public async Task<ScenarioEndPayload> BroadcastScenarioEndAsync(string reason)
+        {
+            if (!_isServerScenarioRunning || string.IsNullOrWhiteSpace(CurrentSessionId))
+                return null;
+
+            _isServerScenarioRunning = false;
+            _pendingAckSessionId = null;
+            StopTickLoop();
+
+            string resolvedReason = ScenarioEndPayload.IsValidReason(reason)
+                ? reason
+                : ScenarioEndPayload.REASON_INSTRUCTOR_ABORT;
+
+            long finalElapsedMs;
+            SwarmAgentState[] finalSnapshot;
+            lock (_tickStateLock)
+            {
+                finalElapsedMs = _currentElapsedMs;
+                finalSnapshot = SwarmAgentState.CloneArray(_injectedSwarmSnapshot);
+            }
+
+            ScenarioEndPayload endPayload = new ScenarioEndPayload
+            {
+                sessionId = CurrentSessionId,
+                t = finalElapsedMs,
+                reason = resolvedReason,
+                finalSwarmSnapshot = finalSnapshot
+            };
+
+            JsonEnvelope endEnvelope = ScenarioEndPayload.CreateEnvelope(
+                endPayload.sessionId,
+                endPayload.t,
+                endPayload.reason,
+                endPayload.finalSwarmSnapshot);
+
+            LastScenarioEndReason = resolvedReason;
+            LastEndPayload = endPayload;
+
+            WsServer activeServer = Server;
+            if (activeServer != null && activeServer.IsRunning)
+            {
+                await activeServer.BroadcastAsync(endEnvelope.ToJson()).ConfigureAwait(false);
+            }
+
+            Debug.Log("[ScenarioManager] SCENARIO_END broadcast \u2014 sessionId: " + endPayload.sessionId +
+                      ", t: " + endPayload.t + ", reason: " + endPayload.reason);
+
+            Action<ScenarioEndPayload> endHandler = OnScenarioEndBroadcast;
+            if (endHandler != null)
+                endHandler(endPayload);
+
+            return endPayload;
+        }
+
+        private static bool EvaluateTerminalCondition(
+            long elapsedMs,
+            SwarmAgentState[] snapshot,
+            ScenarioConfig config,
+            out string reason)
+        {
+            reason = null;
+
+            if (snapshot != null && snapshot.Length > 0)
+            {
+                int attackerTotal = 0;
+                int attackerNeutralised = 0;
+                float radiusSq = ExclusionZoneRadiusMeters * ExclusionZoneRadiusMeters;
+
+                for (int i = 0; i < snapshot.Length; i++)
+                {
+                    SwarmAgentState agent = snapshot[i];
+                    if (agent == null || agent.isDecoy)
+                        continue;
+
+                    attackerTotal++;
+                    if (agent.isNeutralised)
+                    {
+                        attackerNeutralised++;
+                    }
+                    else
+                    {
+                        float distSq = (agent.positionWorld.x * agent.positionWorld.x) +
+                                       (agent.positionWorld.y * agent.positionWorld.y) +
+                                       (agent.positionWorld.z * agent.positionWorld.z);
+                        if (distSq <= radiusSq)
+                        {
+                            reason = ScenarioEndPayload.REASON_EXCLUSION_BREACH;
+                            return true;
+                        }
+                    }
+                }
+
+                int expectedAttackers = (config != null && config.swarmProfile != null && config.swarmProfile.attackerCount > 0)
+                    ? config.swarmProfile.attackerCount
+                    : attackerTotal;
+
+                if (attackerTotal > 0 && attackerNeutralised >= expectedAttackers && attackerNeutralised == attackerTotal)
+                {
+                    reason = ScenarioEndPayload.REASON_ALL_NEUTRALISED;
+                    return true;
+                }
+            }
+
+            long durationLimitMs = (config != null && config.durationMaxSecs > 0 ? config.durationMaxSecs : 120) * 1000L;
+            if (elapsedMs >= durationLimitMs)
+            {
+                reason = ScenarioEndPayload.REASON_TIME_LIMIT;
+                return true;
+            }
+
+            return false;
+        }
+
+#if !UNITY_5_3_OR_NEWER
+        public Coroutine StartCoroutine(IEnumerator routine)
+        {
+            if (routine == null)
+                return null;
+
+            CancellationTokenSource cts = new CancellationTokenSource();
+            Coroutine handle = new Coroutine { Cts = cts };
+            handle.RunnerTask = RunCoroutineInternalAsync(routine, cts.Token);
+            return handle;
+        }
+
+        public void StopCoroutine(Coroutine coroutine)
+        {
+            if (coroutine == null || coroutine.Cts == null)
+                return;
+            try { coroutine.Cts.Cancel(); } catch { }
+        }
+
+        private static async Task RunCoroutineInternalAsync(IEnumerator routine, CancellationToken token)
+        {
+            try
+            {
+                while (!token.IsCancellationRequested && routine.MoveNext())
+                {
+                    object yielded = routine.Current;
+                    WaitForSeconds wfs = yielded as WaitForSeconds;
+                    if (wfs != null)
+                    {
+                        int delayMs = Math.Max(1, (int)Math.Round(wfs.Seconds * 1000.0f));
+                        await Task.Delay(delayMs, token).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await Task.Yield();
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[ScenarioManager] Coroutine exception: " + ex);
+            }
+        }
+#endif
 
         private async Task MonitorAckTimeoutAsync(string sessionId, int generation, int timeoutMs)
         {
@@ -463,6 +887,28 @@ namespace TrishulSim.Scenarios
             }
         }
 
+        private void SubscribeAbortButton()
+        {
+            if (ReferenceEquals(_subscribedAbortButton, abortButton))
+                return;
+
+            UnsubscribeAbortButton();
+            if (abortButton != null && abortButton.onClick != null)
+            {
+                abortButton.onClick.AddListener(AbortScenario);
+                _subscribedAbortButton = abortButton;
+            }
+        }
+
+        private void UnsubscribeAbortButton()
+        {
+            if (_subscribedAbortButton != null && _subscribedAbortButton.onClick != null)
+            {
+                _subscribedAbortButton.onClick.RemoveListener(AbortScenario);
+                _subscribedAbortButton = null;
+            }
+        }
+
         private void HandleServerMessageReceived(JsonEnvelope envelope)
         {
             if (_pendingAckSessionId == null)
@@ -477,9 +923,26 @@ namespace TrishulSim.Scenarios
 
         private void HandleClientMessageReceived(JsonEnvelope envelope)
         {
-            if (!string.Equals(envelope.type, JsonEnvelope.SCENARIO_START, StringComparison.Ordinal))
+            if (string.Equals(envelope.type, JsonEnvelope.SCENARIO_START, StringComparison.Ordinal))
+            {
+                HandleClientScenarioStart(envelope);
                 return;
+            }
 
+            if (string.Equals(envelope.type, JsonEnvelope.SCENARIO_TICK, StringComparison.Ordinal))
+            {
+                HandleClientScenarioTick(envelope);
+                return;
+            }
+
+            if (string.Equals(envelope.type, JsonEnvelope.SCENARIO_END, StringComparison.Ordinal))
+            {
+                HandleClientScenarioEnd(envelope);
+            }
+        }
+
+        private void HandleClientScenarioStart(JsonEnvelope envelope)
+        {
             WsClient activeClient = Client;
 
             ScenarioStartPayload startPayload;
@@ -526,6 +989,12 @@ namespace TrishulSim.Scenarios
             CurrentSessionId = startPayload.sessionId;
             CurrentScenario = startPayload.scenarioConfig;
             CurrentStartedAtMs = startPayload.startedAtMs;
+            LastScenarioEndReason = null;
+            lock (_tickStateLock)
+            {
+                _currentElapsedMs = 0;
+                _tickCount = 0;
+            }
             _isClientScenarioRunning = true;
 
             Debug.Log("[WsClient] SCENARIO_START received \u2014 sessionId: " + startPayload.sessionId);
@@ -550,6 +1019,68 @@ namespace TrishulSim.Scenarios
             Action<ScenarioStartPayload> handler = OnScenarioStartReceived;
             if (handler != null)
                 handler(startPayload);
+        }
+
+        private void HandleClientScenarioTick(JsonEnvelope envelope)
+        {
+            WsClient activeClient = Client;
+            ScenarioTickPayload tickPayload;
+            string parseError;
+            if (!ScenarioTickPayload.TryParse(envelope.payload, out tickPayload, out parseError))
+            {
+                Debug.LogWarning("[ScenarioManager] Invalid SCENARIO_TICK payload: " + parseError);
+                if (activeClient != null && activeClient.IsConnected)
+                {
+                    JsonEnvelope errEnv = JsonEnvelope.CreateError(JsonEnvelope.ERR_PAYLOAD_INVALID, parseError, false);
+                    Task _ = activeClient.SendEnvelopeAsync(errEnv);
+                }
+                return;
+            }
+
+            lock (_tickStateLock)
+            {
+                _currentElapsedMs = tickPayload.t;
+                _tickCount++;
+            }
+            LastTickPayload = tickPayload;
+
+            Debug.Log("[WsClient] SCENARIO_TICK received \u2014 sessionId: " + tickPayload.sessionId + ", t: " + tickPayload.t);
+
+            Action<ScenarioTickPayload> handler = OnScenarioTickReceived;
+            if (handler != null)
+                handler(tickPayload);
+        }
+
+        private void HandleClientScenarioEnd(JsonEnvelope envelope)
+        {
+            WsClient activeClient = Client;
+            ScenarioEndPayload endPayload;
+            string parseError;
+            if (!ScenarioEndPayload.TryParse(envelope.payload, out endPayload, out parseError))
+            {
+                Debug.LogWarning("[ScenarioManager] Invalid SCENARIO_END payload: " + parseError);
+                if (activeClient != null && activeClient.IsConnected)
+                {
+                    JsonEnvelope errEnv = JsonEnvelope.CreateError(JsonEnvelope.ERR_PAYLOAD_INVALID, parseError, false);
+                    Task _ = activeClient.SendEnvelopeAsync(errEnv);
+                }
+                return;
+            }
+
+            _isClientScenarioRunning = false;
+            lock (_tickStateLock)
+            {
+                _currentElapsedMs = endPayload.t;
+            }
+            LastScenarioEndReason = endPayload.reason;
+            LastEndPayload = endPayload;
+
+            Debug.Log("[WsClient] SCENARIO_END received \u2014 sessionId: " + endPayload.sessionId +
+                      ", t: " + endPayload.t + ", reason: " + endPayload.reason);
+
+            Action<ScenarioEndPayload> handler = OnScenarioEndReceived;
+            if (handler != null)
+                handler(endPayload);
         }
     }
 }

@@ -157,7 +157,7 @@ CONTEXT:
 DELIVERABLE: ScenarioManager.cs updated with TickLoop + BroadcastScenarioEnd + stub inject
 
 TEST: Run scenario; Console shows SCENARIO_TICK at ~10Hz; SCENARIO_END on abort.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---

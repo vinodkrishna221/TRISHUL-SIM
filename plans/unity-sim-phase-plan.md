@@ -202,7 +202,7 @@ TEST:
 DEPENDS: US-P0-B               UNBLOCKS: AA-P0-A (TICK + END events), SA-P0-A (tick clock)
 
 DEMO: "Plumbing for 10 Hz log file — telemetry grows during scenario." (Beat 5 plumbing)
-PERSONA: unity-sim builder     STATUS: [ ] todo
+PERSONA: unity-sim builder     STATUS: [x] done
 ```
 
 ---

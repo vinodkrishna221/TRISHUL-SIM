@@ -3,11 +3,44 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using TrishulSim.Network;
 
 #if !UNITY_5_3_OR_NEWER
 namespace UnityEngine
 {
+    [Serializable]
+    public struct Vector3
+    {
+        public float x;
+        public float y;
+        public float z;
+
+        public Vector3(float x, float y, float z)
+        {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
+        public static Vector3 zero { get { return new Vector3(0f, 0f, 0f); } }
+        public float sqrMagnitude { get { return (x * x) + (y * y) + (z * z); } }
+        public float magnitude { get { return (float)Math.Sqrt(sqrMagnitude); } }
+    }
+
+    public sealed class WaitForSeconds
+    {
+        public float Seconds { get; private set; }
+        public WaitForSeconds(float seconds) { Seconds = seconds; }
+    }
+
+    public sealed class Coroutine
+    {
+        internal CancellationTokenSource Cts;
+        internal Task RunnerTask;
+    }
+
     public static class Application
     {
         private static string _streamingAssetsPath;
@@ -814,6 +847,798 @@ namespace TrishulSim.Scenarios
         }
     }
 
+    /// <summary>
+    /// SwarmAgentState matching docs/SCHEMA.md Entity 2 and board/contracts/scenario-events.md v1.
+    /// </summary>
+    [Serializable]
+    public class SwarmAgentState
+    {
+        public string agentId = "agent-0";
+        public bool isDecoy;
+        public UnityEngine.Vector3 positionWorld;
+        public UnityEngine.Vector3 velocityMs;
+        public float headingDeg;
+        public float altitudeM;
+        public bool rfEmitting;
+        public float rfFreqGHz = 5.825f;
+        public float rfPowerDbm = 23.0f;
+        public float propellerRpm = 11400f;
+        public float rcs = 0.012f;
+        public bool isNeutralised;
+        public long? neutralisedAtMs;
+
+        public SwarmAgentState Clone()
+        {
+            return new SwarmAgentState
+            {
+                agentId = agentId,
+                isDecoy = isDecoy,
+                positionWorld = positionWorld,
+                velocityMs = velocityMs,
+                headingDeg = headingDeg,
+                altitudeM = altitudeM,
+                rfEmitting = rfEmitting,
+                rfFreqGHz = rfFreqGHz,
+                rfPowerDbm = rfPowerDbm,
+                propellerRpm = propellerRpm,
+                rcs = rcs,
+                isNeutralised = isNeutralised,
+                neutralisedAtMs = neutralisedAtMs
+            };
+        }
+
+        public static SwarmAgentState[] CloneArray(SwarmAgentState[] source)
+        {
+            if (source == null || source.Length == 0)
+                return new SwarmAgentState[0];
+
+            SwarmAgentState[] copy = new SwarmAgentState[source.Length];
+            for (int i = 0; i < source.Length; i++)
+            {
+                copy[i] = source[i] != null ? source[i].Clone() : new SwarmAgentState();
+            }
+            return copy;
+        }
+
+        public string ToJson()
+        {
+            StringBuilder sb = new StringBuilder(320);
+            sb.Append("{\"agentId\":\"");
+            sb.Append(JsonEnvelope.EscapeJsonString(agentId ?? string.Empty));
+            sb.Append("\",\"isDecoy\":");
+            sb.Append(isDecoy ? "true" : "false");
+            sb.Append(",\"positionWorld\":");
+            sb.Append(JsonParser.FormatVector3(positionWorld));
+            sb.Append(",\"velocityMs\":");
+            sb.Append(JsonParser.FormatVector3(velocityMs));
+            sb.Append(",\"headingDeg\":");
+            sb.Append(ScenarioConfig.FormatFloat(headingDeg));
+            sb.Append(",\"altitudeM\":");
+            sb.Append(ScenarioConfig.FormatFloat(altitudeM));
+            sb.Append(",\"rfEmitting\":");
+            sb.Append(rfEmitting ? "true" : "false");
+            sb.Append(",\"rfFreqGHz\":");
+            sb.Append(ScenarioConfig.FormatFloat(rfFreqGHz));
+            sb.Append(",\"rfPowerDbm\":");
+            sb.Append(ScenarioConfig.FormatFloat(rfPowerDbm));
+            sb.Append(",\"propellerRpm\":");
+            long roundedRpm = (long)Math.Round(propellerRpm);
+            if (Math.Abs(propellerRpm - roundedRpm) < 0.0001f)
+                sb.Append(roundedRpm.ToString(CultureInfo.InvariantCulture));
+            else
+                sb.Append(ScenarioConfig.FormatFloat(propellerRpm));
+            sb.Append(",\"rcs\":");
+            sb.Append(ScenarioConfig.FormatFloat(rcs));
+            sb.Append(",\"isNeutralised\":");
+            sb.Append(isNeutralised ? "true" : "false");
+            sb.Append(",\"neutralisedAtMs\":");
+            sb.Append(neutralisedAtMs.HasValue ? neutralisedAtMs.Value.ToString(CultureInfo.InvariantCulture) : "null");
+            sb.Append('}');
+            return sb.ToString();
+        }
+
+        public static bool TryParse(string json, out SwarmAgentState state, out string error)
+        {
+            state = null;
+            Dictionary<string, JsonToken> fields;
+            if (!JsonParser.TryParseObject(json, out fields, out error))
+                return false;
+
+            string agentIdVal;
+            if (!JsonParser.TryGetRequiredString(fields, "agentId", out agentIdVal, out error))
+                return false;
+
+            bool isDecoyVal;
+            if (!JsonParser.TryGetRequiredBool(fields, "isDecoy", out isDecoyVal, out error))
+                return false;
+
+            UnityEngine.Vector3 posVal;
+            if (!JsonParser.TryGetRequiredVector3(fields, "positionWorld", out posVal, out error))
+                return false;
+
+            UnityEngine.Vector3 velVal;
+            if (!JsonParser.TryGetRequiredVector3(fields, "velocityMs", out velVal, out error))
+                return false;
+
+            float headingVal;
+            if (!JsonParser.TryGetRequiredFloat(fields, "headingDeg", out headingVal, out error))
+                return false;
+
+            float altVal;
+            if (!JsonParser.TryGetRequiredFloat(fields, "altitudeM", out altVal, out error))
+                return false;
+
+            bool rfEmitVal;
+            if (!JsonParser.TryGetRequiredBool(fields, "rfEmitting", out rfEmitVal, out error))
+                return false;
+
+            float rfFreqVal;
+            if (!JsonParser.TryGetRequiredFloat(fields, "rfFreqGHz", out rfFreqVal, out error))
+                return false;
+
+            float rfPowerVal;
+            if (!JsonParser.TryGetRequiredFloat(fields, "rfPowerDbm", out rfPowerVal, out error))
+                return false;
+
+            float rpmVal;
+            if (!JsonParser.TryGetRequiredFloat(fields, "propellerRpm", out rpmVal, out error))
+                return false;
+
+            float rcsVal;
+            if (!JsonParser.TryGetRequiredFloat(fields, "rcs", out rcsVal, out error))
+                return false;
+
+            bool neutralisedVal;
+            if (!JsonParser.TryGetRequiredBool(fields, "isNeutralised", out neutralisedVal, out error))
+                return false;
+
+            long? neutralisedAtVal;
+            if (!JsonParser.TryGetOptionalNullableLong(fields, "neutralisedAtMs", out neutralisedAtVal, out error))
+                return false;
+
+            state = new SwarmAgentState
+            {
+                agentId = agentIdVal,
+                isDecoy = isDecoyVal,
+                positionWorld = posVal,
+                velocityMs = velVal,
+                headingDeg = headingVal,
+                altitudeM = altVal,
+                rfEmitting = rfEmitVal,
+                rfFreqGHz = rfFreqVal,
+                rfPowerDbm = rfPowerVal,
+                propellerRpm = rpmVal,
+                rcs = rcsVal,
+                isNeutralised = neutralisedVal,
+                neutralisedAtMs = neutralisedAtVal
+            };
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// SensorReadings matching docs/SCHEMA.md Entity 3 and board/contracts/scenario-events.md v1.
+    /// </summary>
+    [Serializable]
+    public class SensorReadings
+    {
+        public float rfWaterfallPeakGHz;
+        public float rfWaterfallPeakDbm;
+        public float dopplerPeakHz;
+        public float acousticSplDb;
+        public int radarDetectedCount;
+
+        public SensorReadings Clone()
+        {
+            return new SensorReadings
+            {
+                rfWaterfallPeakGHz = rfWaterfallPeakGHz,
+                rfWaterfallPeakDbm = rfWaterfallPeakDbm,
+                dopplerPeakHz = dopplerPeakHz,
+                acousticSplDb = acousticSplDb,
+                radarDetectedCount = radarDetectedCount
+            };
+        }
+
+        public string ToJson()
+        {
+            StringBuilder sb = new StringBuilder(160);
+            sb.Append("{\"rfWaterfallPeakGHz\":");
+            sb.Append(ScenarioConfig.FormatFloat(rfWaterfallPeakGHz));
+            sb.Append(",\"rfWaterfallPeakDbm\":");
+            sb.Append(ScenarioConfig.FormatFloat(rfWaterfallPeakDbm));
+            sb.Append(",\"dopplerPeakHz\":");
+            sb.Append(ScenarioConfig.FormatFloat(dopplerPeakHz));
+            sb.Append(",\"acousticSplDb\":");
+            sb.Append(ScenarioConfig.FormatFloat(acousticSplDb));
+            sb.Append(",\"radarDetectedCount\":");
+            sb.Append(radarDetectedCount.ToString(CultureInfo.InvariantCulture));
+            sb.Append('}');
+            return sb.ToString();
+        }
+
+        public static bool TryParse(string json, out SensorReadings readings, out string error)
+        {
+            readings = null;
+            Dictionary<string, JsonToken> fields;
+            if (!JsonParser.TryParseObject(json, out fields, out error))
+                return false;
+
+            float peakGhz;
+            if (!JsonParser.TryGetRequiredFloat(fields, "rfWaterfallPeakGHz", out peakGhz, out error))
+                return false;
+
+            float peakDbm;
+            if (!JsonParser.TryGetRequiredFloat(fields, "rfWaterfallPeakDbm", out peakDbm, out error))
+                return false;
+
+            float dopplerHz;
+            if (!JsonParser.TryGetRequiredFloat(fields, "dopplerPeakHz", out dopplerHz, out error))
+                return false;
+
+            float acousticDb;
+            if (!JsonParser.TryGetRequiredFloat(fields, "acousticSplDb", out acousticDb, out error))
+                return false;
+
+            int radarCount;
+            if (!JsonParser.TryGetRequiredInt(fields, "radarDetectedCount", out radarCount, out error))
+                return false;
+
+            readings = new SensorReadings
+            {
+                rfWaterfallPeakGHz = peakGhz,
+                rfWaterfallPeakDbm = peakDbm,
+                dopplerPeakHz = dopplerHz,
+                acousticSplDb = acousticDb,
+                radarDetectedCount = radarCount
+            };
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// KineticEvent matching docs/SCHEMA.md Entity 3 and board/contracts/telemetry.md v1.
+    /// </summary>
+    [Serializable]
+    public class KineticEvent
+    {
+        public long firedAtMs;
+        public string targetAgentId = string.Empty;
+        public bool hit;
+        public float leadAngleDeg;
+
+        public KineticEvent Clone()
+        {
+            return new KineticEvent
+            {
+                firedAtMs = firedAtMs,
+                targetAgentId = targetAgentId,
+                hit = hit,
+                leadAngleDeg = leadAngleDeg
+            };
+        }
+
+        public string ToJson()
+        {
+            StringBuilder sb = new StringBuilder(128);
+            sb.Append("{\"firedAtMs\":");
+            sb.Append(firedAtMs.ToString(CultureInfo.InvariantCulture));
+            sb.Append(",\"targetAgentId\":\"");
+            sb.Append(JsonEnvelope.EscapeJsonString(targetAgentId ?? string.Empty));
+            sb.Append("\",\"hit\":");
+            sb.Append(hit ? "true" : "false");
+            sb.Append(",\"leadAngleDeg\":");
+            sb.Append(ScenarioConfig.FormatFloat(leadAngleDeg));
+            sb.Append('}');
+            return sb.ToString();
+        }
+
+        public static bool TryParse(string json, out KineticEvent evt, out string error)
+        {
+            evt = null;
+            Dictionary<string, JsonToken> fields;
+            if (!JsonParser.TryParseObject(json, out fields, out error))
+                return false;
+
+            long firedAtVal;
+            if (!JsonParser.TryGetRequiredLong(fields, "firedAtMs", out firedAtVal, out error))
+                return false;
+
+            string targetIdVal;
+            if (!JsonParser.TryGetRequiredString(fields, "targetAgentId", out targetIdVal, out error))
+                return false;
+
+            bool hitVal;
+            if (!JsonParser.TryGetRequiredBool(fields, "hit", out hitVal, out error))
+                return false;
+
+            float leadAngleVal;
+            if (!JsonParser.TryGetRequiredFloat(fields, "leadAngleDeg", out leadAngleVal, out error))
+                return false;
+
+            evt = new KineticEvent
+            {
+                firedAtMs = firedAtVal,
+                targetAgentId = targetIdVal,
+                hit = hitVal,
+                leadAngleDeg = leadAngleVal
+            };
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// TraineeAction matching docs/SCHEMA.md Entity 3 and board/contracts/scenario-events.md v1.
+    /// </summary>
+    [Serializable]
+    public class TraineeAction
+    {
+        public float antennaBearingDeg;
+        public float antennaElevationDeg;
+        public bool ewEngaged;
+        public float? ewBandGHz;
+        public KineticEvent kinetic;
+
+        public TraineeAction Clone()
+        {
+            return new TraineeAction
+            {
+                antennaBearingDeg = antennaBearingDeg,
+                antennaElevationDeg = antennaElevationDeg,
+                ewEngaged = ewEngaged,
+                ewBandGHz = ewBandGHz,
+                kinetic = kinetic != null ? kinetic.Clone() : null
+            };
+        }
+
+        public string ToJson()
+        {
+            StringBuilder sb = new StringBuilder(160);
+            sb.Append("{\"antennaBearingDeg\":");
+            sb.Append(ScenarioConfig.FormatFloat(antennaBearingDeg));
+            sb.Append(",\"antennaElevationDeg\":");
+            sb.Append(ScenarioConfig.FormatFloat(antennaElevationDeg));
+            sb.Append(",\"ewEngaged\":");
+            sb.Append(ewEngaged ? "true" : "false");
+            sb.Append(",\"ewBandGHz\":");
+            sb.Append(ewBandGHz.HasValue ? ScenarioConfig.FormatFloat(ewBandGHz.Value) : "null");
+            sb.Append(",\"kinetic\":");
+            sb.Append(kinetic != null ? kinetic.ToJson() : "null");
+            sb.Append('}');
+            return sb.ToString();
+        }
+
+        public static bool TryParse(string json, out TraineeAction action, out string error)
+        {
+            action = null;
+            Dictionary<string, JsonToken> fields;
+            if (!JsonParser.TryParseObject(json, out fields, out error))
+                return false;
+
+            float bearingVal;
+            if (!JsonParser.TryGetRequiredFloat(fields, "antennaBearingDeg", out bearingVal, out error))
+                return false;
+
+            float elevationVal;
+            if (!JsonParser.TryGetRequiredFloat(fields, "antennaElevationDeg", out elevationVal, out error))
+                return false;
+
+            bool ewEngagedVal;
+            if (!JsonParser.TryGetRequiredBool(fields, "ewEngaged", out ewEngagedVal, out error))
+                return false;
+
+            float? ewBandVal;
+            if (!JsonParser.TryGetNullableFloat(fields, "ewBandGHz", out ewBandVal, out error))
+                return false;
+
+            string kineticRaw;
+            if (!JsonParser.TryGetNullableObjectRaw(fields, "kinetic", out kineticRaw, out error))
+                return false;
+
+            KineticEvent kineticEvt = null;
+            if (kineticRaw != null)
+            {
+                if (!KineticEvent.TryParse(kineticRaw, out kineticEvt, out error))
+                    return false;
+            }
+
+            action = new TraineeAction
+            {
+                antennaBearingDeg = bearingVal,
+                antennaElevationDeg = elevationVal,
+                ewEngaged = ewEngagedVal,
+                ewBandGHz = ewBandVal,
+                kinetic = kineticEvt
+            };
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// EWJammerState matching docs/SCHEMA.md Entity 3 and board/contracts/scenario-events.md v1.
+    /// </summary>
+    [Serializable]
+    public class EWJammerState
+    {
+        public bool engaged;
+        public float bearingDeg;
+        public float elevationDeg;
+        public float bandGHz;
+        public bool friendlyBlackoutRisk;
+
+        public EWJammerState Clone()
+        {
+            return new EWJammerState
+            {
+                engaged = engaged,
+                bearingDeg = bearingDeg,
+                elevationDeg = elevationDeg,
+                bandGHz = bandGHz,
+                friendlyBlackoutRisk = friendlyBlackoutRisk
+            };
+        }
+
+        public string ToJson()
+        {
+            StringBuilder sb = new StringBuilder(160);
+            sb.Append("{\"engaged\":");
+            sb.Append(engaged ? "true" : "false");
+            sb.Append(",\"bearingDeg\":");
+            sb.Append(ScenarioConfig.FormatFloat(bearingDeg));
+            sb.Append(",\"elevationDeg\":");
+            sb.Append(ScenarioConfig.FormatFloat(elevationDeg));
+            sb.Append(",\"bandGHz\":");
+            sb.Append(ScenarioConfig.FormatFloat(bandGHz));
+            sb.Append(",\"friendlyBlackoutRisk\":");
+            sb.Append(friendlyBlackoutRisk ? "true" : "false");
+            sb.Append('}');
+            return sb.ToString();
+        }
+
+        public static bool TryParse(string json, out EWJammerState state, out string error)
+        {
+            state = null;
+            Dictionary<string, JsonToken> fields;
+            if (!JsonParser.TryParseObject(json, out fields, out error))
+                return false;
+
+            bool engagedVal;
+            if (!JsonParser.TryGetRequiredBool(fields, "engaged", out engagedVal, out error))
+                return false;
+
+            float bearingVal;
+            if (!JsonParser.TryGetRequiredFloat(fields, "bearingDeg", out bearingVal, out error))
+                return false;
+
+            float elevationVal;
+            if (!JsonParser.TryGetRequiredFloat(fields, "elevationDeg", out elevationVal, out error))
+                return false;
+
+            float bandVal;
+            if (!JsonParser.TryGetRequiredFloat(fields, "bandGHz", out bandVal, out error))
+                return false;
+
+            bool riskVal;
+            if (!JsonParser.TryGetRequiredBool(fields, "friendlyBlackoutRisk", out riskVal, out error))
+                return false;
+
+            state = new EWJammerState
+            {
+                engaged = engagedVal,
+                bearingDeg = bearingVal,
+                elevationDeg = elevationVal,
+                bandGHz = bandVal,
+                friendlyBlackoutRisk = riskVal
+            };
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// SCENARIO_TICK payload matching board/contracts/scenario-events.md v1 (10 Hz simulation heartbeat).
+    /// </summary>
+    [Serializable]
+    public class ScenarioTickPayload
+    {
+        public const string THREAT_GREEN = "GREEN";
+        public const string THREAT_AMBER = "AMBER";
+        public const string THREAT_RED = "RED";
+
+        public string sessionId = string.Empty;
+        public long t;
+        public SwarmAgentState[] swarmSnapshot = new SwarmAgentState[0];
+        public SensorReadings sensorReadings = new SensorReadings();
+        public string threatState = THREAT_GREEN;
+        public TraineeAction traineeAction = new TraineeAction();
+        public EWJammerState ewJammerState = new EWJammerState();
+        public bool friendlyVhfActive;
+
+        public static bool IsValidThreatState(string value)
+        {
+            return string.Equals(value, THREAT_GREEN, StringComparison.Ordinal) ||
+                   string.Equals(value, THREAT_AMBER, StringComparison.Ordinal) ||
+                   string.Equals(value, THREAT_RED, StringComparison.Ordinal);
+        }
+
+        public string ToJson()
+        {
+            SensorReadings sr = sensorReadings ?? new SensorReadings();
+            TraineeAction ta = traineeAction ?? new TraineeAction();
+            EWJammerState ew = ewJammerState ?? new EWJammerState();
+            string tsStr = IsValidThreatState(threatState) ? threatState : THREAT_GREEN;
+
+            StringBuilder sb = new StringBuilder(512);
+            sb.Append("{\"sessionId\":\"");
+            sb.Append(JsonEnvelope.EscapeJsonString(sessionId ?? string.Empty));
+            sb.Append("\",\"t\":");
+            sb.Append(t.ToString(CultureInfo.InvariantCulture));
+            sb.Append(",\"swarmSnapshot\":[");
+            if (swarmSnapshot != null)
+            {
+                for (int i = 0; i < swarmSnapshot.Length; i++)
+                {
+                    if (i > 0)
+                        sb.Append(',');
+                    SwarmAgentState agent = swarmSnapshot[i] ?? new SwarmAgentState();
+                    sb.Append(agent.ToJson());
+                }
+            }
+            sb.Append("],\"sensorReadings\":");
+            sb.Append(sr.ToJson());
+            sb.Append(",\"threatState\":\"");
+            sb.Append(JsonEnvelope.EscapeJsonString(tsStr));
+            sb.Append("\",\"traineeAction\":");
+            sb.Append(ta.ToJson());
+            sb.Append(",\"ewJammerState\":");
+            sb.Append(ew.ToJson());
+            sb.Append(",\"friendlyVhfActive\":");
+            sb.Append(friendlyVhfActive ? "true" : "false");
+            sb.Append('}');
+            return sb.ToString();
+        }
+
+        public static JsonEnvelope CreateEnvelope(ScenarioTickPayload payload, long? timestampMs = null)
+        {
+            if (payload == null)
+                throw new ArgumentNullException("payload");
+            if (string.IsNullOrWhiteSpace(payload.sessionId))
+                throw new ArgumentException("ScenarioTickPayload.sessionId must not be empty.", "payload");
+
+            return JsonEnvelope.Create(JsonEnvelope.SCENARIO_TICK, payload.ToJson(), JsonEnvelope.CurrentVersion, timestampMs);
+        }
+
+        public static ScenarioTickPayload Parse(string payloadJson)
+        {
+            ScenarioTickPayload payload;
+            string error;
+            if (!TryParse(payloadJson, out payload, out error))
+                throw new FormatException(error);
+            return payload;
+        }
+
+        public static bool TryParse(string payloadJson, out ScenarioTickPayload payload, out string error)
+        {
+            payload = null;
+            error = null;
+
+            if (string.IsNullOrWhiteSpace(payloadJson))
+            {
+                error = "SCENARIO_TICK payload is null or empty.";
+                return false;
+            }
+
+            Dictionary<string, JsonToken> fields;
+            if (!JsonParser.TryParseObject(payloadJson, out fields, out error))
+                return false;
+
+            string sessionIdVal;
+            if (!JsonParser.TryGetRequiredString(fields, "sessionId", out sessionIdVal, out error))
+                return false;
+
+            long tVal;
+            if (!JsonParser.TryGetRequiredLong(fields, "t", out tVal, out error) || tVal < 0)
+            {
+                if (string.IsNullOrEmpty(error))
+                    error = "SCENARIO_TICK field 't' must be >= 0.";
+                return false;
+            }
+
+            string[] snapshotRaws;
+            if (!JsonParser.TryGetRequiredObjectArrayRaw(fields, "swarmSnapshot", out snapshotRaws, out error))
+                return false;
+
+            SwarmAgentState[] snapshot = new SwarmAgentState[snapshotRaws.Length];
+            for (int i = 0; i < snapshotRaws.Length; i++)
+            {
+                SwarmAgentState agent;
+                if (!SwarmAgentState.TryParse(snapshotRaws[i], out agent, out error))
+                    return false;
+                snapshot[i] = agent;
+            }
+
+            string srRaw;
+            if (!JsonParser.TryGetRequiredObjectRaw(fields, "sensorReadings", out srRaw, out error))
+                return false;
+            SensorReadings sr;
+            if (!SensorReadings.TryParse(srRaw, out sr, out error))
+                return false;
+
+            string threatVal;
+            if (!JsonParser.TryGetRequiredString(fields, "threatState", out threatVal, out error))
+                return false;
+            if (!IsValidThreatState(threatVal))
+            {
+                error = "SCENARIO_TICK field 'threatState' has unsupported value '" + threatVal + "'.";
+                return false;
+            }
+
+            string taRaw;
+            if (!JsonParser.TryGetRequiredObjectRaw(fields, "traineeAction", out taRaw, out error))
+                return false;
+            TraineeAction ta;
+            if (!TraineeAction.TryParse(taRaw, out ta, out error))
+                return false;
+
+            string ewRaw;
+            if (!JsonParser.TryGetRequiredObjectRaw(fields, "ewJammerState", out ewRaw, out error))
+                return false;
+            EWJammerState ew;
+            if (!EWJammerState.TryParse(ewRaw, out ew, out error))
+                return false;
+
+            bool vhfVal;
+            if (!JsonParser.TryGetRequiredBool(fields, "friendlyVhfActive", out vhfVal, out error))
+                return false;
+
+            payload = new ScenarioTickPayload
+            {
+                sessionId = sessionIdVal,
+                t = tVal,
+                swarmSnapshot = snapshot,
+                sensorReadings = sr,
+                threatState = threatVal,
+                traineeAction = ta,
+                ewJammerState = ew,
+                friendlyVhfActive = vhfVal
+            };
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// SCENARIO_END payload matching board/contracts/scenario-events.md v1.
+    /// </summary>
+    [Serializable]
+    public class ScenarioEndPayload
+    {
+        public const string REASON_TIME_LIMIT = "TIME_LIMIT";
+        public const string REASON_ALL_NEUTRALISED = "ALL_NEUTRALISED";
+        public const string REASON_EXCLUSION_BREACH = "EXCLUSION_BREACH";
+        public const string REASON_INSTRUCTOR_ABORT = "INSTRUCTOR_ABORT";
+
+        public string sessionId = string.Empty;
+        public long t;
+        public string reason = REASON_TIME_LIMIT;
+        public SwarmAgentState[] finalSwarmSnapshot = new SwarmAgentState[0];
+
+        public static bool IsValidReason(string value)
+        {
+            return string.Equals(value, REASON_TIME_LIMIT, StringComparison.Ordinal) ||
+                   string.Equals(value, REASON_ALL_NEUTRALISED, StringComparison.Ordinal) ||
+                   string.Equals(value, REASON_EXCLUSION_BREACH, StringComparison.Ordinal) ||
+                   string.Equals(value, REASON_INSTRUCTOR_ABORT, StringComparison.Ordinal);
+        }
+
+        public string ToJson()
+        {
+            string reasonStr = IsValidReason(reason) ? reason : REASON_INSTRUCTOR_ABORT;
+            StringBuilder sb = new StringBuilder(256);
+            sb.Append("{\"sessionId\":\"");
+            sb.Append(JsonEnvelope.EscapeJsonString(sessionId ?? string.Empty));
+            sb.Append("\",\"t\":");
+            sb.Append(t.ToString(CultureInfo.InvariantCulture));
+            sb.Append(",\"reason\":\"");
+            sb.Append(JsonEnvelope.EscapeJsonString(reasonStr));
+            sb.Append("\",\"finalSwarmSnapshot\":[");
+            if (finalSwarmSnapshot != null)
+            {
+                for (int i = 0; i < finalSwarmSnapshot.Length; i++)
+                {
+                    if (i > 0)
+                        sb.Append(',');
+                    SwarmAgentState agent = finalSwarmSnapshot[i] ?? new SwarmAgentState();
+                    sb.Append(agent.ToJson());
+                }
+            }
+            sb.Append("]}");
+            return sb.ToString();
+        }
+
+        public static JsonEnvelope CreateEnvelope(string sessionId, long t, string reason, SwarmAgentState[] finalSwarmSnapshot = null, long? timestampMs = null)
+        {
+            if (string.IsNullOrWhiteSpace(sessionId))
+                throw new ArgumentException("sessionId must not be empty.", "sessionId");
+
+            ScenarioEndPayload payload = new ScenarioEndPayload
+            {
+                sessionId = sessionId,
+                t = Math.Max(0L, t),
+                reason = IsValidReason(reason) ? reason : REASON_INSTRUCTOR_ABORT,
+                finalSwarmSnapshot = SwarmAgentState.CloneArray(finalSwarmSnapshot)
+            };
+
+            return JsonEnvelope.Create(JsonEnvelope.SCENARIO_END, payload.ToJson(), JsonEnvelope.CurrentVersion, timestampMs);
+        }
+
+        public static ScenarioEndPayload Parse(string payloadJson)
+        {
+            ScenarioEndPayload payload;
+            string error;
+            if (!TryParse(payloadJson, out payload, out error))
+                throw new FormatException(error);
+            return payload;
+        }
+
+        public static bool TryParse(string payloadJson, out ScenarioEndPayload payload, out string error)
+        {
+            payload = null;
+            error = null;
+
+            if (string.IsNullOrWhiteSpace(payloadJson))
+            {
+                error = "SCENARIO_END payload is null or empty.";
+                return false;
+            }
+
+            Dictionary<string, JsonToken> fields;
+            if (!JsonParser.TryParseObject(payloadJson, out fields, out error))
+                return false;
+
+            string sessionIdVal;
+            if (!JsonParser.TryGetRequiredString(fields, "sessionId", out sessionIdVal, out error))
+                return false;
+
+            long tVal;
+            if (!JsonParser.TryGetRequiredLong(fields, "t", out tVal, out error) || tVal < 0)
+            {
+                if (string.IsNullOrEmpty(error))
+                    error = "SCENARIO_END field 't' must be >= 0.";
+                return false;
+            }
+
+            string reasonVal;
+            if (!JsonParser.TryGetRequiredString(fields, "reason", out reasonVal, out error))
+                return false;
+            if (!IsValidReason(reasonVal))
+            {
+                error = "SCENARIO_END field 'reason' has unsupported value '" + reasonVal + "'.";
+                return false;
+            }
+
+            string[] snapshotRaws;
+            if (!JsonParser.TryGetRequiredObjectArrayRaw(fields, "finalSwarmSnapshot", out snapshotRaws, out error))
+                return false;
+
+            SwarmAgentState[] snapshot = new SwarmAgentState[snapshotRaws.Length];
+            for (int i = 0; i < snapshotRaws.Length; i++)
+            {
+                SwarmAgentState agent;
+                if (!SwarmAgentState.TryParse(snapshotRaws[i], out agent, out error))
+                    return false;
+                snapshot[i] = agent;
+            }
+
+            payload = new ScenarioEndPayload
+            {
+                sessionId = sessionIdVal,
+                t = tVal,
+                reason = reasonVal,
+                finalSwarmSnapshot = snapshot
+            };
+            return true;
+        }
+    }
+
     internal enum JsonTokenKind
     {
         String,
@@ -877,6 +1702,53 @@ namespace TrishulSim.Scenarios
             return true;
         }
 
+        public static bool TryGetNullableObjectRaw(Dictionary<string, JsonToken> fields, string key, out string rawObject, out string error)
+        {
+            rawObject = null;
+            error = null;
+            JsonToken tok;
+            if (!fields.TryGetValue(key, out tok))
+            {
+                error = "Missing required field '" + key + "'.";
+                return false;
+            }
+            if (tok.Kind == JsonTokenKind.Null)
+                return true;
+            if (tok.Kind != JsonTokenKind.Object || string.IsNullOrWhiteSpace(tok.RawText))
+            {
+                error = "Field '" + key + "' must be an object or null.";
+                return false;
+            }
+            rawObject = tok.RawText;
+            return true;
+        }
+
+        public static bool TryGetRequiredObjectArrayRaw(Dictionary<string, JsonToken> fields, string key, out string[] rawObjects, out string error)
+        {
+            rawObjects = null;
+            error = null;
+            JsonToken tok;
+            if (!fields.TryGetValue(key, out tok) || tok.Kind != JsonTokenKind.Array || tok.ArrayElements == null)
+            {
+                error = "Missing or invalid array field '" + key + "'.";
+                return false;
+            }
+
+            string[] arr = new string[tok.ArrayElements.Count];
+            for (int i = 0; i < tok.ArrayElements.Count; i++)
+            {
+                JsonToken elem = tok.ArrayElements[i];
+                if (elem.Kind != JsonTokenKind.Object || string.IsNullOrWhiteSpace(elem.RawText))
+                {
+                    error = "Invalid object element at index " + i + " in array '" + key + "'.";
+                    return false;
+                }
+                arr[i] = elem.RawText;
+            }
+            rawObjects = arr;
+            return true;
+        }
+
         public static bool TryGetRequiredInt(Dictionary<string, JsonToken> fields, string key, out int value, out string error)
         {
             value = 0;
@@ -903,6 +1775,24 @@ namespace TrishulSim.Scenarios
             return true;
         }
 
+        public static bool TryGetOptionalNullableLong(Dictionary<string, JsonToken> fields, string key, out long? value, out string error)
+        {
+            value = null;
+            error = null;
+            JsonToken tok;
+            if (!fields.TryGetValue(key, out tok) || tok.Kind == JsonTokenKind.Null)
+                return true;
+
+            long parsed;
+            if (tok.Kind != JsonTokenKind.Number || !TryParseIntegralLong(tok.RawText, out parsed))
+            {
+                error = "Invalid nullable integer field '" + key + "'.";
+                return false;
+            }
+            value = parsed;
+            return true;
+        }
+
         public static bool TryGetRequiredFloat(Dictionary<string, JsonToken> fields, string key, out float value, out string error)
         {
             value = 0f;
@@ -913,6 +1803,29 @@ namespace TrishulSim.Scenarios
                 error = "Missing or invalid number field '" + key + "'.";
                 return false;
             }
+            return true;
+        }
+
+        public static bool TryGetNullableFloat(Dictionary<string, JsonToken> fields, string key, out float? value, out string error)
+        {
+            value = null;
+            error = null;
+            JsonToken tok;
+            if (!fields.TryGetValue(key, out tok))
+            {
+                error = "Missing required field '" + key + "'.";
+                return false;
+            }
+            if (tok.Kind == JsonTokenKind.Null)
+                return true;
+
+            float parsed;
+            if (tok.Kind != JsonTokenKind.Number || !TryParseFloat(tok.RawText, out parsed))
+            {
+                error = "Field '" + key + "' must be a number or null.";
+                return false;
+            }
+            value = parsed;
             return true;
         }
 
@@ -955,6 +1868,44 @@ namespace TrishulSim.Scenarios
             }
             values = arr;
             return true;
+        }
+
+        public static bool TryGetRequiredVector3(Dictionary<string, JsonToken> fields, string key, out UnityEngine.Vector3 vector, out string error)
+        {
+            vector = UnityEngine.Vector3.zero;
+            string raw;
+            if (!TryGetRequiredObjectRaw(fields, key, out raw, out error))
+                return false;
+
+            Dictionary<string, JsonToken> vFields;
+            if (!TryParseObject(raw, out vFields, out error))
+                return false;
+
+            float x;
+            if (!TryGetRequiredFloat(vFields, "x", out x, out error))
+                return false;
+            float y;
+            if (!TryGetRequiredFloat(vFields, "y", out y, out error))
+                return false;
+            float z;
+            if (!TryGetRequiredFloat(vFields, "z", out z, out error))
+                return false;
+
+            vector = new UnityEngine.Vector3(x, y, z);
+            return true;
+        }
+
+        public static string FormatVector3(UnityEngine.Vector3 v)
+        {
+            StringBuilder sb = new StringBuilder(64);
+            sb.Append("{\"x\":");
+            sb.Append(ScenarioConfig.FormatFloat(v.x));
+            sb.Append(",\"y\":");
+            sb.Append(ScenarioConfig.FormatFloat(v.y));
+            sb.Append(",\"z\":");
+            sb.Append(ScenarioConfig.FormatFloat(v.z));
+            sb.Append('}');
+            return sb.ToString();
         }
 
         private static bool TryReadObject(string text, ref int idx, int end, out Dictionary<string, JsonToken> fields, out string error)
