@@ -36,7 +36,7 @@
 | SA-P1-A · Doppler + Acoustic physics | Venu | [ ] |
 | SA-P1-B-i · HBT PINCER approach | Venu | [ ] |
 | SA-P1-B-ii · HBT PINCER execution + EW evasion | Venu | [ ] |
-| SA-P1-C · EW deconfliction / friendlyBlackoutRisk | Uday | [ ] |
+| SA-P1-C · EW deconfliction / friendlyBlackoutRisk | Uday | [x] |
 | SA-P1-D · SMASH 2000 lead-angle + KineticEvent | Uday | [ ] |
 | SA-P2-A · SATURATION_DIVE + MULTI-AXIS_SPLIT tactics | Uday | [ ] |
 | SA-P2-B · Burst + 60 FPS validation | Uday | [ ] |

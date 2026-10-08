@@ -1,4 +1,4 @@
-# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-06T22:30 IST by Rani (UX-P1-B)
+# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-08T12:06 IST by Uday (SA-P1-C)
 
 > The single glance-source. Every session reads this first, appends one line at end.
 > Standup blocks replace the top section; history accumulates below.
@@ -14,7 +14,7 @@
 | Track | Done | In flight | Next |
 |---|---|---|---|
 | unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B | — | US-P2-A (air-gap validation pass) |
-| swarm-ai | — | — | Reynolds Boids + HBT scaffold |
+| swarm-ai | SA-P1-C (EW deconfliction) | — | SA-P1-D (SMASH fire control) |
 | aar-engine | — | — | 10 Hz telemetry logger + Scorecard renderer |
 | ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B | — | UX-P1-C (split-screen) |
 
@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-08T12:06 IST · Uday: SA-P1-C done — EwDeconfliction friendlyBlackoutRisk ROE logic + SensorSuiteComputer tick integration complete; EwDeconflictionSelfTest PASSED
 - 2026-10-06T22:30 IST · Rani: UX-P1-B done — EW Jammer controls + SMASH 2000 fire-control reticle (azimuth/elevation/band, ROE blackout warning, dynamic lead-angle, kinetic hit/miss feedback); UiShellSelfTest PASSED
 - 2026-10-06T22:10 IST · Rani: UX-P1-A done — live sensor suite (RF Waterfall scrolling spectrogram, Doppler circular PPI radar with 6 swarm blips, 8-band Acoustic FFT with blade-tip harmonic); UiShellSelfTest PASSED
 - 2026-10-06T19:12 IST · Vinod (unity-sim): [US-P1-B] ✅ All 4 tactical scenario JSON configs authored & validated (Punjab riverine fog, Ladakh LAC ridge, LoC mountain pass, Desert FOB) + bilingual English/Hindi dropdown and SwarmProfile console logging — self-test green on `feat/unity-sim-scenario-configs`
