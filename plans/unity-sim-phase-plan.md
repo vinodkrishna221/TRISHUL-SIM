@@ -419,7 +419,7 @@ TEST:
 DEPENDS: US-P2-B               UNBLOCKS: —
 
 DEMO: "'VR-Ready' shown in system info panel — extensibility signal to judges." (Beat 6 judge Q)
-PERSONA: unity-sim builder     STATUS: [ ] todo
+PERSONA: unity-sim builder     STATUS: [x] done
 ```
 
 ---
