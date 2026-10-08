@@ -64,6 +64,7 @@ namespace TrishulSim.Scenarios
             Console.WriteLine("    Ministry of Defence (MoD) · Battalion-Deployable Air-Gapped Simulator");
             Console.WriteLine("    Scripting Backend: IL2CPP / Native Master · Target: Windows x86-64");
             Console.WriteLine("    Display Target: " + TargetDisplayWidth + "x" + TargetDisplayHeight + " Fullscreen · Target FPS: >=60 FPS");
+            Console.WriteLine("    System Info: Air-Gap: CONFIRMED · XR-Ready: Yes (WebXR scaffold)");
             Console.WriteLine("================================================================================\n");
         }
 
@@ -142,6 +143,12 @@ namespace TrishulSim.Scenarios
 
             instructorMgr.Start();
             traineeMgr.Start();
+
+            Console.WriteLine("[Init] Validating XR Scaffold status: " + instructorMgr.XrReadyStatus);
+            if (!instructorMgr.XrReadyStatus.Contains("XR-Ready: Yes (WebXR scaffold)"))
+            {
+                throw new InvalidOperationException("Instructor C2 system info panel must indicate XR-Ready: Yes (WebXR scaffold)");
+            }
 
             instructorMgr.LaunchScenario(activeScenario);
             await Task.Delay(100);

@@ -259,7 +259,7 @@ CONTEXT:
 DELIVERABLE: VRSentryStub.unity + XR Plugin Management installed
 TEST: Open VRSentryStub.unity — no compile errors. NOT in Build Settings (verify).
 DEMO: "'VR-Ready' in system info panel." (Beat 6 judge Q)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---

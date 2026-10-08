@@ -13,7 +13,7 @@
 
 | Track | Done | In flight | Next |
 |---|---|---|---|
-| unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B, US-P2-A, US-P2-B | — | US-P2-C (XR scaffold stub) |
+| unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B, US-P2-A, US-P2-B, US-P2-C | — | US-P2-D (Warden review coordination + smoke) |
 | swarm-ai | — | — | Reynolds Boids + HBT scaffold |
 | aar-engine | — | — | 10 Hz telemetry logger + Scorecard renderer |
 | ui-ux | — | — | Bilingual UI shell + MIL-STD-2525 symbology |
@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-08T12:35 IST · Vinod (unity-sim): [US-P2-C] ✅ XR scaffold stub configured (com.unity.xr.management + Mock HMD dev settings, VRSentryStub.unity with labeled sphere excluded from demo build per Cut List #1, system info panel "XR-Ready: Yes (WebXR scaffold)") — self-test green on `feat/unity-sim-xr-scaffold`
 - 2026-10-08T11:35 IST · Vinod (unity-sim): [US-P2-B] ✅ IL2CPP standalone build & InnoSetup single-file installer compiled (dist/TRISHUL-SIM-installer-20261008.exe) with clean sandbox install, 60+ FPS verification & Scorecard render — self-test green on `feat/unity-sim-installer`
 - 2026-10-06T19:48 IST · Vinod (unity-sim): [US-P2-A] ✅ Air-gap validation pass complete (zero external URLs/cloud SDKs, ProjectSettings analytics disabled, WsServer NetworkReachability assertions, loopback socket inspection & evidence artifacts at Build/ and docs/evidence/) — self-test green on `feat/unity-sim-airgap-validation`
 - 2026-10-06T19:12 IST · Vinod (unity-sim): [US-P1-B] ✅ All 4 tactical scenario JSON configs authored & validated (Punjab riverine fog, Ladakh LAC ridge, LoC mountain pass, Desert FOB) + bilingual English/Hindi dropdown and SwarmProfile console logging — self-test green on `feat/unity-sim-scenario-configs`

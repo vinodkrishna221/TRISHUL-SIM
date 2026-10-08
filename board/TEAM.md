@@ -28,7 +28,7 @@
 | US-P1-B · 4 scenario JSON configs | Vinod | [ ] |
 | US-P2-A · Air-gap validation | Vinod | [ ] |
 | US-P2-B · IL2CPP + InnoSetup installer | Vinod | [ ] |
-| US-P2-C · XR scaffold stub | Vinod | [ ] |
+| US-P2-C · XR scaffold stub | Vinod | [x] |
 | US-P2-D · Warden smoke | Vinod | [ ] |
 | US-P3-A · Submission package coordination | Vinod | [ ] |
 | SA-P0-A · Boids 6-agent spawn | Venu | [ ] |

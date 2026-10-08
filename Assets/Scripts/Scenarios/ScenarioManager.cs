@@ -80,6 +80,7 @@ namespace TrishulSim.Scenarios
         public const float DefaultTickIntervalSeconds = 0.1f;
         public const int DefaultTickStepMs = 100;
         public const float ExclusionZoneRadiusMeters = 20.0f;
+        public const string DefaultXrReadyStatus = "XR-Ready: Yes (WebXR scaffold)";
 
         public static ScenarioManager Instance { get; private set; }
 
@@ -89,6 +90,7 @@ namespace TrishulSim.Scenarios
         [SerializeField] private Dropdown modeDropdown;
         [SerializeField] private Button launchButton;
         [SerializeField] private Button abortButton;
+        [SerializeField] private Text systemInfoText;
         [SerializeField] private GameObject traineeCockpitRoot;
         [SerializeField] private string traineeCockpitSceneName = DefaultTraineeSceneName;
         [SerializeField] private string twoLaptopSceneName = DefaultTwoLaptopSceneName;
@@ -102,6 +104,7 @@ namespace TrishulSim.Scenarios
         [SerializeField] private bool autoLogTelemetryToDisk = true;
         [SerializeField] private bool spawnDefaultSwarmIfEmpty = false;
         [SerializeField] private string telemetryDirectoryOverride;
+        [SerializeField] private string xrReadyStatus = DefaultXrReadyStatus;
 
         private readonly List<ScenarioConfig> _scenarios = new List<ScenarioConfig>();
         private readonly object _tickStateLock = new object();
@@ -271,6 +274,34 @@ namespace TrishulSim.Scenarios
             set { spawnDefaultSwarmIfEmpty = value; }
         }
 
+        public Text SystemInfoText
+        {
+            get { return systemInfoText; }
+            set
+            {
+                systemInfoText = value;
+                UpdateSystemInfoText();
+            }
+        }
+
+        public string XrReadyStatus
+        {
+            get { return string.IsNullOrEmpty(xrReadyStatus) ? DefaultXrReadyStatus : xrReadyStatus; }
+            set
+            {
+                xrReadyStatus = value;
+                UpdateSystemInfoText();
+            }
+        }
+
+        public void UpdateSystemInfoText()
+        {
+            if (systemInfoText != null)
+            {
+                systemInfoText.text = XrReadyStatus;
+            }
+        }
+
         public string TraineeCockpitSceneName
         {
             get { return traineeCockpitSceneName; }
@@ -381,6 +412,7 @@ namespace TrishulSim.Scenarios
                 Instance = this;
 
             RefreshScenarioLibrary();
+            UpdateSystemInfoText();
             SubscribeServer();
             SubscribeClient();
             SubscribeButton();
