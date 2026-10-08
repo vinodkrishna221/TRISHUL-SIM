@@ -108,7 +108,7 @@ TEST:
 DEPENDS: unity-sim P0-A, P0-C     UNBLOCKS: AA-P0-B, UX-P0-A (NDJSON shape frozen)
 
 DEMO: "Session file visible in Explorer growing in real time." (P0 checklist item #5)
-PERSONA: aar-engine builder        STATUS: [ ] todo
+PERSONA: aar-engine builder        STATUS: [x] done
 ```
 
 ---

@@ -109,7 +109,7 @@ TEST:
   File exists and grows (Explorer shows increasing Size).
   Open in Notepad: each line is valid JSON; line count after 10s ≈ 100.
   Fields: t (increasing by ~100), sessionId (matches), swarmSnapshot (array).
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
