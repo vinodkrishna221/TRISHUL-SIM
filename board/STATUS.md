@@ -1,4 +1,4 @@
-# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-05T19:45 IST by Rani (UX-P0-A)
+# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-05T23:26 IST by Rani (UX-P0-B)
 
 > The single glance-source. Every session reads this first, appends one line at end.
 > Standup blocks replace the top section; history accumulates below.
@@ -13,10 +13,10 @@
 
 | Track | Done | In flight | Next |
 |---|---|---|---|
-| unity-sim | — | — | Walking skeleton: sensor panes + WebSocket IPC |
+| unity-sim | US-P0-A, US-P0-B, US-P0-C | — | US-P1-A |
 | swarm-ai | — | — | Reynolds Boids + HBT scaffold |
 | aar-engine | — | — | 10 Hz telemetry logger + Scorecard renderer |
-| ui-ux | UX-P0-A (UITK shell) | — | UX-P0-B (localization) |
+| ui-ux | UX-P0-A, UX-P0-B | — | UX-P1-A |
 
 ## Blockers (>45m old = escalated, advisor protocol)
 
@@ -50,5 +50,8 @@
 - 2026-10-05T23:26 IST · Rani: UX-P0-B done — Unity Localization setup, Hindi/English CSVs, LocaleToggle singleton, C2 & Cockpit controllers fully localized; UiShellSelfTest PASSED
 
 - 2026-10-05T22:45 IST · Rani: UX-P0-A done — UITK shell (C2 + Cockpit), status icon, 3 sensor stubs, threat indicator, dropdown, null safety; UiShellSelfTest PASSED
+- 2026-10-05T20:15 IST · Vinod (unity-sim): [US-P0-C] ✅ 10 Hz `SCENARIO_TICK` + `SCENARIO_END` broadcast loop live (`ScenarioManager.TickLoop`, `BroadcastScenarioEnd`, `InjectSwarmSnapshot`, C2 Abort button wired in `InstructorC2.unity`) — self-test green on `feat/unity-sim-tick-loop`
+- 2026-10-05T19:52 IST · Vinod (unity-sim): [US-P0-B] ✅ Scenario Library loader + `SCENARIO_START` broadcast live (`ScenarioConfig`, `ScenarioLibrary`, `ScenarioManager`, 4× `StreamingAssets/scenarios/*.json`, C2 Launch UI + Trainee scene transition) — self-test green on `feat/unity-sim-scenario-library`
+- 2026-10-05T18:58 IST · Vinod (unity-sim): [US-P0-A] ✅ WS IPC bootstrap live (`WsServer`, `WsClient`, `JsonEnvelope`, `ConnectionStatusUI`, `InstructorC2.unity`, `TraineeCockpit.unity`) — self-test green on `feat/unity-sim-ws-ipc`
 - 2026-10-04T11:03 IST · Orion: /blueprint complete — ARCHITECTURE.md · SCHEMA.md · 4× contracts · FIT-AUDIT (clean) · BUILD-PLAN.md written; 4 tracks confirmed; ready for /phase-plan
 - 2026-10-04T10:52 IST · Orion: /kickoff complete — PRD drafted, board seeded, vocabulary frozen, ready for /blueprint

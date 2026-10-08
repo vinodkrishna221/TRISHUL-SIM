@@ -106,7 +106,7 @@ TEST:
 DEPENDS: —                   UNBLOCKS: US-P0-B, SA-P0-A, AA-P0-A, UX-P0-A
 
 DEMO: "Two-laptop LAN link confirmed — green icon visible on C2 screen." (Beat 1)
-PERSONA: unity-sim builder   STATUS: [ ] todo
+PERSONA: unity-sim builder   STATUS: [x] done
 ```
 
 ---
@@ -160,7 +160,7 @@ TEST:
 DEPENDS: US-P0-A               UNBLOCKS: SA-P0-A, AA-P0-A, UX-P0-A (SCENARIO_START shape frozen)
 
 DEMO: "Instructor clicks Launch → Trainee screen transitions." (Beat 1)
-PERSONA: unity-sim builder     STATUS: [ ] todo
+PERSONA: unity-sim builder     STATUS: [x] done
 ```
 
 ---
@@ -202,7 +202,7 @@ TEST:
 DEPENDS: US-P0-B               UNBLOCKS: AA-P0-A (TICK + END events), SA-P0-A (tick clock)
 
 DEMO: "Plumbing for 10 Hz log file — telemetry grows during scenario." (Beat 5 plumbing)
-PERSONA: unity-sim builder     STATUS: [ ] todo
+PERSONA: unity-sim builder     STATUS: [x] done
 ```
 
 ---
