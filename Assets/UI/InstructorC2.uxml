@@ -1,0 +1,30 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+  <ui:VisualElement class="c2-root">
+
+    <!-- Status Bar -->
+    <ui:VisualElement class="status-bar">
+      <ui:Label name="app-title" text="TRISHUL-SIM \u00B7 C2 STATION" class="app-title" />
+      <ui:VisualElement name="link-status-icon" class="status-icon status-waiting" />
+      <ui:Label name="link-status-label" text="\u25CB Waiting for Trainee..." class="status-label" />
+    </ui:VisualElement>
+
+    <!-- Scenario Selection -->
+    <ui:VisualElement class="control-group">
+      <ui:DropdownField name="scenario-dropdown" label="Scenario" class="scenario-dropdown" />
+      <ui:TextField name="trainee-id" label="Trainee ID (optional)" class="trainee-id" />
+    </ui:VisualElement>
+
+    <!-- Action Buttons -->
+    <ui:VisualElement class="button-row">
+      <ui:Button name="launch-btn" text="LAUNCH SCENARIO" class="btn-launch" />
+      <ui:Button name="abort-btn" text="ABORT" class="btn-abort" />
+      <ui:Button name="lang-toggle" text="\u0939\u093F\u0902\u0926\u0940" class="btn-lang" />
+    </ui:VisualElement>
+
+    <!-- Scorecard Mirror (stub — hidden until SCORECARD_PAYLOAD received) -->
+    <ui:VisualElement name="scorecard-mirror" class="scorecard-panel hidden">
+      <ui:Label name="scorecard-stub-label" text="" class="scorecard-stub" />
+    </ui:VisualElement>
+
+  </ui:VisualElement>
+</ui:UXML>

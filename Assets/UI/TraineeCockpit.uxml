@@ -1,0 +1,53 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+  <ui:VisualElement class="cockpit-root">
+
+    <!-- Threat State Indicator -->
+    <ui:VisualElement name="threat-indicator" class="threat-indicator threat-green">
+      <ui:Label name="threat-label" text="GREEN" class="threat-label" />
+    </ui:VisualElement>
+
+    <!-- Three Sensor Panes (stubs — renderers wired in UX-P1-A) -->
+    <ui:VisualElement class="sensor-row">
+
+      <ui:VisualElement name="rf-waterfall-pane" class="sensor-pane">
+        <ui:Label class="pane-title" text="RF WATERFALL" />
+        <ui:VisualElement name="rf-content" class="sensor-content">
+          <!-- Stub: grey placeholder. RfWaterfallRenderer replaces with Texture2D in UX-P1-A -->
+          <ui:Label class="sensor-stub-label" text="[Awaiting SA-P0-B]" />
+        </ui:VisualElement>
+        <!-- Frequency markers (positioned by CSS in P1-A) -->
+        <ui:VisualElement class="freq-markers">
+          <ui:Label text="915 MHz" class="freq-marker" />
+          <ui:Label text="2.4 GHz" class="freq-marker" />
+          <ui:Label text="5.8 GHz" class="freq-marker" />
+        </ui:VisualElement>
+      </ui:VisualElement>
+
+      <ui:VisualElement name="doppler-pane" class="sensor-pane">
+        <ui:Label class="pane-title" text="MICRO-DOPPLER RADAR" />
+        <ui:VisualElement name="doppler-content" class="sensor-content">
+          <ui:Label class="sensor-stub-label" text="[Awaiting SA-P1-A]" />
+        </ui:VisualElement>
+        <ui:Label name="doppler-hz-label" text="Doppler: --- Hz" class="sensor-readout" />
+      </ui:VisualElement>
+
+      <ui:VisualElement name="acoustic-pane" class="sensor-pane">
+        <ui:Label class="pane-title" text="ACOUSTIC SONAR" />
+        <ui:VisualElement name="acoustic-content" class="sensor-content">
+          <ui:Label class="sensor-stub-label" text="[Awaiting SA-P1-A]" />
+        </ui:VisualElement>
+        <ui:Label name="acoustic-spl-label" text="SPL: --- dB" class="sensor-readout" />
+      </ui:VisualElement>
+
+    </ui:VisualElement>
+
+    <!-- Controls Row: EW + SMASH — added in UX-P1-B; hidden until SCENARIO_START -->
+    <ui:VisualElement name="controls-row" class="hidden" />
+
+    <!-- Scorecard Panel — hidden until SCORECARD_PAYLOAD received -->
+    <ui:VisualElement name="scorecard-panel" class="scorecard-panel hidden">
+      <ui:Label name="scorecard-overlay-label" text="Computing Scorecard\u2026" class="computing-label" />
+    </ui:VisualElement>
+
+  </ui:VisualElement>
+</ui:UXML>

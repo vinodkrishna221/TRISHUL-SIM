@@ -144,13 +144,15 @@ DELIVERABLE:
   Assets/UI/TraineeCockpit.uxml + TraineeCockpit.uss
   Assets/Scripts/UI/C2StationController.cs
   Assets/Scripts/UI/CockpitController.cs
+  Assets/Scripts/UI/UiShellSelfTest.cs
 
 TEST:
+  UiShellSelfTest PASS: csc.exe /main:TrishulSim.UI.UiShellSelfTest Assets\Scripts\UI\*.cs
   Play InstructorC2: green status icon when Trainee connects; dropdown shows ≥1 scenario.
   Play TraineeCockpit: 3 grey sensor pane boxes labelled; GREEN threat indicator visible.
   Trigger scenario: threat indicator updates on TICK. Resolution: 1920×1080 — no overflow.
 DEMO: "Both screens render with correct layout at 1920×1080." (P0 gate · Beat 1 foundation)
-STATUS: [ ] todo
+STATUS: [x] done — 2026-10-05 (verified with UiShellSelfTest PASS)
 ```
 
 ---
@@ -362,4 +364,4 @@ STATUS: [ ] todo
 
 > I, Rani, have read this brief and will push `feat/ui-ux-uitk-shell` the same day Vinod's WS IPC branch lands.
 
-- [ ] **ACCEPTED**
+- [x] **ACCEPTED**

@@ -1,0 +1,121 @@
+/* ====================================================
+   TRISHUL-SIM  ·  Trainee Cockpit  ·  USS Theme
+   MIL-STD-2525 colours shared with InstructorC2.uss
+   ==================================================== */
+
+.cockpit-root {
+    flex-direction: column;
+    background-color: #0D0D0D;
+    color: #E0E0E0;
+    font-size: 14px;
+    width: 100%;
+    height: 100%;
+    padding: 8px;
+}
+
+/* --- Threat Indicator --- */
+.threat-indicator {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    padding: 4px 16px;
+}
+
+.threat-label {
+    font-size: 16px;
+    -unity-font-style: bold;
+    color: #000000;
+    -unity-text-align: middle-center;
+}
+
+/* Threat state colours — MIL-STD-2525 */
+.threat-green { background-color: #00B300; }
+.threat-amber { background-color: #FFB300; }
+.threat-red   { background-color: #CC0000; }
+
+/* --- Sensor Row --- */
+.sensor-row {
+    flex-direction: row;
+    flex-grow: 1;
+    margin-bottom: 8px;
+}
+
+.sensor-pane {
+    flex-direction: column;
+    flex-grow: 1;
+    flex-basis: 0;
+    border-color: #333333;
+    border-width: 1px;
+    border-radius: 4px;
+    margin: 4px;
+    padding: 4px;
+    background-color: #0A0A0A;
+    min-width: 200px;
+}
+
+.pane-title {
+    font-size: 11px;
+    color: #888888;
+    -unity-font-style: bold;
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+}
+
+.sensor-content {
+    flex-grow: 1;
+    background-color: #1A1A1A;
+    border-radius: 3px;
+    min-height: 180px;
+    align-items: center;
+    justify-content: center;
+}
+
+.sensor-stub-label {
+    color: #444444;
+    font-size: 11px;
+    -unity-font-style: italic;
+}
+
+.sensor-readout {
+    font-size: 11px;
+    color: #00CC88;
+    margin-top: 4px;
+    -unity-font-style: bold;
+}
+
+/* --- Frequency markers --- */
+.freq-markers {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-top: 2px;
+}
+
+.freq-marker {
+    font-size: 9px;
+    color: #666666;
+}
+
+/* --- Scorecard panel --- */
+.scorecard-panel {
+    background-color: #111122;
+    border-color: #334499;
+    border-width: 1px;
+    border-radius: 4px;
+    padding: 16px;
+    align-items: center;
+    justify-content: center;
+}
+
+.computing-label {
+    color: #8899FF;
+    font-size: 16px;
+    -unity-font-style: italic;
+}
+
+/* --- Utility --- */
+.hidden {
+    display: none;
+}
