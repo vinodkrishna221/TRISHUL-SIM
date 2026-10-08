@@ -231,9 +231,22 @@ namespace TrishulSim.Network
             }
         }
 
+        public static void CheckAirGapStatus()
+        {
+            if (Application.internetReachability != NetworkReachability.NotReachable)
+            {
+                Debug.LogWarning("[WsServer] [AIR-GAP WARNING] External internet connectivity detected (" + Application.internetReachability + "). TRISHUL-SIM requires air-gapped deployment; zero external telemetry or outbound connections permitted.");
+            }
+            else
+            {
+                Debug.Log("[WsServer] [AIR-GAP CONFIRMED] NetworkReachability is NotReachable. Air-gapped localhost operation verified.");
+            }
+        }
+
         public bool StartServer()
         {
             CaptureMainThreadContext();
+            CheckAirGapStatus();
             if (_isRunning)
                 return true;
 

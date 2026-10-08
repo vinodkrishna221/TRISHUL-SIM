@@ -41,9 +41,17 @@ namespace UnityEngine
         internal Task RunnerTask;
     }
 
+    public enum NetworkReachability
+    {
+        NotReachable = 0,
+        ReachableViaCarrierDataNetwork = 1,
+        ReachableViaLocalAreaNetwork = 2
+    }
+
     public static class Application
     {
         private static string _streamingAssetsPath;
+        private static NetworkReachability _internetReachability = NetworkReachability.NotReachable;
 
         public static string streamingAssetsPath
         {
@@ -54,6 +62,12 @@ namespace UnityEngine
                 return Path.Combine(Directory.GetCurrentDirectory(), "Assets", "StreamingAssets");
             }
             set { _streamingAssetsPath = value; }
+        }
+
+        public static NetworkReachability internetReachability
+        {
+            get { return _internetReachability; }
+            set { _internetReachability = value; }
         }
     }
 

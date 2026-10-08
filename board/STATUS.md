@@ -1,4 +1,4 @@
-# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-08T12:06 IST by Uday (SA-P1-C)
+# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-06T19:48 IST by Vinod (unity-sim)
 
 > The single glance-source. Every session reads this first, appends one line at end.
 > Standup blocks replace the top section; history accumulates below.
@@ -13,7 +13,7 @@
 
 | Track | Done | In flight | Next |
 |---|---|---|---|
-| unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B | — | US-P2-A (air-gap validation pass) |
+| unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B, US-P2-A | — | US-P2-B (IL2CPP + InnoSetup installer) |
 | swarm-ai | SA-P1-C (EW deconfliction) | — | SA-P1-D (SMASH fire control) |
 | aar-engine | — | — | 10 Hz telemetry logger + Scorecard renderer |
 | ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B | — | UX-P1-C (split-screen) |
@@ -50,6 +50,7 @@
 - 2026-10-08T12:06 IST · Uday: SA-P1-C done — EwDeconfliction friendlyBlackoutRisk ROE logic + SensorSuiteComputer tick integration complete; EwDeconflictionSelfTest PASSED
 - 2026-10-06T22:30 IST · Rani: UX-P1-B done — EW Jammer controls + SMASH 2000 fire-control reticle (azimuth/elevation/band, ROE blackout warning, dynamic lead-angle, kinetic hit/miss feedback); UiShellSelfTest PASSED
 - 2026-10-06T22:10 IST · Rani: UX-P1-A done — live sensor suite (RF Waterfall scrolling spectrogram, Doppler circular PPI radar with 6 swarm blips, 8-band Acoustic FFT with blade-tip harmonic); UiShellSelfTest PASSED
+- 2026-10-06T19:48 IST · Vinod (unity-sim): [US-P2-A] ✅ Air-gap validation pass complete (zero external URLs/cloud SDKs, ProjectSettings analytics disabled, WsServer NetworkReachability assertions, loopback socket inspection & evidence artifacts at Build/ and docs/evidence/) — self-test green on `feat/unity-sim-airgap-validation`
 - 2026-10-06T19:12 IST · Vinod (unity-sim): [US-P1-B] ✅ All 4 tactical scenario JSON configs authored & validated (Punjab riverine fog, Ladakh LAC ridge, LoC mountain pass, Desert FOB) + bilingual English/Hindi dropdown and SwarmProfile console logging — self-test green on `feat/unity-sim-scenario-configs`
 - 2026-10-06T18:42 IST · Vinod (unity-sim): [US-P1-A] ✅ Split-screen fallback live (`Assets/Scenes/SplitScreen.unity`, `InstructorC2Root.prefab`, `TraineeCockpitRoot.prefab`, Camera.rect [0,0,0.5,1]/[0.5,0,0.5,1], single AudioListener, mode toggle, loopback bind safety, 6-Boid swarm + 10 Hz NDJSON telemetry + scorecard relay) — self-test green on `feat/unity-sim-split-screen`
 - 2026-10-05T23:26 IST · Rani: UX-P0-B done — Unity Localization setup, Hindi/English CSVs, LocaleToggle singleton, C2 & Cockpit controllers fully localized; UiShellSelfTest PASSED

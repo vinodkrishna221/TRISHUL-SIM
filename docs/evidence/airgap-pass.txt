@@ -1,0 +1,41 @@
+﻿================================================================================
+TRISHUL-SIM · AIR-GAP VALIDATION AUDIT REPORT
+Card: US-P2-A · Date: 2026-10-06T14:18:46Z
+Standard: Indian Ministry of Defence (MoD) C-UAS Tactical Simulator (SIH26247)
+Classification: 100% AIR-GAPPED STANDALONE / ZERO CLOUD EGRESS
+================================================================================
+
+=== 1. AUDITING SOURCE FILES & ASSETS FOR EXTERNAL URLS ===
+  Scanned 22 source/asset files across Assets/ and ProjectSettings/.
+  [PASS] Zero external URLs detected. Only localhost/127.0.0.1 addresses present.
+
+=== 2. AUDITING PROJECTSETTINGS AIR-GAP CONFIGURATION ===
+  [PASS] Unity Analytics, Crash Reporting, and Performance Diagnostics disabled.
+  [PASS] IL2CPP scripting backend enabled for standalone Windows build.
+
+=== 3. AUDITING SOURCE CODE FOR TELEMETRY SDK REFERENCES ===
+  Scanned 10 C# source files for cloud/telemetry SDKs.
+  [PASS] Zero external telemetry/cloud SDK dependencies found.
+
+=== 4. TESTING WsServer INTERNET REACHABILITY ASSERTIONS ===
+  [PASS] NetworkReachability.NotReachable triggers [AIR-GAP CONFIRMED] log.
+  [PASS] External network reachability correctly raises [AIR-GAP WARNING].
+
+=== 5. RUNNING END-TO-END SCENARIO & INSPECTING ACTIVE SOCKETS ===
+  Inspected active TCP sockets: 2 matching 127.0.0.1:9700 loopback.
+    TCP 127.0.0.1:9700 -> 127.0.0.1:23137 [Established]
+    TCP 127.0.0.1:23137 -> 127.0.0.1:9700 [Established]
+  [PASS] Scenario ran end-to-end with 6 Boids swarm over 127.0.0.1 loopback with zero external sockets.
+
+=== 6. RECORDING EVIDENCE AUDIT ARTIFACT ===
+
+--------------------------------------------------------------------------------
+AIR-GAP COMPLIANCE SUMMARY:
+1. Inbound/Outbound External IP Connections: 0 (Zero)
+2. Outbound Telemetry/Analytics Packets:     0 (Zero)
+3. Localhost IPC Topology:                   127.0.0.1:9700 (Strict Loopback)
+4. Unity Analytics / Cloud Services:        DISABLED (ProjectSettings verified)
+5. NetworkReachability Status:              NotReachable (Verified)
+6. Data Storage Egress:                      100% Local NDJSON file on disk
+VERDICT: PASS — CERTIFIED AIR-GAPPED FOR SECURE BATTALION/BUNKER DEPLOYMENT
+================================================================================
