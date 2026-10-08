@@ -23,3 +23,6 @@ PlayerSettings:
   forceSingleInstance: 1
   runInBackground: 1
   captureSingleScreen: 0
+  defaultScreenWidth: 1920
+  defaultScreenHeight: 1080
+  defaultIsFullScreen: 1

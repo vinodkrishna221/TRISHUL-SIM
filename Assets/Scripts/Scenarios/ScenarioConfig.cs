@@ -59,6 +59,16 @@ namespace UnityEngine
             {
                 if (!string.IsNullOrEmpty(_streamingAssetsPath))
                     return _streamingAssetsPath;
+                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                string dataPath = Path.Combine(baseDir, "TRISHUL-SIM_Data", "StreamingAssets");
+                if (Directory.Exists(dataPath))
+                    return dataPath;
+                string localAssets = Path.Combine(baseDir, "Assets", "StreamingAssets");
+                if (Directory.Exists(localAssets))
+                    return localAssets;
+                string cwdAssets = Path.Combine(Directory.GetCurrentDirectory(), "Assets", "StreamingAssets");
+                if (Directory.Exists(cwdAssets))
+                    return cwdAssets;
                 return Path.Combine(Directory.GetCurrentDirectory(), "Assets", "StreamingAssets");
             }
             set { _streamingAssetsPath = value; }

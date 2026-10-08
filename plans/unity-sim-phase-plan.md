@@ -381,7 +381,7 @@ TEST:
 DEPENDS: US-P2-A               UNBLOCKS: P3 submission package
 
 DEMO: "One .exe installs, runs, hits 60 FPS." (Beat 6)
-PERSONA: unity-sim builder     STATUS: [ ] todo
+PERSONA: unity-sim builder     STATUS: [x] done
 ```
 
 ---

@@ -53,11 +53,11 @@ namespace TrishulSim.Network
         public static async Task RunAllValidationAsync()
         {
             List<string> auditLogLines = new List<string>();
-            void LogAudit(string message)
+            Action<string> LogAudit = delegate(string message)
             {
                 Console.WriteLine(message);
                 auditLogLines.Add(message);
-            }
+            };
 
             LogAudit("=== 1. AUDITING SOURCE FILES & ASSETS FOR EXTERNAL URLS ===");
             TestZeroExternalUrls(LogAudit);
