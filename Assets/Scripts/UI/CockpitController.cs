@@ -1,6 +1,6 @@
 // ============================================================
 // CockpitController.cs — Trainee Cockpit UIDocument Controller
-// TRISHUL-SIM · UX-P1-A · ui-ux track (Rani)
+// TRISHUL-SIM · UX-P0-A + UX-P0-B + UX-P1-A · ui-ux track (Rani)
 //
 // Binds TraineeCockpit.uxml elements and connects the live sensor suite:
 // 1. RF Waterfall Spectrogram (RfWaterfallRenderer)
@@ -8,6 +8,9 @@
 // 3. Acoustic FFT Sonar Bar Equalizer (AcousticFftRenderer)
 // 4. MIL-STD-2525 Threat State Indicator (GREEN / AMBER / RED)
 // 5. Controls row, Scorecard panel, and Computing overlays.
+//
+// UX-P0-B: All label text uses LocaleToggle.GetString(key).
+//          Subscribes to OnLocaleChanged for runtime rebind.
 // ============================================================
 
 using System;
@@ -89,11 +92,25 @@ namespace TrishulSim.UI
 
         private void Start()
         {
+            // ── UX-P0-B: Subscribe to locale changes ──────────
+            if (LocaleToggle.Instance != null)
+            {
+                LocaleToggle.Instance.OnLocaleChanged += OnLocaleChangedCockpit;
+                RefreshLocalizedLabels();
+            }
+
             // ── MOCK PATH (US-P0-A/B / SA-P0-B / SA-P1-A not merged) ──
             // Simulates SCENARIO_START and Punjab incursion tick for editor testing.
 #if UNITY_EDITOR
             SimulateScenarioStart();
 #endif
+        }
+
+        private void OnDestroy()
+        {
+            // ── UX-P0-B: Unsubscribe locale listener ─────────
+            if (LocaleToggle.Instance != null)
+                LocaleToggle.Instance.OnLocaleChanged -= OnLocaleChangedCockpit;
         }
 
         // ══════════════════════════════════════════════════════
@@ -218,6 +235,15 @@ namespace TrishulSim.UI
             var sr = new SensorReadings(rfPeakGHz, rfPeakDbm, dopplerHz, acousticDb, radarCount);
             UpdateSensors(sr, lastSwarmSnapshot);
 
+            if (dopplerReading != null)
+                dopplerReading.text = LocaleToggle.Instance != null
+                    ? LocaleToggle.Instance.GetFormatted("DOPPLER_READING", dopplerHz)
+                    : string.Format("Doppler: {0:F1} Hz", dopplerHz);
+            if (acousticReading != null)
+                acousticReading.text = LocaleToggle.Instance != null
+                    ? LocaleToggle.Instance.GetFormatted("ACOUSTIC_READING", acousticDb)
+                    : string.Format("SPL: {0:F1} dB", acousticDb);
+
             Debug.Log(string.Format("[Cockpit][TICK] threat={0} RF={1:F3}GHz/{2:F1}dBm Doppler={3:F1}Hz Acoustic={4:F1}dB radar={5}",
                 threatState, rfPeakGHz, rfPeakDbm, dopplerHz, acousticDb, radarCount));
         }
@@ -291,7 +317,31 @@ namespace TrishulSim.UI
             if (scorecardPanel != null)
                 scorecardPanel.RemoveFromClassList("hidden");
             if (scorecardStubLabel != null)
-                scorecardStubLabel.text = string.Format("Scorecard received — Session: {0}", sessionId);
+                scorecardStubLabel.text = LocaleToggle.Instance.GetFormatted("SCORECARD_RECEIVED", sessionId);
+        }
+
+        // ══════════════════════════════════════════════════════
+        // Localization (UX-P0-B)
+        // ══════════════════════════════════════════════════════
+
+        private void OnLocaleChangedCockpit(TrishulLocale newLocale)
+        {
+            RefreshLocalizedLabels();
+        }
+
+        public void RefreshLocalizedLabels()
+        {
+            var loc = LocaleToggle.Instance;
+
+            // Re-apply threat state string based on current state
+            SetThreatState(currentThreatState);
+
+            // Re-apply static labels if they exist
+            if (computingOverlay != null)
+            {
+                var lbl = computingOverlay.Q<Label>();
+                if (lbl != null) lbl.text = loc.GetString("COMPUTING_SCORECARD");
+            }
         }
 
         // ══════════════════════════════════════════════════════
@@ -313,23 +363,25 @@ namespace TrishulSim.UI
             threatIndicator.RemoveFromClassList("threat-amber");
             threatIndicator.RemoveFromClassList("threat-red");
 
+            var loc = LocaleToggle.Instance;
+
             switch (state)
             {
                 case "GREEN":
                     threatIndicator.AddToClassList("threat-green");
-                    if (threatLabel != null) threatLabel.text = "GREEN";
+                    if (threatLabel != null) threatLabel.text = loc != null ? loc.GetString("THREAT_GREEN") : "GREEN";
                     break;
                 case "AMBER":
                     threatIndicator.AddToClassList("threat-amber");
-                    if (threatLabel != null) threatLabel.text = "AMBER";
+                    if (threatLabel != null) threatLabel.text = loc != null ? loc.GetString("THREAT_AMBER") : "AMBER";
                     break;
                 case "RED":
                     threatIndicator.AddToClassList("threat-red");
-                    if (threatLabel != null) threatLabel.text = "RED";
+                    if (threatLabel != null) threatLabel.text = loc != null ? loc.GetString("THREAT_RED") : "RED";
                     break;
                 default:
                     threatIndicator.AddToClassList("threat-green");
-                    if (threatLabel != null) threatLabel.text = "GREEN";
+                    if (threatLabel != null) threatLabel.text = loc != null ? loc.GetString("THREAT_GREEN") : "GREEN";
                     Debug.LogWarning(string.Format("[Cockpit] Unknown threat state: {0}", state));
                     break;
             }

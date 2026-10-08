@@ -1,10 +1,14 @@
 // ============================================================
 // C2StationController.cs — Instructor C2 Station UIDocument Controller
-// TRISHUL-SIM · UX-P0-A · ui-ux track (Rani)
+// TRISHUL-SIM · UX-P0-A + UX-P0-B · ui-ux track (Rani)
 //
 // Binds InstructorC2.uxml elements. Reacts to WS connection events
 // and scenario lifecycle. Dependencies US-P0-A/B not merged —
 // uses mock path: stub ConnectedCount=1, mock SCENARIO_START.
+//
+// UX-P0-B: Wired LocaleToggle — all labels use GetString(key).
+//          lang-toggle button calls LocaleToggle.ToggleLanguage().
+//          OnLocaleChanged subscription rebinds all label text.
 // ============================================================
 
 using UnityEngine;
@@ -69,6 +73,10 @@ namespace TrishulSim.UI
             PopulateScenarioDropdown();
             RegisterCallbacks();
 
+            // ── UX-P0-B: Subscribe to locale changes ──────────
+            LocaleToggle.Instance.OnLocaleChanged += OnLocaleChanged;
+            RefreshLocalizedLabels();
+
             // ── MOCK PATH (US-P0-A not merged) ──────────────
             // Stub: simulate connected state for editor testing.
             // Remove this block once US-P0-A (WsServer) is merged.
@@ -80,6 +88,10 @@ namespace TrishulSim.UI
         private void OnDestroy()
         {
             UnregisterCallbacks();
+
+            // ── UX-P0-B: Unsubscribe locale listener ─────────
+            if (LocaleToggle.Instance != null)
+                LocaleToggle.Instance.OnLocaleChanged -= OnLocaleChanged;
         }
 
         // ══════════════════════════════════════════════════════
@@ -209,12 +221,91 @@ namespace TrishulSim.UI
         }
 
         /// <summary>
-        /// Toggle language (placeholder — full implementation in UX-P0-B).
+        /// Toggle language via LocaleToggle (UX-P0-B).
+        /// LocaleToggle fires OnLocaleChanged → RefreshLocalizedLabels().
         /// </summary>
         public void OnLangToggleClicked()
         {
-            Debug.Log("[C2] Language toggle clicked. Full implementation in UX-P0-B.");
-            // TODO: Wire to LocaleToggle.ToggleLanguage() in UX-P0-B.
+            LocaleToggle.Instance.ToggleLanguage();
+            // RefreshLocalizedLabels is called by the OnLocaleChanged handler
+        }
+
+        // ══════════════════════════════════════════════════════
+        // Localization (UX-P0-B)
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Called by LocaleToggle.OnLocaleChanged event.
+        /// Rebinds all label text from the active string table.
+        /// </summary>
+        private void OnLocaleChanged(TrishulLocale newLocale)
+        {
+            RefreshLocalizedLabels();
+        }
+
+        /// <summary>
+        /// Rebinds all UI labels from the active locale's string table.
+        /// Called on Start and after every locale toggle.
+        /// </summary>
+        public void RefreshLocalizedLabels()
+        {
+            var loc = LocaleToggle.Instance;
+
+            if (appTitle != null)
+                appTitle.text = loc.GetString("APP_TITLE");
+
+            if (linkStatusLabel != null)
+            {
+                // Preserve connection-state label text based on current state
+                linkStatusLabel.text = isConnected
+                    ? loc.GetString("LINK_CONNECTED")
+                    : loc.GetString("LINK_WAITING");
+            }
+
+            if (launchBtn != null)
+                launchBtn.text = loc.GetString("LAUNCH_BTN");
+
+            if (abortBtn != null)
+                abortBtn.text = loc.GetString("ABORT_BTN");
+
+            if (langToggle != null)
+            {
+                // Show the OTHER language name as the toggle target
+                langToggle.text = loc.IsHindi
+                    ? loc.GetString("LANG_TOGGLE_TO_ENGLISH")
+                    : loc.GetString("LANG_TOGGLE_TO_HINDI");
+            }
+
+            if (scenarioDropdown != null && scenarioDropdown.label != null)
+                scenarioDropdown.label = loc.GetString("SCENARIO_LABEL");
+
+            if (traineeIdField != null)
+                traineeIdField.label = loc.GetString("TRAINEE_ID_LABEL");
+
+            // Refresh scenario dropdown names for current locale
+            RefreshScenarioNames();
+        }
+
+        /// <summary>
+        /// Updates the scenario dropdown choices with localized names.
+        /// </summary>
+        private void RefreshScenarioNames()
+        {
+            if (scenarioDropdown == null) return;
+
+            var loc = LocaleToggle.Instance;
+            scenarioNames = new List<string>
+            {
+                loc.GetString("SCENARIO_PUNJAB"),
+                loc.GetString("SCENARIO_RAJASTHAN"),
+                loc.GetString("SCENARIO_SIACHEN"),
+                loc.GetString("SCENARIO_ANDAMAN")
+            };
+
+            int currentIdx = scenarioDropdown.index;
+            scenarioDropdown.choices = scenarioNames;
+            if (currentIdx >= 0 && currentIdx < scenarioNames.Count)
+                scenarioDropdown.index = currentIdx;
         }
 
         // ══════════════════════════════════════════════════════
@@ -236,7 +327,7 @@ namespace TrishulSim.UI
             }
             if (linkStatusLabel != null)
             {
-                linkStatusLabel.text = "● LAN LINK CONFIRMED";
+                linkStatusLabel.text = LocaleToggle.Instance.GetString("LINK_CONNECTED");
             }
             Debug.Log("[C2] Trainee connected — status GREEN.");
         }
@@ -256,7 +347,7 @@ namespace TrishulSim.UI
             }
             if (linkStatusLabel != null)
             {
-                linkStatusLabel.text = "✕ LINK LOST";
+                linkStatusLabel.text = LocaleToggle.Instance.GetString("LINK_LOST");
             }
             Debug.LogWarning("[C2] Trainee disconnected — status RED.");
         }
@@ -278,7 +369,7 @@ namespace TrishulSim.UI
             }
             if (scorecardStubLabel != null)
             {
-                scorecardStubLabel.text = string.Format("Scorecard ready — Session: {0}", sessionId);
+                scorecardStubLabel.text = LocaleToggle.Instance.GetFormatted("SCORECARD_RECEIVED", sessionId);
             }
             Debug.Log(string.Format("[C2] SCORECARD_PAYLOAD received for session {0}.", sessionId));
         }

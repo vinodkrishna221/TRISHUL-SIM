@@ -212,7 +212,7 @@ TEST:
   Play C2 → click lang toggle → all labels switch to Hindi (Devanagari script).
   Toggle again → English. NotoSansDevanagari renders correctly (no placeholder boxes).
 DEMO: "Toggle button; Hindi renders correctly." (Beat 6)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
