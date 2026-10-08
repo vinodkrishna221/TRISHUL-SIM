@@ -206,7 +206,7 @@ TEST:
 
 PUSH IMMEDIATELY — Rajeswari (UX-P1-D) is waiting for real ScorecardMetrics.
 DEMO: ⭐ "Scorecard shows non-zero metrics with pass/fail colours." (Beat 5 resolution)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
