@@ -8,6 +8,8 @@ dist/
 .next/
 *.log
 .DS_Store
+*.exe
+*.cmd
 # tool-generated mirrors (regenerate with scripts/sync.sh)
 .claude/
 .opencode/

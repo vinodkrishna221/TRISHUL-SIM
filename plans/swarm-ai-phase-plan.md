@@ -385,7 +385,7 @@ TEST:
 DEPENDS: SA-P1-B-ii (EWJammerState shape in use)     UNBLOCKS: AA-P1-A (roeCompliance scorer)
 
 DEMO: "EW engaged without friendly blackout → roeCompliance = 1.0." (Beat 4 ROE proof)
-PERSONA: swarm-ai builder                             STATUS: [ ] todo
+PERSONA: swarm-ai builder                             STATUS: [x] done
 ```
 
 ---
