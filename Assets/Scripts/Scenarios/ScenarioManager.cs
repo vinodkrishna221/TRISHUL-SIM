@@ -400,6 +400,15 @@ namespace TrishulSim.Scenarios
                 Instance = null;
         }
 
+        public static string FormatScenarioOption(ScenarioConfig config)
+        {
+            if (config == null)
+                return string.Empty;
+            if (string.IsNullOrWhiteSpace(config.nameHindi))
+                return config.name ?? string.Empty;
+            return (config.name ?? string.Empty) + " / " + config.nameHindi;
+        }
+
         public List<ScenarioConfig> RefreshScenarioLibrary()
         {
             List<ScenarioConfig> loaded = ScenarioLibrary.LoadAll(_scenariosDirectoryOverride, true);
@@ -412,7 +421,7 @@ namespace TrishulSim.Scenarios
                 List<string> optionNames = new List<string>(_scenarios.Count);
                 for (int i = 0; i < _scenarios.Count; i++)
                 {
-                    optionNames.Add(_scenarios[i].name);
+                    optionNames.Add(FormatScenarioOption(_scenarios[i]));
                 }
                 scenarioDropdown.AddOptions(optionNames);
                 scenarioDropdown.value = 0;
@@ -429,8 +438,11 @@ namespace TrishulSim.Scenarios
 
             for (int i = 0; i < _scenarios.Count; i++)
             {
-                if (string.Equals(_scenarios[i].name, scenarioName, StringComparison.Ordinal) ||
-                    string.Equals(_scenarios[i].id, scenarioName, StringComparison.Ordinal))
+                ScenarioConfig cfg = _scenarios[i];
+                if (string.Equals(cfg.name, scenarioName, StringComparison.Ordinal) ||
+                    string.Equals(cfg.id, scenarioName, StringComparison.Ordinal) ||
+                    string.Equals(cfg.nameHindi, scenarioName, StringComparison.Ordinal) ||
+                    string.Equals(FormatScenarioOption(cfg), scenarioName, StringComparison.Ordinal))
                 {
                     if (scenarioDropdown != null)
                         scenarioDropdown.value = i;
@@ -595,16 +607,24 @@ namespace TrishulSim.Scenarios
             }
 
             WsServer activeServer = Server;
+            string swarmSummary = launchConfig.swarmProfile != null
+                ? "tactic=" + launchConfig.swarmProfile.tacticTree + ", agents=" + launchConfig.swarmProfile.agentCount +
+                  " (decoys=" + launchConfig.swarmProfile.decoyCount + ", attackers=" + launchConfig.swarmProfile.attackerCount +
+                  "), speed=" + launchConfig.swarmProfile.speedKmh + "km/h, alt=" + launchConfig.swarmProfile.altitudeM + "m"
+                : "none";
+
             if (activeServer != null && activeServer.IsRunning)
             {
                 await activeServer.BroadcastAsync(envelope.ToJson()).ConfigureAwait(false);
                 Debug.Log("[ScenarioManager] SCENARIO_START broadcast \u2014 sessionId: " + sessionId +
-                          ", scenarioId: " + launchConfig.id + ", seed: " + launchConfig.seed);
+                          ", scenarioId: " + launchConfig.id + ", seed: " + launchConfig.seed +
+                          ", swarmProfile: " + swarmSummary);
                 Task _ = MonitorAckTimeoutAsync(sessionId, generation, ackTimeoutMs);
             }
             else
             {
-                Debug.LogWarning("[ScenarioManager] WsServer is not running; SCENARIO_START prepared for sessionId: " + sessionId);
+                Debug.LogWarning("[ScenarioManager] WsServer is not running; SCENARIO_START prepared for sessionId: " + sessionId +
+                                 ", swarmProfile: " + swarmSummary);
             }
 
             ScenarioStartPayload payload = new ScenarioStartPayload
@@ -1129,7 +1149,15 @@ namespace TrishulSim.Scenarios
                 InitSessionTelemetryFile(startPayload.sessionId);
             }
 
-            Debug.Log("[WsClient] SCENARIO_START received \u2014 sessionId: " + startPayload.sessionId);
+            string clientSwarmSummary = (startPayload.scenarioConfig != null && startPayload.scenarioConfig.swarmProfile != null)
+                ? "tactic=" + startPayload.scenarioConfig.swarmProfile.tacticTree + ", agents=" + startPayload.scenarioConfig.swarmProfile.agentCount +
+                  " (decoys=" + startPayload.scenarioConfig.swarmProfile.decoyCount + ", attackers=" + startPayload.scenarioConfig.swarmProfile.attackerCount +
+                  "), speed=" + startPayload.scenarioConfig.swarmProfile.speedKmh + "km/h, alt=" + startPayload.scenarioConfig.swarmProfile.altitudeM + "m"
+                : "none";
+
+            Debug.Log("[WsClient] SCENARIO_START received \u2014 sessionId: " + startPayload.sessionId +
+                      ", scenarioId: " + startPayload.scenarioId +
+                      ", swarmProfile: " + clientSwarmSummary);
 
             // Immediate ACK within 1s per board/contracts/scenario-events.md using registered CLIENT_HEARTBEAT frame.
             if (activeClient != null && activeClient.IsConnected)

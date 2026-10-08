@@ -204,7 +204,7 @@ DELIVERABLE: 4 real JSON files in Assets/StreamingAssets/scenarios/
 
 TEST: ScenarioLibrary.LoadAll() returns 4 configs; dropdown shows all 4 names.
 DEMO: "Scenario library shows 4 entries — no two runs identical." (Beat 1)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
