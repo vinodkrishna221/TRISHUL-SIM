@@ -106,7 +106,7 @@ TEST:
 DEPENDS: —                   UNBLOCKS: US-P0-B, SA-P0-A, AA-P0-A, UX-P0-A
 
 DEMO: "Two-laptop LAN link confirmed — green icon visible on C2 screen." (Beat 1)
-PERSONA: unity-sim builder   STATUS: [ ] todo
+PERSONA: unity-sim builder   STATUS: [x] done
 ```
 
 ---
