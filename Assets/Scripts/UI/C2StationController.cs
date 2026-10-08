@@ -1,218 +1,392 @@
-// UX-P0-A  ·  C2StationController.cs
-// UITK controller for the Instructor C2 Station scene.
+// ============================================================
+// C2StationController.cs — Instructor C2 Station UIDocument Controller
+// TRISHUL-SIM · UX-P0-A + UX-P0-B · ui-ux track (Rani)
 //
-// Dependencies (from mission mock path):
-//   WsServer, ScenarioManager, ScenarioLibrary  — stubbed below with #if TRISHUL_MOCK
-//   when US-P0-A + US-P0-B land, remove the MOCK stubs and reference the real classes.
+// Binds InstructorC2.uxml elements. Reacts to WS connection events
+// and scenario lifecycle. Dependencies US-P0-A/B not merged —
+// uses mock path: stub ConnectedCount=1, mock SCENARIO_START.
 //
-// OWNED BY: Rani (ui-ux track)
-// DO NOT TOUCH: Assets/Scripts/Network/, Assets/Scripts/SwarmAI/, Assets/Scripts/AAR/
+// UX-P0-B: Wired LocaleToggle — all labels use GetString(key).
+//          lang-toggle button calls LocaleToggle.ToggleLanguage().
+//          OnLocaleChanged subscription rebinds all label text.
+// ============================================================
 
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
+using System.Collections.Generic;
 
-namespace TRISHUL.UI
+namespace TrishulSim.UI
 {
     /// <summary>
-    /// Drives the Instructor C2 Station UITK document.
-    /// Binds to InstructorC2.uxml via UIDocument component on the same GameObject.
+    /// MonoBehaviour attached to the InstructorC2 scene's UIDocument.
+    /// Manages the C2 Station HUD: connection status, scenario launch,
+    /// abort, language toggle, and scorecard mirror.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     public class C2StationController : MonoBehaviour
     {
-        // ── Cached element references ─────────────────────────────────────
-        private VisualElement _root;
-        private VisualElement _statusIcon;
-        private Label         _statusLabel;
-        private DropdownField _scenarioDropdown;
-        private TextField     _traineeId;
-        private Button        _launchBtn;
-        private Button        _abortBtn;
-        private Button        _langToggle;
-        private VisualElement _scorecardMirror;
-        private Label         _scorecardStubLabel;
+        // ── UI Element References ──────────────────────────────
+        private VisualElement root;
+        private Label appTitle;
+        private VisualElement linkStatusIcon;
+        private Label linkStatusLabel;
+        private DropdownField scenarioDropdown;
+        private TextField traineeIdField;
+        private Button launchBtn;
+        private Button abortBtn;
+        private Button langToggle;
+        private VisualElement scorecardMirror;
+        private Label scorecardStubLabel;
 
-        // ── State ─────────────────────────────────────────────────────────
-        private string _selectedScenarioId = string.Empty;
+        // ── State ─────────────────────────────────────────────
+        private bool isConnected = false;
+        private string selectedScenarioId = "";
+        private List<string> scenarioNames = new List<string>();
+        private List<string> scenarioIds = new List<string>();
 
-        // ─────────────────────────────────────────────────────────────────
+        // ── Public Accessors for Tests / UI Validation ────────
+        public bool IsConnected { get { return isConnected; } }
+        public string SelectedScenarioId { get { return selectedScenarioId; } }
+        public VisualElement Root { get { return root; } }
+        public Label LinkStatusLabel { get { return linkStatusLabel; } }
+        public VisualElement LinkStatusIcon { get { return linkStatusIcon; } }
+        public DropdownField ScenarioDropdown { get { return scenarioDropdown; } }
+        public VisualElement ScorecardMirror { get { return scorecardMirror; } }
+        public Label ScorecardStubLabel { get { return scorecardStubLabel; } }
+
+        // ══════════════════════════════════════════════════════
+        // Lifecycle
+        // ══════════════════════════════════════════════════════
+
         private void Awake()
         {
-            _root = GetComponent<UIDocument>().rootVisualElement;
-            BindElements();
+            var uiDoc = GetComponent<UIDocument>();
+            if (uiDoc != null)
+            {
+                root = uiDoc.rootVisualElement;
+                BindElements();
+            }
         }
 
         private void Start()
         {
             PopulateScenarioDropdown();
-            SubscribeToWsEvents();
+            RegisterCallbacks();
 
-#if TRISHUL_MOCK
-            // Mock path: simulate Trainee connected immediately in Editor
-            // Remove when US-P0-A (WsServer) is merged.
-            SimulateTraineeConnected();
+            // ── UX-P0-B: Subscribe to locale changes ──────────
+            LocaleToggle.Instance.OnLocaleChanged += OnLocaleChanged;
+            RefreshLocalizedLabels();
+
+            // ── MOCK PATH (US-P0-A not merged) ──────────────
+            // Stub: simulate connected state for editor testing.
+            // Remove this block once US-P0-A (WsServer) is merged.
+#if UNITY_EDITOR
+            SimulateConnection();
 #endif
         }
 
         private void OnDestroy()
         {
-            UnsubscribeFromWsEvents();
+            UnregisterCallbacks();
+
+            // ── UX-P0-B: Unsubscribe locale listener ─────────
+            if (LocaleToggle.Instance != null)
+                LocaleToggle.Instance.OnLocaleChanged -= OnLocaleChanged;
         }
 
-        // ── Element binding ───────────────────────────────────────────────
-        private void BindElements()
+        // ══════════════════════════════════════════════════════
+        // UI Binding
+        // ══════════════════════════════════════════════════════
+
+        public void BindElements(VisualElement customRoot = null)
         {
-            _statusIcon         = _root.Q<VisualElement>("link-status-icon");
-            _statusLabel        = _root.Q<Label>("link-status-label");
-            _scenarioDropdown   = _root.Q<DropdownField>("scenario-dropdown");
-            _traineeId          = _root.Q<TextField>("trainee-id");
-            _launchBtn          = _root.Q<Button>("launch-btn");
-            _abortBtn           = _root.Q<Button>("abort-btn");
-            _langToggle         = _root.Q<Button>("lang-toggle");
-            _scorecardMirror    = _root.Q<VisualElement>("scorecard-mirror");
-            _scorecardStubLabel = _root.Q<Label>("scorecard-stub-label");
+            if (customRoot != null)
+                root = customRoot;
 
-            // Button callbacks
-            _launchBtn.clicked  += OnLaunchClicked;
-            _abortBtn.clicked   += OnAbortClicked;
-            _langToggle.clicked += OnLangToggleClicked;
+            if (root == null)
+                return;
 
-            // Dropdown callback
-            _scenarioDropdown.RegisterValueChangedCallback(evt =>
-            {
-                _selectedScenarioId = evt.newValue;
-            });
+            appTitle           = root.Q<Label>("app-title");
+            linkStatusIcon     = root.Q<VisualElement>("link-status-icon");
+            linkStatusLabel    = root.Q<Label>("link-status-label");
+            scenarioDropdown   = root.Q<DropdownField>("scenario-dropdown");
+            traineeIdField     = root.Q<TextField>("trainee-id");
+            launchBtn          = root.Q<Button>("launch-btn");
+            abortBtn           = root.Q<Button>("abort-btn");
+            langToggle         = root.Q<Button>("lang-toggle");
+            scorecardMirror    = root.Q<VisualElement>("scorecard-mirror");
+            scorecardStubLabel = root.Q<Label>("scorecard-stub-label");
         }
 
-        // ── Scenario dropdown ─────────────────────────────────────────────
-        private void PopulateScenarioDropdown()
+        // ══════════════════════════════════════════════════════
+        // Scenario Dropdown
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Populates the scenario dropdown from available configs.
+        /// MOCK PATH: hard-coded scenario list until US-P0-B
+        /// (ScenarioLibrary.LoadAll()) is merged.
+        /// </summary>
+        public void PopulateScenarioDropdown()
         {
-#if TRISHUL_MOCK
-            // Mock path: hard-coded scenario list until ScenarioLibrary (US-P0-B) lands.
-            var mockScenarios = new List<string>
+            // ── MOCK: Hard-coded scenarios (US-P0-B not merged) ──
+            // Replace with ScenarioLibrary.LoadAll() once available.
+            scenarioNames = new List<string>
             {
-                "Punjab Border \u2014 Zero Visibility Pincer",
-                "Desert FOB \u2014 Dawn Saturation",
-                "Coastal Estuary \u2014 Sea-Skimmer Swarm",
-                "Mountain Pass \u2014 High-Alt Loiter"
+                "Punjab Border — Zero Visibility Pincer",
+                "Rajasthan Desert FOB — Saturation Dive",
+                "Siachen Glacier Post — High-Alt Swarm",
+                "Andaman Coastal Battery — Maritime Multi-Axis"
             };
-            _scenarioDropdown.choices = mockScenarios;
-            if (mockScenarios.Count > 0)
+            scenarioIds = new List<string>
             {
-                _scenarioDropdown.value  = mockScenarios[0];
-                _selectedScenarioId     = mockScenarios[0];
+                "punjab-fog-pincer-01",
+                "rajasthan-desert-fob-01",
+                "siachen-glacier-01",
+                "andaman-coastal-01"
+            };
+
+            if (scenarioDropdown != null)
+            {
+                scenarioDropdown.choices = scenarioNames;
+                if (scenarioNames.Count > 0)
+                {
+                    scenarioDropdown.index = 0;
+                    selectedScenarioId = scenarioIds[0];
+                }
             }
-#else
-            // Real path: ScenarioLibrary.LoadAll() from US-P0-B.
-            // var scenarios = ScenarioLibrary.LoadAll();
-            // _scenarioDropdown.choices = scenarios.ConvertAll(s => s.name);
-            // if (scenarios.Count > 0) { _scenarioDropdown.value = scenarios[0].name; }
-            Debug.LogWarning("[C2StationController] ScenarioLibrary not yet available. Build US-P0-B.");
-#endif
         }
 
-        // ── WebSocket event wiring ────────────────────────────────────────
-        private void SubscribeToWsEvents()
+        // ══════════════════════════════════════════════════════
+        // Callbacks
+        // ══════════════════════════════════════════════════════
+
+        public void RegisterCallbacks()
         {
-#if TRISHUL_MOCK
-            // No-op in mock mode.
-#else
-            // Real path (after US-P0-A lands):
-            // WsServer.Instance.OnClientConnected    += OnTraineeConnected;
-            // WsServer.Instance.OnClientDisconnected += OnTraineeDisconnected;
-            // WsClient.Instance.OnMessageReceived    += OnWsMessageReceived;
-#endif
+            if (launchBtn != null) launchBtn.clicked += OnLaunchClicked;
+            if (abortBtn != null) abortBtn.clicked += OnAbortClicked;
+            if (langToggle != null) langToggle.clicked += OnLangToggleClicked;
+
+            if (scenarioDropdown != null)
+                scenarioDropdown.RegisterValueChangedCallback(OnScenarioChanged);
         }
 
-        private void UnsubscribeFromWsEvents()
+        public void UnregisterCallbacks()
         {
-#if !TRISHUL_MOCK
-            // WsServer.Instance.OnClientConnected    -= OnTraineeConnected;
-            // WsServer.Instance.OnClientDisconnected -= OnTraineeDisconnected;
-            // WsClient.Instance.OnMessageReceived    -= OnWsMessageReceived;
-#endif
+            if (launchBtn != null) launchBtn.clicked -= OnLaunchClicked;
+            if (abortBtn != null) abortBtn.clicked -= OnAbortClicked;
+            if (langToggle != null) langToggle.clicked -= OnLangToggleClicked;
+
+            if (scenarioDropdown != null)
+                scenarioDropdown.UnregisterValueChangedCallback(OnScenarioChanged);
         }
 
-        // ── Status icon helpers ───────────────────────────────────────────
-        public void OnTraineeConnected()
+        public void OnScenarioChanged(ChangeEvent<string> evt)
         {
-            SetStatusClass("status-connected");
-            _statusLabel.text = "\u25CF LAN LINK CONFIRMED";
+            if (evt == null) return;
+            int idx = scenarioNames.IndexOf(evt.newValue);
+            if (idx >= 0 && idx < scenarioIds.Count)
+                selectedScenarioId = scenarioIds[idx];
         }
 
-        public void OnTraineeDisconnected()
+        /// <summary>
+        /// Launch the selected scenario.
+        /// MOCK: logs to console until ScenarioManager is available.
+        /// </summary>
+        public void OnLaunchClicked()
         {
-            SetStatusClass("status-lost");
-            _statusLabel.text = "\u25CB Link lost\u2026";
+            if (!isConnected)
+            {
+                Debug.LogWarning("[C2] Cannot launch — Trainee not connected.");
+                return;
+            }
+
+            string traineeId = traineeIdField != null ? traineeIdField.value : "";
+            Debug.Log(string.Format("[C2] LAUNCH: scenario={0}, trainee={1}", selectedScenarioId, traineeId));
+
+            // TODO: Replace with ScenarioManager.LaunchScenario(selectedScenarioId)
+            // once US-P0-B is merged.
         }
 
-        private void SetStatusClass(string cls)
+        /// <summary>
+        /// Abort the running scenario.
+        /// MOCK: logs to console until ScenarioManager is available.
+        /// </summary>
+        public void OnAbortClicked()
         {
-            _statusIcon.RemoveFromClassList("status-waiting");
-            _statusIcon.RemoveFromClassList("status-connected");
-            _statusIcon.RemoveFromClassList("status-lost");
-            _statusIcon.AddToClassList(cls);
+            Debug.Log("[C2] ABORT requested by Instructor.");
+
+            // TODO: Replace with ScenarioManager.BroadcastScenarioEnd("INSTRUCTOR_ABORT")
+            // once US-P0-B is merged.
         }
 
-        // ── Button handlers ───────────────────────────────────────────────
-        private void OnLaunchClicked()
+        /// <summary>
+        /// Toggle language via LocaleToggle (UX-P0-B).
+        /// LocaleToggle fires OnLocaleChanged → RefreshLocalizedLabels().
+        /// </summary>
+        public void OnLangToggleClicked()
         {
-#if TRISHUL_MOCK
-            Debug.Log($"[C2Station MOCK] LaunchScenario: {_selectedScenarioId}");
-            // Directly invoke mock scenario start on CockpitController for editor testing.
-            var cockpit = FindObjectOfType<CockpitController>();
-            cockpit?.OnScenarioStart_Mock();
-#else
-            // ScenarioManager.Instance.LaunchScenario(_selectedScenarioId);
-#endif
+            LocaleToggle.Instance.ToggleLanguage();
+            // RefreshLocalizedLabels is called by the OnLocaleChanged handler
         }
 
-        private void OnAbortClicked()
+        // ══════════════════════════════════════════════════════
+        // Localization (UX-P0-B)
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Called by LocaleToggle.OnLocaleChanged event.
+        /// Rebinds all label text from the active string table.
+        /// </summary>
+        private void OnLocaleChanged(TrishulLocale newLocale)
         {
-#if TRISHUL_MOCK
-            Debug.Log("[C2Station MOCK] ABORT pressed.");
-#else
-            // ScenarioManager.Instance.BroadcastScenarioEnd("INSTRUCTOR_ABORT");
-#endif
+            RefreshLocalizedLabels();
         }
 
-        private void OnLangToggleClicked()
+        /// <summary>
+        /// Rebinds all UI labels from the active locale's string table.
+        /// Called on Start and after every locale toggle.
+        /// </summary>
+        public void RefreshLocalizedLabels()
         {
-            // Wired to LocaleToggle in UX-P0-B.
-            var localeToggle = FindObjectOfType<LocaleToggle>();
-            if (localeToggle != null)
-                localeToggle.ToggleLanguage();
-            else
-                Debug.Log("[C2Station] LocaleToggle not yet present (UX-P0-B).");
+            var loc = LocaleToggle.Instance;
+
+            if (appTitle != null)
+                appTitle.text = loc.GetString("APP_TITLE");
+
+            if (linkStatusLabel != null)
+            {
+                // Preserve connection-state label text based on current state
+                linkStatusLabel.text = isConnected
+                    ? loc.GetString("LINK_CONNECTED")
+                    : loc.GetString("LINK_WAITING");
+            }
+
+            if (launchBtn != null)
+                launchBtn.text = loc.GetString("LAUNCH_BTN");
+
+            if (abortBtn != null)
+                abortBtn.text = loc.GetString("ABORT_BTN");
+
+            if (langToggle != null)
+            {
+                // Show the OTHER language name as the toggle target
+                langToggle.text = loc.IsHindi
+                    ? loc.GetString("LANG_TOGGLE_TO_ENGLISH")
+                    : loc.GetString("LANG_TOGGLE_TO_HINDI");
+            }
+
+            if (scenarioDropdown != null && scenarioDropdown.label != null)
+                scenarioDropdown.label = loc.GetString("SCENARIO_LABEL");
+
+            if (traineeIdField != null)
+                traineeIdField.label = loc.GetString("TRAINEE_ID_LABEL");
+
+            // Refresh scenario dropdown names for current locale
+            RefreshScenarioNames();
         }
 
-        // ── Scorecard mirror (stub for UX-P1-D) ──────────────────────────
-        public void ShowScorecardMirror(string sessionId)
+        /// <summary>
+        /// Updates the scenario dropdown choices with localized names.
+        /// </summary>
+        private void RefreshScenarioNames()
         {
-            _scorecardMirror.RemoveFromClassList("hidden");
-            _scorecardStubLabel.text = $"Scorecard received \u2014 session: {sessionId}";
+            if (scenarioDropdown == null) return;
+
+            var loc = LocaleToggle.Instance;
+            scenarioNames = new List<string>
+            {
+                loc.GetString("SCENARIO_PUNJAB"),
+                loc.GetString("SCENARIO_RAJASTHAN"),
+                loc.GetString("SCENARIO_SIACHEN"),
+                loc.GetString("SCENARIO_ANDAMAN")
+            };
+
+            int currentIdx = scenarioDropdown.index;
+            scenarioDropdown.choices = scenarioNames;
+            if (currentIdx >= 0 && currentIdx < scenarioNames.Count)
+                scenarioDropdown.index = currentIdx;
         }
 
-        // ── WS message dispatcher (real path, active when US-P0-A lands) ──
-        // private void OnWsMessageReceived(string json)
-        // {
-        //     var envelope = JsonUtility.FromJson<WsEnvelope>(json);
-        //     switch (envelope.type)
-        //     {
-        //         case "SCORECARD_PAYLOAD":
-        //             var payload = JsonUtility.FromJson<ScorecardPayload>(json);
-        //             ShowScorecardMirror(payload.payload.scorecard.sessionId);
-        //             break;
-        //     }
-        // }
+        // ══════════════════════════════════════════════════════
+        // Connection Status
+        // ══════════════════════════════════════════════════════
 
-        // ── Mock helpers ──────────────────────────────────────────────────
-#if TRISHUL_MOCK
-        [ContextMenu("Mock: Simulate Trainee Connected")]
-        public void SimulateTraineeConnected()
+        /// <summary>
+        /// Called when a Trainee client connects.
+        /// Wire to WsServer.OnClientConnected once US-P0-A is merged.
+        /// </summary>
+        public void OnClientConnected()
         {
-            OnTraineeConnected();
+            isConnected = true;
+            if (linkStatusIcon != null)
+            {
+                linkStatusIcon.RemoveFromClassList("status-waiting");
+                linkStatusIcon.RemoveFromClassList("status-lost");
+                linkStatusIcon.AddToClassList("status-connected");
+            }
+            if (linkStatusLabel != null)
+            {
+                linkStatusLabel.text = LocaleToggle.Instance.GetString("LINK_CONNECTED");
+            }
+            Debug.Log("[C2] Trainee connected — status GREEN.");
+        }
+
+        /// <summary>
+        /// Called when the Trainee client disconnects.
+        /// Wire to WsServer.OnClientDisconnected once US-P0-A is merged.
+        /// </summary>
+        public void OnClientDisconnected()
+        {
+            isConnected = false;
+            if (linkStatusIcon != null)
+            {
+                linkStatusIcon.RemoveFromClassList("status-connected");
+                linkStatusIcon.RemoveFromClassList("status-waiting");
+                linkStatusIcon.AddToClassList("status-lost");
+            }
+            if (linkStatusLabel != null)
+            {
+                linkStatusLabel.text = LocaleToggle.Instance.GetString("LINK_LOST");
+            }
+            Debug.LogWarning("[C2] Trainee disconnected — status RED.");
+        }
+
+        // ══════════════════════════════════════════════════════
+        // Scorecard Mirror
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Called when SCORECARD_PAYLOAD is received via WebSocket.
+        /// Shows the scorecard mirror panel on the C2 screen.
+        /// Stub: displays sessionId text. Full renderer in UX-P1-D (Rajeswari).
+        /// </summary>
+        public void OnScorecardReceived(string sessionId)
+        {
+            if (scorecardMirror != null)
+            {
+                scorecardMirror.RemoveFromClassList("hidden");
+            }
+            if (scorecardStubLabel != null)
+            {
+                scorecardStubLabel.text = LocaleToggle.Instance.GetFormatted("SCORECARD_RECEIVED", sessionId);
+            }
+            Debug.Log(string.Format("[C2] SCORECARD_PAYLOAD received for session {0}.", sessionId));
+        }
+
+        // ══════════════════════════════════════════════════════
+        // Mock Path (Editor Only)
+        // ══════════════════════════════════════════════════════
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// Simulates a connected Trainee for editor testing.
+        /// Remove once US-P0-A (WsServer) is merged.
+        /// </summary>
+        private void SimulateConnection()
+        {
+            Debug.Log("[C2][MOCK] Simulating Trainee connection (US-P0-A not merged).");
+            OnClientConnected();
         }
 #endif
     }

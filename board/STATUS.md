@@ -1,4 +1,4 @@
-# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-05T22:45 IST by Rani (UX-P0-A)
+# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-05T23:26 IST by Rani (UX-P0-B)
 
 > The single glance-source. Every session reads this first, appends one line at end.
 > Standup blocks replace the top section; history accumulates below.
@@ -16,7 +16,7 @@
 | unity-sim | US-P0-A, US-P0-B, US-P0-C | — | US-P1-A |
 | swarm-ai | — | — | Reynolds Boids + HBT scaffold |
 | aar-engine | — | — | 10 Hz telemetry logger + Scorecard renderer |
-| ui-ux | UX-P0-A | — | UX-P0-B (localization) |
+| ui-ux | UX-P0-A, UX-P0-B | — | UX-P1-A |
 
 ## Blockers (>45m old = escalated, advisor protocol)
 
@@ -46,6 +46,8 @@
 | Endgame tiering active | 19 Oct 2026 ~18:00 (T-6h) |
 
 ## Log (one line per session-end, newest first)
+
+- 2026-10-05T23:26 IST · Rani: UX-P0-B done — Unity Localization setup, Hindi/English CSVs, LocaleToggle singleton, C2 & Cockpit controllers fully localized; UiShellSelfTest PASSED
 
 - 2026-10-05T22:45 IST · Rani: UX-P0-A done — UITK shell (C2 + Cockpit), status icon, 3 sensor stubs, threat indicator, dropdown, null safety; UiShellSelfTest PASSED
 - 2026-10-05T20:15 IST · Vinod (unity-sim): [US-P0-C] ✅ 10 Hz `SCENARIO_TICK` + `SCENARIO_END` broadcast loop live (`ScenarioManager.TickLoop`, `BroadcastScenarioEnd`, `InjectSwarmSnapshot`, C2 Abort button wired in `InstructorC2.unity`) — self-test green on `feat/unity-sim-tick-loop`

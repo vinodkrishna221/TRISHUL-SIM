@@ -1,36 +1,44 @@
-/* ====================================================
-   TRISHUL-SIM  ·  C2 Station  ·  USS Theme
-   MIL-STD-2525 colour palette:
-     GREEN  #00B300  AMBER  #FFB300  RED  #CC0000
-   ==================================================== */
+/* ============================================================
+   InstructorC2.uss — C2 Station Stylesheet
+   TRISHUL-SIM · UX-P0-A · MIL-STD-2525 colour palette
+   ============================================================ */
 
+/* --- Root --- */
 .c2-root {
-    flex-direction: column;
     background-color: #0D0D0D;
     color: #E0E0E0;
     font-size: 14px;
-    width: 100%;
-    height: 100%;
+    flex-grow: 1;
     padding: 16px;
+    -unity-font-style: normal;
 }
 
 /* --- Status Bar --- */
 .status-bar {
     flex-direction: row;
     align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
     margin-bottom: 16px;
     background-color: #1A1A1A;
-    padding: 8px 12px;
     border-radius: 4px;
+    border-bottom-width: 1px;
+    border-bottom-color: #333333;
 }
 
 .app-title {
-    font-size: 16px;
-    color: #FFFFFF;
+    font-size: 18px;
     -unity-font-style: bold;
-    flex-grow: 1;
+    color: #FFFFFF;
+    letter-spacing: 2px;
 }
 
+.status-group {
+    flex-direction: row;
+    align-items: center;
+}
+
+/* --- Status Icon (connection indicator) --- */
 .status-icon {
     width: 12px;
     height: 12px;
@@ -38,104 +46,103 @@
     margin-right: 8px;
 }
 
-/* Status states */
-.status-waiting   { background-color: #888888; }
-.status-connected { background-color: #00B300; }  /* MIL-STD-2525 GREEN */
-.status-lost      { background-color: #CC0000; }  /* MIL-STD-2525 RED   */
-
-.status-label {
-    color: #AAAAAA;
-    font-size: 12px;
+.status-waiting {
+    background-color: #888888;
 }
 
-/* --- Control Group --- */
-.control-group {
-    flex-direction: column;
+.status-connected {
+    background-color: #00B300; /* MIL-STD-2525 GREEN */
+}
+
+.status-lost {
+    background-color: #CC0000; /* MIL-STD-2525 RED */
+}
+
+.status-label {
+    font-size: 13px;
+    color: #AAAAAA;
+}
+
+/* --- Controls Panel --- */
+.controls-panel {
+    padding: 16px;
+    margin-bottom: 16px;
+    background-color: #141414;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: #2A2A2A;
+}
+
+.control-field {
     margin-bottom: 12px;
 }
 
-.scenario-dropdown {
-    margin-bottom: 8px;
-    background-color: #1E1E1E;
-    border-color: #444444;
-    border-width: 1px;
-    color: #E0E0E0;
+.control-field > Label {
+    color: #AAAAAA;
+    font-size: 12px;
+    min-width: 140px;
 }
 
-.trainee-id {
-    background-color: #1E1E1E;
-    border-color: #444444;
-    border-width: 1px;
-    color: #E0E0E0;
-}
-
-/* --- Buttons --- */
 .button-row {
     flex-direction: row;
-    margin-bottom: 16px;
+    margin-top: 8px;
     flex-wrap: wrap;
 }
 
-.btn-launch {
-    background-color: #004D00;
-    border-color: #00B300;
-    border-width: 1px;
-    color: #00FF00;
+/* --- Buttons --- */
+.btn {
+    padding: 8px 16px;
+    margin-right: 8px;
+    margin-bottom: 4px;
+    border-radius: 3px;
     font-size: 13px;
     -unity-font-style: bold;
-    margin-right: 8px;
-    padding: 8px 16px;
-    border-radius: 3px;
-    flex-grow: 1;
+    border-width: 1px;
+}
+
+.btn-launch {
+    background-color: #00B300;
+    color: #FFFFFF;
+    border-color: #009900;
 }
 
 .btn-launch:hover {
-    background-color: #006600;
+    background-color: #00CC00;
 }
 
 .btn-abort {
-    background-color: #4D0000;
-    border-color: #CC0000;
-    border-width: 1px;
-    color: #FF4444;
-    font-size: 13px;
-    -unity-font-style: bold;
-    margin-right: 8px;
-    padding: 8px 16px;
-    border-radius: 3px;
+    background-color: #CC0000;
+    color: #FFFFFF;
+    border-color: #990000;
 }
 
 .btn-abort:hover {
-    background-color: #660000;
+    background-color: #EE0000;
 }
 
 .btn-lang {
-    background-color: #1A1A2E;
-    border-color: #4466CC;
-    border-width: 1px;
-    color: #8899FF;
-    font-size: 13px;
-    padding: 8px 12px;
-    border-radius: 3px;
+    background-color: #333333;
+    color: #E0E0E0;
+    border-color: #555555;
 }
 
 .btn-lang:hover {
-    background-color: #222244;
+    background-color: #444444;
 }
 
-/* --- Scorecard Mirror Panel --- */
+/* --- Scorecard Panel (stub) --- */
 .scorecard-panel {
-    background-color: #111122;
-    border-color: #334499;
-    border-width: 1px;
+    padding: 16px;
+    background-color: #141414;
     border-radius: 4px;
-    padding: 12px;
-    flex-grow: 1;
+    border-width: 1px;
+    border-color: #2A2A2A;
 }
 
 .scorecard-stub {
-    color: #8899FF;
-    font-size: 12px;
+    font-size: 14px;
+    color: #888888;
+    -unity-font-style: italic;
 }
 
 /* --- Utility --- */
@@ -143,7 +150,15 @@
     display: none;
 }
 
-/* --- Threat state (shared, referenced from controllers) --- */
-.threat-green { background-color: #00B300; }
-.threat-amber { background-color: #FFB300; }
-.threat-red   { background-color: #CC0000; }
+/* --- MIL-STD-2525 Threat State Colours (shared) --- */
+.threat-green {
+    background-color: #00B300;
+}
+
+.threat-amber {
+    background-color: #FFB300;
+}
+
+.threat-red {
+    background-color: #CC0000;
+}
