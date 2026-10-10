@@ -178,7 +178,7 @@ TEST:
 
 PUSH IMMEDIATELY — this is Beat 5, the scorecard that judges examine longest.
 DEMO: ⭐ "Beat 5 fully visual on both screens — judge scrubs to the moment he fired." (Beat 5)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---

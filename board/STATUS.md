@@ -1,4 +1,4 @@
-# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-08T12:35 IST by Vinod (unity-sim)
+# ⚔️ STATUS — TRISHUL-SIM · updated 2026-10-10T12:26 IST by Rajeswari (UX-P1-D)
 
 > The single glance-source. Every session reads this first, appends one line at end.
 > Standup blocks replace the top section; history accumulates below.
@@ -16,7 +16,7 @@
 | unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B, US-P2-A, US-P2-B, US-P2-C | — | US-P2-D (Warden review coordination + smoke) |
 | swarm-ai | SA-P1-C (EW deconfliction) | — | SA-P1-D (SMASH fire control) |
 | aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B | — | AA-P2-A (PDF export) |
-| ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B | — | UX-P1-C (split-screen) |
+| ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B, UX-P1-D | — | UX-P2-A (PDF export button) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
 
@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-08T18:15 IST · Rajeswari: UX-P1-D done — ScorecardPanel UXML/USS, ScorecardPanelController, ScorecardMock fixtures, interactive timeline scrubber with 6-agent spatial radar overlay, bilingual pass; ScorecardSelfTest & UiShellSelfTest PASSED
 - 2026-10-10T12:26 IST · Sohail (aar-engine): [AA-P1-B] ✅ Timeline Scrubber data engine live (TimelineIndexer, TimelinePlaybackController, Scorecard.timelineIndex populated, O(log n) <20ms seek & observable scrubber) — self-test green on `feat/aar-engine-timeline-indexer`
 - 2026-10-08T19:50 IST · Sohail (aar-engine): [AA-P1-A] ✅ DecisionTreeScorer single O(n) math + real ScorecardMetrics (timeToDetectionMs, roeCompliance, kineticEfficiency, neutralised/missed, prematureEwPenalty, doctrinePassed) live & verified on NDJSON — self-test green on `feat/aar-engine-decision-tree-scorer`
 - 2026-10-08T19:20 IST · Sohail (aar-engine): [AA-P0-B] ✅ Stub Scorecard compute + SCORECARD_PAYLOAD live (ScorecardComputer, SessionManifest, %AppData% scorecard.json & manifest.json lifecycle, WsClient broadcast) — self-test green on `feat/aar-engine-stub-scorecard`
