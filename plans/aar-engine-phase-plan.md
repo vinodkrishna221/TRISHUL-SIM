@@ -387,7 +387,7 @@ TEST:
 DEPENDS: AA-P2-A, AA-P1-A, AA-P1-B     UNBLOCKS: unity-sim P2-D (Warden coordination)
 
 DEMO: "Scorecard renders in ≤10 s — the PRD hard requirement." (Beat 5)
-PERSONA: aar-engine builder             STATUS: [ ] todo
+PERSONA: aar-engine builder             STATUS: [x] done
 ```
 
 ---

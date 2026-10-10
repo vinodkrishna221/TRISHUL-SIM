@@ -15,7 +15,7 @@
 |---|---|---|---|
 | unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B, US-P2-A, US-P2-B, US-P2-C | — | US-P2-D (Warden review coordination + smoke) |
 | swarm-ai | SA-P1-C (EW deconfliction) | — | SA-P1-D (SMASH fire control) |
-| aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A | — | AA-P2-B (Warden contract fidelity) |
+| aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A, AA-P2-B | — | AA-P3-A (Partial-file guard) |
 | ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B, UX-P1-D, UX-P2-A | — | UX-P1-C (Split-screen) / UX-P2-B (Bilingual pass) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-10T13:10 IST · Sohail (aar-engine): [AA-P2-B] ✅ Warden contract fidelity & timing verified (3× Punjab runs measured: 1438ms, 38ms, 29ms vs ≤10s SLA; zero nulls in 5-line NDJSON spot-check; full Scorecard in <64KB envelope; dual-screen C2/Trainee WS routing confirmed; manifest updated) — self-test green on `feat/aar-engine-warden-review`
 - 2026-10-08T19:55 IST · Rajeswari: UX-P2-A done — ScorecardPanelController PDF export button wired with loading spinner, Process.Start invocation, clipboard fallback, error handling & PdfExporter generating 6-section dossier; ScorecardSelfTest (7/7 suites) PASSED
 - 2026-10-10T12:47 IST · Sohail (aar-engine): [AA-P2-A] ✅ Tactical Performance Dossier PDF export live (iTextSharp 5.5.13 embedded, NotoSansDevanagari Hindi font, colored doctrine badge, metrics table, threat sparkline, one-click ExportPdf) — self-test green on `feat/aar-engine-pdf-export`
 - 2026-10-08T18:15 IST · Rajeswari: UX-P1-D done — ScorecardPanel UXML/USS, ScorecardPanelController, ScorecardMock fixtures, interactive timeline scrubber with 6-agent spatial radar overlay, bilingual pass; ScorecardSelfTest & UiShellSelfTest PASSED
