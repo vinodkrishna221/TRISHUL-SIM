@@ -15,7 +15,7 @@
 |---|---|---|---|
 | unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B, US-P2-A, US-P2-B, US-P2-C | — | US-P2-D (Warden review coordination + smoke) |
 | swarm-ai | SA-P1-C (EW deconfliction) | — | SA-P1-D (SMASH fire control) |
-| aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B | — | AA-P2-A (PDF export) |
+| aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A | — | AA-P2-B (Warden contract fidelity) |
 | ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B, UX-P1-D | — | UX-P2-A (PDF export button) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-10T12:47 IST · Sohail (aar-engine): [AA-P2-A] ✅ Tactical Performance Dossier PDF export live (iTextSharp 5.5.13 embedded, NotoSansDevanagari Hindi font, colored doctrine badge, metrics table, threat sparkline, one-click ExportPdf) — self-test green on `feat/aar-engine-pdf-export`
 - 2026-10-08T18:15 IST · Rajeswari: UX-P1-D done — ScorecardPanel UXML/USS, ScorecardPanelController, ScorecardMock fixtures, interactive timeline scrubber with 6-agent spatial radar overlay, bilingual pass; ScorecardSelfTest & UiShellSelfTest PASSED
 - 2026-10-10T12:26 IST · Sohail (aar-engine): [AA-P1-B] ✅ Timeline Scrubber data engine live (TimelineIndexer, TimelinePlaybackController, Scorecard.timelineIndex populated, O(log n) <20ms seek & observable scrubber) — self-test green on `feat/aar-engine-timeline-indexer`
 - 2026-10-08T19:50 IST · Sohail (aar-engine): [AA-P1-A] ✅ DecisionTreeScorer single O(n) math + real ScorecardMetrics (timeToDetectionMs, roeCompliance, kineticEfficiency, neutralised/missed, prematureEwPenalty, doctrinePassed) live & verified on NDJSON — self-test green on `feat/aar-engine-decision-tree-scorer`

@@ -866,10 +866,46 @@ namespace TrishulSim.AAR
             if (compHandler != null)
                 compHandler(scorecard);
 
-            // 3. Broadcast SCORECARD_PAYLOAD via WsClient (Client -> Server -> broadcast)
+            // 3. Export PDF Dossier (AA-P2-A)
+            try
+            {
+                TrishulSim.PDF.PdfExporter.WriteToFile(scorecard, dir);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[ScorecardComputer] PDF export notice: " + ex.Message);
+            }
+
+            // 4. Broadcast SCORECARD_PAYLOAD via WsClient (Client -> Server -> broadcast)
             BroadcastScorecard(scorecard);
 
             return scorecard;
+        }
+
+        /// <summary>
+        /// Exports the last computed (or specified) Scorecard as a PDF dossier to %AppData%\TRISHUL-SIM\sessions\<sessionId>.pdf.
+        /// Exposes one-click PDF generation for UI button wiring (Rajeswari UX-P2-A).
+        /// </summary>
+        public string ExportPdf(Scorecard scorecard = null)
+        {
+            Scorecard target = scorecard ?? _lastComputedScorecard;
+            if (target == null)
+            {
+                Debug.LogWarning("[ScorecardComputer] Cannot export PDF: no Scorecard has been computed yet.");
+                return null;
+            }
+
+            try
+            {
+                string pdfPath = TrishulSim.PDF.PdfExporter.WriteToFile(target, GetSessionsDirectory());
+                Debug.Log("[ScorecardComputer] PDF exported to: " + pdfPath);
+                return pdfPath;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[ScorecardComputer] Failed to export PDF dossier: " + ex.Message);
+                return null;
+            }
         }
 
         /// <summary>

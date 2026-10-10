@@ -297,7 +297,7 @@ TEST:
   - Timeline sparkline visible
   File size < 500 KB.
 DEMO: "Judge gets a PDF in one click." (Beat 6)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---

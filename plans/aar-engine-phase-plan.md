@@ -350,7 +350,7 @@ TEST:
 DEPENDS: AA-P1-A               UNBLOCKS: UX-P2-A (PDF export button becomes functional)
 
 DEMO: "Judge gets a PDF in one click — one-click iTextSharp export." (Beat 6)
-PERSONA: aar-engine builder   STATUS: [ ] todo
+PERSONA: aar-engine builder   STATUS: [x] done
 ```
 
 ---
