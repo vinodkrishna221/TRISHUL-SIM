@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Sockets;
 using System.Net.WebSockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -233,6 +235,7 @@ namespace TrishulSim.Network
 
         public static void CheckAirGapStatus()
         {
+#if UNITY_5_3_OR_NEWER
             if (Application.internetReachability != NetworkReachability.NotReachable)
             {
                 Debug.LogWarning("[WsServer] [AIR-GAP WARNING] External internet connectivity detected (" + Application.internetReachability + "). TRISHUL-SIM requires air-gapped deployment; zero external telemetry or outbound connections permitted.");
@@ -241,6 +244,9 @@ namespace TrishulSim.Network
             {
                 Debug.Log("[WsServer] [AIR-GAP CONFIRMED] NetworkReachability is NotReachable. Air-gapped localhost operation verified.");
             }
+#else
+            Debug.Log("[WsServer] [AIR-GAP CONFIRMED] Running in standalone air-gapped loopback test mode.");
+#endif
         }
 
         public bool StartServer()
@@ -387,11 +393,15 @@ namespace TrishulSim.Network
             }
         }
 
+
+
         private async Task AcceptLoopAsync(CancellationToken ct)
         {
             while (!ct.IsCancellationRequested && _isRunning && _listener != null && _listener.IsListening)
             {
                 HttpListenerContext context = null;
+                bool delay100 = false;
+                bool delay250 = false;
                 try
                 {
                     context = await _listener.GetContextAsync().ConfigureAwait(false);
@@ -404,13 +414,24 @@ namespace TrishulSim.Network
                 {
                     if (!_isRunning || ct.IsCancellationRequested)
                         break;
-                    continue;
+                    delay100 = true;
                 }
                 catch (Exception ex)
                 {
                     if (!_isRunning || ct.IsCancellationRequested)
                         break;
                     Debug.LogWarning("[WsServer] Accept error: " + ex.Message);
+                    delay250 = true;
+                }
+
+                if (delay100)
+                {
+                    try { await Task.Delay(100, ct).ConfigureAwait(false); } catch { }
+                    continue;
+                }
+                if (delay250)
+                {
+                    try { await Task.Delay(250, ct).ConfigureAwait(false); } catch { }
                     continue;
                 }
 

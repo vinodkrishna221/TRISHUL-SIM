@@ -602,6 +602,16 @@ namespace TrishulSim.UI
     using UnityEngine;
     using UnityEngine.UIElements;
 
+#if UNITY_5_3_OR_NEWER
+    public static class UiTestExtensions
+    {
+        public static void SimulateChange(this DropdownField field, string newVal)
+        {
+            field.value = newVal;
+        }
+    }
+#endif
+
     public static class UiShellSelfTest
     {
 #if !UNITY_5_3_OR_NEWER
@@ -997,22 +1007,32 @@ namespace TrishulSim.UI
             renderer.UpdateAcoustic(quietSr);
             Assert(label.text == "SPL: 32.0 dB", "Acoustic label must format SPL correctly");
             var bladeBar = renderer.BarElements[AcousticFftRenderer.BladeTipBandIndex];
-            Assert(bladeBar.style.height.value <= 15.0f, "Quiet blade bar height must be <= 15% (noise floor)");
+            Assert(GetBarHeight(bladeBar) <= 15.0f, "Quiet blade bar height must be <= 15% (noise floor)");
 
             // Test Amber threat level (40–55 dB)
             var amberSr = new SensorReadings(5.825f, -62.3f, 220.4f, 48.0f, 6);
             renderer.UpdateAcoustic(amberSr);
             Assert(label.text == "SPL: 48.0 dB", "Acoustic label must show 48.0 dB");
-            Assert(bladeBar.style.height.value >= 25.0f && bladeBar.style.height.value <= 65.0f, "Amber bar height must be between 25% and 65%");
-            Assert(bladeBar.style.backgroundColor.r == 1.0f && bladeBar.style.backgroundColor.g > 0.6f, "Amber bar must use #FFB300");
+            Assert(GetBarHeight(bladeBar) >= 25.0f && GetBarHeight(bladeBar) <= 65.0f, "Amber bar height must be between 25% and 65%");
+            Color amberColor = GetBarColor(bladeBar);
+            Assert(amberColor.r == 1.0f && amberColor.g > 0.6f, "Amber bar must use #FFB300");
 
             // Test Red alert (> 55 dB)
             var redSr = new SensorReadings(5.825f, -40.0f, 220.4f, 65.0f, 6);
             renderer.UpdateAcoustic(redSr);
             Assert(label.text == "SPL: 65.0 dB", "Acoustic label must show 65.0 dB");
-            Assert(bladeBar.style.height.value > 65.0f, "Red alert bar height must be > 65%");
-            Assert(bladeBar.style.backgroundColor.r >= 0.75f && bladeBar.style.backgroundColor.g < 0.1f, "Red alert bar must use #CC0000");
+            Assert(GetBarHeight(bladeBar) > 65.0f, "Red alert bar height must be > 65%");
+            Color redColor = GetBarColor(bladeBar);
+            Assert(redColor.r >= 0.75f && redColor.g < 0.1f, "Red alert bar must use #CC0000");
         }
+
+#if UNITY_5_3_OR_NEWER
+        private static float GetBarHeight(VisualElement el) { return el.style.height.value.value; }
+        private static Color GetBarColor(VisualElement el) { return el.style.backgroundColor.value; }
+#else
+        private static float GetBarHeight(VisualElement el) { return el.style.height.value; }
+        private static Color GetBarColor(VisualElement el) { return el.style.backgroundColor; }
+#endif
 
         public static void TestCockpitControllerSensorIntegration()
         {

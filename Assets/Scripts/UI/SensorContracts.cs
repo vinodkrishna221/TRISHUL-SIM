@@ -30,7 +30,7 @@ namespace TrishulSim.UI
         public int propellerRpm;
         public float rcs;
         public bool isNeutralised;
-        public int? neutralisedAtMs;
+        [System.NonSerialized] public int? neutralisedAtMs;
     }
 
     /// <summary>
@@ -132,7 +132,7 @@ namespace TrishulSim.UI
         public float antennaBearingDeg;
         public float antennaElevationDeg;
         public bool ewEngaged;
-        public float? ewBandGHz;
+        [System.NonSerialized] public float? ewBandGHz;
         public KineticEvent kinetic;
 
         public TraineeAction()

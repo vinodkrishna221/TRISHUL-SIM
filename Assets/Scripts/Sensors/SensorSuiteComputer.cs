@@ -29,7 +29,7 @@ namespace TrishulSim.Sensors
         public int propellerRpm;
         public float rcs;
         public bool isNeutralised;
-        public long? neutralisedAtMs;
+        [System.NonSerialized] public long? neutralisedAtMs;
 
         public SwarmAgentState()
         {

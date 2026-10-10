@@ -60,6 +60,10 @@ namespace TrishulSim.Network
         {
             WsServer activeServer = Server;
             int connected = activeServer != null ? activeServer.ConnectedCount : WsServer.ActiveConnectedCount;
+            if (connected <= 0 && WsClient.Instance != null && WsClient.Instance.IsConnected)
+            {
+                connected = 1;
+            }
 
             if (connected > 0)
             {
@@ -74,8 +78,10 @@ namespace TrishulSim.Network
 
             if (statusText != null)
             {
-                statusText.text = CurrentStatusText;
-                statusText.color = CurrentStatusColor;
+                if (statusText.text != CurrentStatusText)
+                    statusText.text = CurrentStatusText;
+                if (statusText.color != CurrentStatusColor)
+                    statusText.color = CurrentStatusColor;
             }
         }
     }

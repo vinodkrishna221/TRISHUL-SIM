@@ -396,9 +396,10 @@ namespace TrishulSim.Scenarios
             client.HeartbeatIntervalMs = 5000;
             client.StaleThresholdMs = 15000;
 
-            Dropdown dropdown = new Dropdown();
-            Button launchBtn = new Button();
-            GameObject cockpitRoot = new GameObject("TraineeCockpitRoot") { activeSelf = false };
+            Dropdown dropdown = CreateDropdown("ScenarioDropdown");
+            Button launchBtn = CreateButton("LaunchBtn");
+            GameObject cockpitRoot = new GameObject("TraineeCockpitRoot");
+            cockpitRoot.SetActive(false);
 
             ScenarioManager instructorMgr = new ScenarioManager();
             instructorMgr.Server = server;
@@ -586,9 +587,9 @@ namespace TrishulSim.Scenarios
             client.HeartbeatIntervalMs = 5000;
             client.StaleThresholdMs = 15000;
 
-            Dropdown dropdown = new Dropdown();
-            Button launchBtn = new Button();
-            Button abortBtn = new Button();
+            Dropdown dropdown = CreateDropdown("ScenarioDropdown");
+            Button launchBtn = CreateButton("LaunchBtn");
+            Button abortBtn = CreateButton("AbortBtn");
 
             ScenarioManager instructorMgr = new ScenarioManager();
             instructorMgr.Server = server;
@@ -855,8 +856,8 @@ namespace TrishulSim.Scenarios
             Debug.OnLog += onLog;
 #endif
 
-            Dropdown dropdown = new Dropdown();
-            Button launchBtn = new Button();
+            Dropdown dropdown = CreateDropdown("ScenarioDropdown");
+            Button launchBtn = CreateButton("LaunchBtn");
 
             WsServer server = new WsServer();
             server.Port = 9704;
@@ -1030,6 +1031,24 @@ namespace TrishulSim.Scenarios
         {
             if (!condition)
                 throw new InvalidOperationException("Assertion failed: " + message);
+        }
+
+        private static Dropdown CreateDropdown(string name = "Dropdown")
+        {
+#if UNITY_5_3_OR_NEWER
+            return new GameObject(name).AddComponent<Dropdown>();
+#else
+            return new Dropdown();
+#endif
+        }
+
+        private static Button CreateButton(string name = "Button")
+        {
+#if UNITY_5_3_OR_NEWER
+            return new GameObject(name).AddComponent<Button>();
+#else
+            return new Button();
+#endif
         }
     }
 }

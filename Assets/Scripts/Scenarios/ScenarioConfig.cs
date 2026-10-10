@@ -920,7 +920,7 @@ namespace TrishulSim.Scenarios
         public float propellerRpm = 11400f;
         public float rcs = 0.012f;
         public bool isNeutralised;
-        public long? neutralisedAtMs;
+        [System.NonSerialized] public long? neutralisedAtMs;
 
         public SwarmAgentState Clone()
         {
@@ -1231,7 +1231,7 @@ namespace TrishulSim.Scenarios
         public float antennaBearingDeg;
         public float antennaElevationDeg;
         public bool ewEngaged;
-        public float? ewBandGHz;
+        [System.NonSerialized] public float? ewBandGHz;
         public KineticEvent kinetic;
 
         public TraineeAction Clone()

@@ -43,7 +43,7 @@ namespace TrishulSim.UI
         public int propellerRpm;
         public float rcs;
         public bool isNeutralised;
-        public int? neutralisedAtMs;
+        [System.NonSerialized] public int? neutralisedAtMs;
     }
 
     [Serializable]

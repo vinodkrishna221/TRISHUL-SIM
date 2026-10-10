@@ -126,7 +126,11 @@ namespace TrishulSim.Scenarios
             Assert(testMgr.XrReadyStatus == "XR-Ready: Yes (WebXR scaffold)",
                 "testMgr.XrReadyStatus must match DefaultXrReadyStatus");
 
+#if UNITY_5_3_OR_NEWER
+            UnityEngine.UI.Text textStub = new UnityEngine.GameObject("TextStub").AddComponent<UnityEngine.UI.Text>();
+#else
             UnityEngine.UI.Text textStub = new UnityEngine.UI.Text();
+#endif
             testMgr.SystemInfoText = textStub;
             Assert(textStub.text == "XR-Ready: Yes (WebXR scaffold)",
                 "Wiring SystemInfoText must update UI Text component");

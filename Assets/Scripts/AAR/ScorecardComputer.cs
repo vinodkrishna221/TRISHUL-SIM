@@ -546,7 +546,7 @@ namespace TrishulSim.AAR
             if (telemetryLogger == null)
             {
 #if UNITY_5_3_OR_NEWER
-                telemetryLogger = FindObjectOfType<TelemetryLogger>();
+                telemetryLogger = FindAnyObjectByType<TelemetryLogger>();
 #endif
             }
 

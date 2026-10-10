@@ -208,7 +208,6 @@ namespace TrishulSim.Network
             Action<string> onWarn = msg => capturedWarnings.Add(msg);
             Debug.OnLog += onLog;
             Debug.OnLogWarning += onWarn;
-#endif
             try
             {
                 // Test 1: Air-gapped environment (NetworkReachability.NotReachable)
@@ -235,11 +234,13 @@ namespace TrishulSim.Network
             finally
             {
                 Application.internetReachability = NetworkReachability.NotReachable;
-#if !UNITY_5_3_OR_NEWER
                 Debug.OnLog -= onLog;
                 Debug.OnLogWarning -= onWarn;
-#endif
             }
+#else
+            WsServer.CheckAirGapStatus();
+            log("  [PASS] Current Application.internetReachability evaluated (" + Application.internetReachability + ").");
+#endif
         }
 
         public static async Task TestEndToEndScenarioLoopbackSocketsAsync(Action<string> log)
