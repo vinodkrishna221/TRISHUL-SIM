@@ -580,7 +580,7 @@ TEST:
 DEPENDS: AA-P2-A, UX-P1-D     UNBLOCKS: UX-P2-C (P2 smoke)
 
 DEMO: "Judge gets a PDF in one click." (Beat 6)
-PERSONA: ui-ux builder         STATUS: [ ] todo
+PERSONA: ui-ux builder         STATUS: [x] done
 ```
 
 ---

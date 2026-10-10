@@ -33,11 +33,15 @@ namespace TrishulSim.UI
         private VisualElement spatialOverlay;
         private VisualElement blipContainer;
         private Button pdfExportBtn;
+        private VisualElement pdfSpinner;
+        private Label pdfStatusLabel;
+        private Label pdfErrorLabel;
 
         // ── Bound Data State ───────────────────────────────────
         private Scorecard currentScorecard;
         private int currentScrubMs = 0;
         private List<VisualElement> activeBlips = new List<VisualElement>();
+        public string LastExportedPdfPath { get; private set; }
 
         // ── Public Accessors for Validation / Tests ────────────
         public VisualElement Root { get { return root; } }
@@ -54,6 +58,9 @@ namespace TrishulSim.UI
         public VisualElement SpatialOverlay { get { return spatialOverlay; } }
         public VisualElement BlipContainer { get { return blipContainer; } }
         public Button PdfExportBtn { get { return pdfExportBtn; } }
+        public VisualElement PdfSpinner { get { return pdfSpinner; } }
+        public Label PdfStatusLabel { get { return pdfStatusLabel; } }
+        public Label PdfErrorLabel { get { return pdfErrorLabel; } }
         public int ActiveBlipCount { get { return activeBlips.Count; } }
 
         // ══════════════════════════════════════════════════════
@@ -114,6 +121,9 @@ namespace TrishulSim.UI
             spatialOverlay = root.Q<VisualElement>("spatial-overlay");
             blipContainer = root.Q<VisualElement>("drone-blip-container");
             pdfExportBtn = root.Q<Button>("pdf-export-btn");
+            pdfSpinner = root.Q<VisualElement>("pdf-spinner");
+            pdfStatusLabel = root.Q<Label>("pdf-status-label");
+            pdfErrorLabel = root.Q<Label>("pdf-error-label");
 
             RegisterCallbacks();
         }
@@ -419,7 +429,7 @@ namespace TrishulSim.UI
         }
 
         // ══════════════════════════════════════════════════════
-        // Action Handlers
+        // Action Handlers (UX-P2-A)
         // ══════════════════════════════════════════════════════
 
         public void OnPdfExportClicked()
@@ -427,10 +437,106 @@ namespace TrishulSim.UI
             if (currentScorecard == null)
             {
                 Debug.LogWarning("[Scorecard] Cannot export PDF — no scorecard loaded.");
+                ShowPdfError("PDF export failed — check disk space");
                 return;
             }
 
-            Debug.Log(string.Format("[Scorecard] PDF Export requested for session: {0}. (Wired in UX-P2-A)", currentScorecard.sessionId));
+            // 1. Show loading spinner & clear previous status/error
+            SetSpinnerVisible(true);
+            HidePdfMessages();
+
+            try
+            {
+                // 2. Real PDF export via PdfExporter
+                string pdfPath = PdfExporter.WriteToFile(currentScorecard);
+                LastExportedPdfPath = pdfPath;
+
+                // 3. Fallback: copy file path to system clipboard
+                try
+                {
+                    GUIUtility.systemCopyBuffer = pdfPath;
+                }
+                catch { }
+
+                // 4. Hide spinner
+                SetSpinnerVisible(false);
+
+                // 5. Show localized success status
+                var loc = LocaleToggle.Instance;
+                string statusMsg = loc != null
+                    ? loc.GetFormatted("PDF_EXPORT_SAVED", pdfPath)
+                    : string.Format("PDF saved to: {0}", pdfPath);
+                ShowPdfStatus(statusMsg);
+
+                // 6. Launch default Windows PDF viewer
+                try
+                {
+                    var startInfo = new System.Diagnostics.ProcessStartInfo(pdfPath)
+                    {
+                        UseShellExecute = true
+                    };
+                    System.Diagnostics.Process.Start(startInfo);
+                }
+                catch (Exception procEx)
+                {
+                    Debug.LogWarning(string.Format("[Scorecard] Default viewer launch skipped ({0}); copied to clipboard.", procEx.Message));
+                }
+            }
+            catch (Exception ex)
+            {
+                SetSpinnerVisible(false);
+                Debug.LogError(string.Format("[Scorecard] PDF Export failed: {0}", ex.Message));
+                var loc = LocaleToggle.Instance;
+                string errText = loc != null
+                    ? loc.GetString("PDF_EXPORT_FAILED")
+                    : "PDF export failed — check disk space";
+                ShowPdfError(errText);
+            }
+        }
+
+        public void SetSpinnerVisible(bool visible)
+        {
+            if (pdfSpinner == null) return;
+            if (visible)
+            {
+                pdfSpinner.RemoveFromClassList("hidden");
+            }
+            else
+            {
+                pdfSpinner.AddToClassList("hidden");
+            }
+        }
+
+        public void ShowPdfStatus(string message)
+        {
+            if (pdfStatusLabel != null)
+            {
+                pdfStatusLabel.text = message;
+                pdfStatusLabel.RemoveFromClassList("hidden");
+            }
+            if (pdfErrorLabel != null)
+            {
+                pdfErrorLabel.AddToClassList("hidden");
+            }
+        }
+
+        public void ShowPdfError(string error)
+        {
+            if (pdfErrorLabel != null)
+            {
+                pdfErrorLabel.text = error;
+                pdfErrorLabel.RemoveFromClassList("hidden");
+            }
+            if (pdfStatusLabel != null)
+            {
+                pdfStatusLabel.AddToClassList("hidden");
+            }
+        }
+
+        public void HidePdfMessages()
+        {
+            if (pdfStatusLabel != null) pdfStatusLabel.AddToClassList("hidden");
+            if (pdfErrorLabel != null) pdfErrorLabel.AddToClassList("hidden");
         }
     }
 }

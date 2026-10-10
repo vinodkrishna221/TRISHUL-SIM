@@ -63,7 +63,12 @@
 
         <!-- Footer Actions -->
         <ui:VisualElement class="scorecard-actions">
-            <ui:Button name="pdf-export-btn" text="Export PDF" class="btn btn-pdf-export" />
+            <ui:VisualElement class="pdf-export-row">
+                <ui:Button name="pdf-export-btn" text="Export PDF" class="btn btn-pdf-export" />
+                <ui:VisualElement name="pdf-spinner" class="spinner hidden" />
+            </ui:VisualElement>
+            <ui:Label name="pdf-status-label" class="pdf-status-label hidden" text="" />
+            <ui:Label name="pdf-error-label" class="pdf-error-label hidden" text="" />
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

@@ -332,11 +332,16 @@
     color: #888888;
 }
 
-/* --- Actions --- */
+/* --- Actions & PDF Export (UX-P2-A) --- */
 .scorecard-actions {
-    flex-direction: row;
-    justify-content: flex-end;
+    flex-direction: column;
+    align-items: flex-end;
     margin-top: 6px;
+}
+
+.pdf-export-row {
+    flex-direction: row;
+    align-items: center;
 }
 
 .btn-pdf-export {
@@ -351,4 +356,28 @@
 
 .btn-pdf-export:hover {
     background-color: #00CC00;
+}
+
+.spinner {
+    width: 18px;
+    height: 18px;
+    border-width: 2px;
+    border-color: #00B300;
+    border-top-color: rgba(0, 0, 0, 0);
+    border-radius: 9px;
+    margin-left: 8px;
+    transition: rotate 1s linear;
+}
+
+.pdf-status-label {
+    font-size: 11px;
+    color: #00B300;
+    margin-top: 4px;
+}
+
+.pdf-error-label {
+    font-size: 11px;
+    color: #CC0000;
+    margin-top: 4px;
+    -unity-font-style: bold;
 }

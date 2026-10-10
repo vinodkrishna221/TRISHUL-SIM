@@ -22,6 +22,7 @@ using System.Xml;
 // Note: Mock UnityEngine and UnityEngine.UIElements are defined in UiShellSelfTest.cs
 
 
+
 namespace TrishulSim.UI
 {
     using UnityEngine;
@@ -56,7 +57,10 @@ namespace TrishulSim.UI
                 TestDualScreenControllerIntegration();
                 Console.WriteLine("[PASS] 6. Simultaneous Cockpit & C2 Scorecard mirror integration verified.");
 
-                Console.WriteLine("\n[ALL TESTS PASSED] UX-P1-D Scorecard Renderer & Scrubber verified successfully!");
+                TestPdfExportWorkflowAndFileIntegrity();
+                Console.WriteLine("[PASS] 7. Tactical Dossier PDF export (all 6 sections) & UI workflow verified.");
+
+                Console.WriteLine("\n[ALL TESTS PASSED] UX-P1-D & UX-P2-A Scorecard Renderer & PDF Export verified successfully!");
                 return 0;
             }
             catch (Exception ex)
@@ -105,6 +109,9 @@ namespace TrishulSim.UI
             Assert(uxmlText.Contains("name=\"timeline-time\""), "UXML must contain timeline-time");
             Assert(uxmlText.Contains("name=\"spatial-overlay\""), "UXML must contain spatial-overlay");
             Assert(uxmlText.Contains("name=\"pdf-export-btn\""), "UXML must contain pdf-export-btn");
+            Assert(uxmlText.Contains("name=\"pdf-spinner\""), "UXML must contain pdf-spinner");
+            Assert(uxmlText.Contains("name=\"pdf-status-label\""), "UXML must contain pdf-status-label");
+            Assert(uxmlText.Contains("name=\"pdf-error-label\""), "UXML must contain pdf-error-label");
 
             string ussText = File.ReadAllText(ussPath);
             Assert(ussText.Contains("#00B300"), "USS must define MIL-STD-2525 GREEN #00B300");
@@ -113,6 +120,9 @@ namespace TrishulSim.UI
             Assert(ussText.Contains(".badge-pass"), "USS must define .badge-pass");
             Assert(ussText.Contains(".badge-fail"), "USS must define .badge-fail");
             Assert(ussText.Contains(".spatial-overlay"), "USS must define .spatial-overlay");
+            Assert(ussText.Contains(".spinner"), "USS must define .spinner");
+            Assert(ussText.Contains(".pdf-status-label"), "USS must define .pdf-status-label");
+            Assert(ussText.Contains(".pdf-error-label"), "USS must define .pdf-error-label");
         }
 
         public static void TestPassedScorecardBinding()
@@ -292,6 +302,60 @@ namespace TrishulSim.UI
             Assert(c2Controller.ScorecardController.DoctrineBadge.ClassListContains("badge-pass"), "C2 mirror badge must be pass");
         }
 
+        public static void TestPdfExportWorkflowAndFileIntegrity()
+        {
+            var go = new GameObject("PdfExportTest");
+            var controller = go.AddComponent<ScorecardPanelController>();
+            var mockRoot = CreateMockScorecardHierarchy();
+
+            controller.BindElements(mockRoot);
+            var sc = ScorecardMock.GetPunjabFixture();
+            controller.Bind(sc);
+
+            // 1. Direct PdfExporter.WriteToFile test
+            string generatedPdfPath = PdfExporter.WriteToFile(sc);
+            Assert(File.Exists(generatedPdfPath), "Exported PDF must exist on disk: " + generatedPdfPath);
+
+            byte[] pdfBytes = File.ReadAllBytes(generatedPdfPath);
+            Assert(pdfBytes.Length > 200, "PDF file size must be > 200 bytes, was " + pdfBytes.Length);
+            string pdfAscii = Encoding.UTF8.GetString(pdfBytes);
+            Assert(pdfAscii.StartsWith("%PDF-1.4"), "File header must be %PDF-1.4");
+            Assert(pdfAscii.Contains("%%EOF"), "File must conclude with %%EOF");
+
+            // Verify all 6 sections from scorecard.md §"PDF export shape":
+            Assert(pdfAscii.Contains("TRISHUL-SIM · Tactical Performance Dossier"), "Section 1: Header title must exist in PDF");
+            Assert(pdfAscii.Contains(sc.completedAtIso), "Section 1: completedAtIso must exist in PDF");
+            Assert(pdfAscii.Contains(sc.traineeId), "Section 1: traineeId must exist in PDF");
+            Assert(pdfAscii.Contains(sc.scenarioName), "Section 2: Scenario name must exist in PDF");
+            Assert(pdfAscii.Contains("DOCTRINE PASSED"), "Section 3: Doctrine verdict badge must exist in PDF");
+            Assert(pdfAscii.Contains("Time-to-Detection"), "Section 4: Time-to-Detection metric must exist in PDF");
+            Assert(pdfAscii.Contains("ROE Compliance"), "Section 4: ROE Compliance metric must exist in PDF");
+            Assert(pdfAscii.Contains("Kinetic Efficiency"), "Section 4: Kinetic Efficiency metric must exist in PDF");
+            Assert(pdfAscii.Contains("Agents Neutralised"), "Section 4: Agents Neutralised metric must exist in PDF");
+            Assert(pdfAscii.Contains("TIMELINE REPLAY SPARKLINE"), "Section 5: Timeline sparkline chart must exist in PDF");
+            Assert(pdfAscii.Contains("CONFIDENTIAL — For training use only · Air-gapped system"), "Section 6: Confidential footer must exist in PDF");
+
+            // 2. Click workflow simulation via Controller
+            controller.OnPdfExportClicked();
+            Assert(!string.IsNullOrEmpty(controller.LastExportedPdfPath), "LastExportedPdfPath must be recorded");
+            Assert(File.Exists(controller.LastExportedPdfPath), "Exported file must exist");
+            Assert(GUIUtility.systemCopyBuffer == controller.LastExportedPdfPath, "Clipboard must receive pdfPath fallback");
+            Assert(!controller.PdfStatusLabel.ClassListContains("hidden"), "Status label must be un-hidden on success");
+            Assert(controller.PdfStatusLabel.text.Contains(controller.LastExportedPdfPath), "Status label must show destination path");
+            Assert(controller.PdfErrorLabel.ClassListContains("hidden"), "Error label must remain hidden on success");
+            Assert(controller.PdfSpinner.ClassListContains("hidden"), "Spinner must return to hidden after completion");
+
+            // 3. Error handling test
+            var errGo = new GameObject("PdfExportErrTest");
+            var errController = errGo.AddComponent<ScorecardPanelController>();
+            var errRoot = CreateMockScorecardHierarchy();
+            errController.BindElements(errRoot);
+            // Do not bind scorecard (currentScorecard is null)
+            errController.OnPdfExportClicked();
+            Assert(!errController.PdfErrorLabel.ClassListContains("hidden"), "Error label must be un-hidden on export failure");
+            Assert(errController.PdfErrorLabel.text.Contains("PDF export failed"), "Error message must indicate failure");
+        }
+
         private static VisualElement CreateMockScorecardHierarchy()
         {
             var root = new VisualElement { name = "scorecard-root" };
@@ -314,7 +378,24 @@ namespace TrishulSim.UI
             timelineSec.Add(overlay);
 
             root.Add(timelineSec);
-            root.Add(new Button { name = "pdf-export-btn" });
+
+            var actions = new VisualElement { name = "scorecard-actions" };
+            var pdfRow = new VisualElement { name = "pdf-export-row" };
+            pdfRow.Add(new Button { name = "pdf-export-btn" });
+            var spinner = new VisualElement { name = "pdf-spinner" };
+            spinner.AddToClassList("hidden");
+            pdfRow.Add(spinner);
+            actions.Add(pdfRow);
+
+            var statusLabel = new Label { name = "pdf-status-label" };
+            statusLabel.AddToClassList("hidden");
+            actions.Add(statusLabel);
+
+            var errorLabel = new Label { name = "pdf-error-label" };
+            errorLabel.AddToClassList("hidden");
+            actions.Add(errorLabel);
+
+            root.Add(actions);
 
             return root;
         }
