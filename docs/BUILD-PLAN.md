@@ -103,6 +103,8 @@
 | Demo build (P1 gate) | `dist/TRISHUL-SIM-demo-<date>.exe` | Patch | IL2CPP; tested on Intel Iris Xe |
 | Submission package | SIH portal upload | Patch | Source zip + installer; air-gap smoke before upload |
 
+**Air-gap: CONFIRMED — 2026-10-06** · Validated via `Build/TRISHUL-SIM-airgap-test-20261006.exe` (zero external URLs, ProjectSettings analytics disabled, zero telemetry SDKs, 127.0.0.1:9700 strict loopback verified). Evidence logged to `docs/evidence/airgap-validation-log.txt`.
+
 ---
 
 ## Freeze calendar (Patch enforces — DO NOT move dates)

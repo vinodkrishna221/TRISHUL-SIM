@@ -1,0 +1,96 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="InstructorC2.uss" />
+    <Style src="ScorecardPanel.uss" />
+    <ui:VisualElement class="c2-root">
+        <!-- Status Bar -->
+        <ui:VisualElement class="status-bar">
+            <ui:Label name="app-title" text="TRISHUL-SIM · C2 STATION" class="app-title" />
+            <ui:VisualElement class="status-group">
+                <ui:VisualElement name="link-status-icon" class="status-icon status-waiting" />
+                <ui:Label name="link-status-label" text="○ Waiting for Trainee..." class="status-label" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Controls Panel -->
+        <ui:VisualElement class="controls-panel">
+            <ui:DropdownField name="scenario-dropdown" label="Scenario" class="control-field" />
+            <ui:TextField name="trainee-id" label="Trainee ID (optional)" class="control-field" />
+            <ui:VisualElement class="button-row">
+                <ui:Button name="launch-btn" text="LAUNCH SCENARIO" class="btn btn-launch" />
+                <ui:Button name="abort-btn" text="ABORT" class="btn btn-abort" />
+                <ui:Button name="lang-toggle" text="हिंदी" class="btn btn-lang" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Scorecard Mirror (shown after SCORECARD_PAYLOAD — rendered by UX-P1-D) -->
+        <ui:VisualElement name="scorecard-mirror" class="scorecard-panel hidden">
+            <ui:Label name="scorecard-stub-label" text="Scorecard: awaiting data..." class="scorecard-stub hidden" />
+            
+            <ui:VisualElement name="scorecard-root" class="scorecard-root">
+                <!-- Header -->
+                <ui:VisualElement class="scorecard-header">
+                    <ui:Label name="scorecard-title" text="TACTICAL PERFORMANCE SCORECARD" class="scorecard-title" />
+                    <ui:VisualElement class="scorecard-subbar">
+                        <ui:Label name="scenario-name" text="Punjab Border — Zero Visibility Pincer" class="scenario-name" />
+                        <ui:Label name="trainee-id-label" text="Trainee: havildar-rajan" class="trainee-id-label" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="doctrine-badge" class="badge badge-pass">
+                        <ui:Label name="doctrine-text" text="DOCTRINE PASSED" class="badge-text" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- Metrics Table -->
+                <ui:VisualElement class="metrics-section">
+                    <ui:Label text="TACTICAL BENCHMARKS &amp; ROE METRICS" class="section-title" />
+                    <ui:VisualElement class="metrics-header-row">
+                        <ui:Label text="METRIC" class="th-metric" />
+                        <ui:Label text="RECORDED" class="th-value" />
+                        <ui:Label text="BENCHMARK" class="th-benchmark" />
+                        <ui:Label text="VERDICT" class="th-verdict" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="metrics-table" class="metrics-table" />
+                </ui:VisualElement>
+
+                <!-- Timeline Scrubber & Spatial Overlay -->
+                <ui:VisualElement class="timeline-section">
+                    <ui:VisualElement class="timeline-header-bar">
+                        <ui:Label text="TIMELINE REPLAY &amp; SPATIAL RADAR OVERLAY" class="section-title" />
+                        <ui:Label name="timeline-time" text="T+0s" class="timeline-time" />
+                    </ui:VisualElement>
+                    
+                    <ui:Slider name="timeline-slider" low-value="0" high-value="55" class="timeline-slider" />
+                    
+                    <ui:VisualElement class="spatial-radar-container">
+                        <ui:VisualElement name="spatial-overlay" class="spatial-overlay">
+                            <ui:VisualElement class="trainee-marker" />
+                            <ui:VisualElement class="radar-range-ring-1" />
+                            <ui:VisualElement class="radar-range-ring-2" />
+                            <ui:VisualElement class="radar-crosshair-h" />
+                            <ui:VisualElement class="radar-crosshair-v" />
+                            <ui:VisualElement name="drone-blip-container" class="drone-blip-container" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="radar-legend">
+                            <ui:VisualElement class="legend-item">
+                                <ui:VisualElement class="legend-dot dot-decoy" />
+                                <ui:Label text="Decoy (2.4 GHz)" class="legend-text" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="legend-item">
+                                <ui:VisualElement class="legend-dot dot-attacker" />
+                                <ui:Label text="Attacker (5.8 GHz)" class="legend-text" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="legend-item">
+                                <ui:VisualElement class="legend-dot dot-neutralised" />
+                                <ui:Label text="Neutralised" class="legend-text" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- Footer Actions -->
+                <ui:VisualElement class="scorecard-actions">
+                    <ui:Button name="pdf-export-btn" text="Export PDF" class="btn btn-pdf-export" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
