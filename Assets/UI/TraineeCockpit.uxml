@@ -1,5 +1,6 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
     <Style src="TraineeCockpit.uss" />
+    <Style src="ScorecardPanel.uss" />
     <ui:VisualElement class="cockpit-root">
         <!-- Threat Indicator -->
         <ui:VisualElement name="threat-indicator" class="threat-indicator threat-green">
@@ -74,9 +75,75 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <!-- Scorecard Panel (hidden until SCORECARD_PAYLOAD) -->
+        <!-- Scorecard Panel (hidden until SCORECARD_PAYLOAD — rendered by UX-P1-D) -->
         <ui:VisualElement name="scorecard-panel" class="scorecard-panel hidden">
-            <ui:Label name="scorecard-stub-label" text="Scorecard received" class="scorecard-stub" />
+            <ui:Label name="scorecard-stub-label" text="Scorecard received" class="scorecard-stub hidden" />
+            
+            <ui:VisualElement name="scorecard-root" class="scorecard-root">
+                <!-- Header -->
+                <ui:VisualElement class="scorecard-header">
+                    <ui:Label name="scorecard-title" text="TACTICAL PERFORMANCE SCORECARD" class="scorecard-title" />
+                    <ui:VisualElement class="scorecard-subbar">
+                        <ui:Label name="scenario-name" text="Punjab Border — Zero Visibility Pincer" class="scenario-name" />
+                        <ui:Label name="trainee-id-label" text="Trainee: havildar-rajan" class="trainee-id-label" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="doctrine-badge" class="badge badge-pass">
+                        <ui:Label name="doctrine-text" text="DOCTRINE PASSED" class="badge-text" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- Metrics Table -->
+                <ui:VisualElement class="metrics-section">
+                    <ui:Label text="TACTICAL BENCHMARKS &amp; ROE METRICS" class="section-title" />
+                    <ui:VisualElement class="metrics-header-row">
+                        <ui:Label text="METRIC" class="th-metric" />
+                        <ui:Label text="RECORDED" class="th-value" />
+                        <ui:Label text="BENCHMARK" class="th-benchmark" />
+                        <ui:Label text="VERDICT" class="th-verdict" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="metrics-table" class="metrics-table" />
+                </ui:VisualElement>
+
+                <!-- Timeline Scrubber & Spatial Overlay -->
+                <ui:VisualElement class="timeline-section">
+                    <ui:VisualElement class="timeline-header-bar">
+                        <ui:Label text="TIMELINE REPLAY &amp; SPATIAL RADAR OVERLAY" class="section-title" />
+                        <ui:Label name="timeline-time" text="T+0s" class="timeline-time" />
+                    </ui:VisualElement>
+                    
+                    <ui:Slider name="timeline-slider" low-value="0" high-value="55" class="timeline-slider" />
+                    
+                    <ui:VisualElement class="spatial-radar-container">
+                        <ui:VisualElement name="spatial-overlay" class="spatial-overlay">
+                            <ui:VisualElement class="trainee-marker" />
+                            <ui:VisualElement class="radar-range-ring-1" />
+                            <ui:VisualElement class="radar-range-ring-2" />
+                            <ui:VisualElement class="radar-crosshair-h" />
+                            <ui:VisualElement class="radar-crosshair-v" />
+                            <ui:VisualElement name="drone-blip-container" class="drone-blip-container" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="radar-legend">
+                            <ui:VisualElement class="legend-item">
+                                <ui:VisualElement class="legend-dot dot-decoy" />
+                                <ui:Label text="Decoy (2.4 GHz)" class="legend-text" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="legend-item">
+                                <ui:VisualElement class="legend-dot dot-attacker" />
+                                <ui:Label text="Attacker (5.8 GHz)" class="legend-text" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="legend-item">
+                                <ui:VisualElement class="legend-dot dot-neutralised" />
+                                <ui:Label text="Neutralised" class="legend-text" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- Footer Actions -->
+                <ui:VisualElement class="scorecard-actions">
+                    <ui:Button name="pdf-export-btn" text="Export PDF" class="btn btn-pdf-export" />
+                </ui:VisualElement>
+            </ui:VisualElement>
         </ui:VisualElement>
 
         <!-- Computing Overlay (hidden until SCENARIO_END) -->
