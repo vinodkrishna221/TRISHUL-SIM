@@ -489,7 +489,7 @@ TEST:
 DEPENDS: SA-P1-B-ii, US-P1-B     UNBLOCKS: —
 
 DEMO: "4 distinct scenarios, each with different swarm behaviour." (Beat 1 — scenario variety)
-PERSONA: swarm-ai builder         STATUS: [ ] todo
+PERSONA: swarm-ai builder         STATUS: [x] done
 ```
 
 ---
