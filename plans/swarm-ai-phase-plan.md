@@ -436,7 +436,7 @@ TEST:
 DEPENDS: SA-P1-B-ii             UNBLOCKS: AA-P1-A (kinetic metrics need real KineticEvents), UX-P1-B
 
 DEMO: ⭐ "Trainee fires; hit registered; agentId neutralised." (Beat 4 — core wow-moment action)
-PERSONA: swarm-ai builder       STATUS: [ ] todo
+PERSONA: swarm-ai builder       STATUS: [x] done
 ```
 
 ---

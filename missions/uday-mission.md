@@ -129,7 +129,7 @@ TEST:
 
 PUSH IMMEDIATELY — Sohail (AA-P1-A) needs real KineticEvents to compute kineticEfficiency.
 DEMO: ⭐ "Trainee fires; hit registered; agentId neutralised." (Beat 4 core resolution)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---

@@ -14,7 +14,7 @@
 | Track | Done | In flight | Next |
 |---|---|---|---|
 | unity-sim | — | — | Walking skeleton: sensor panes + WebSocket IPC |
-| swarm-ai | SA-P1-C (EW deconfliction) | — | SA-P1-D (SMASH fire control) |
+| swarm-ai | SA-P1-C, SA-P1-D (SMASH fire control) | — | SA-P2-A (extra tactics) |
 | aar-engine | — | — | 10 Hz telemetry logger + Scorecard renderer |
 | ui-ux | — | — | Bilingual UI shell + MIL-STD-2525 symbology |
 
@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-10T14:50 IST · Uday: SA-P1-D done — SMASH 2000 lead-angle reticle + KineticEvent hit resolution + SwarmManager neutralisation and ALL_NEUTRALISED terminal state; SmashFireControlSelfTest PASSED
 - 2026-10-08T12:06 IST · Uday: SA-P1-C done — EwDeconfliction friendlyBlackoutRisk ROE logic + SensorSuiteComputer tick integration complete; EwDeconflictionSelfTest PASSED
 - 2026-10-04T11:03 IST · Orion: /blueprint complete — ARCHITECTURE.md · SCHEMA.md · 4× contracts · FIT-AUDIT (clean) · BUILD-PLAN.md written; 4 tracks confirmed; ready for /phase-plan
 - 2026-10-04T10:52 IST · Orion: /kickoff complete — PRD drafted, board seeded, vocabulary frozen, ready for /blueprint

@@ -151,6 +151,78 @@ namespace TrishulSim.Sensors
         }
 
         /// <summary>
+        /// Processes trainee action and kinetic fire for SCENARIO_TICK payload (SA-P1-D).
+        /// If kineticFireTriggered is true, resolves lead-angle intercept for locked target,
+        /// applies neutralisation on hit, and injects KineticEvent into action.kinetic.
+        /// </summary>
+        public KineticEvent ProcessTraineeAction(
+            TraineeAction action,
+            SwarmAgentState[] swarmSnapshot,
+            long t,
+            Vector3 traineePos,
+            string targetAgentId = null)
+        {
+            if (action == null)
+                return null;
+
+            if (action.kineticFireTriggered)
+            {
+                SwarmAgentState target = null;
+                if (!string.IsNullOrEmpty(targetAgentId) && swarmSnapshot != null)
+                {
+                    for (int i = 0; i < swarmSnapshot.Length; i++)
+                    {
+                        if (swarmSnapshot[i] != null && string.Equals(swarmSnapshot[i].agentId, targetAgentId, StringComparison.OrdinalIgnoreCase))
+                        {
+                            target = swarmSnapshot[i];
+                            break;
+                        }
+                    }
+                }
+
+                if (target == null && swarmSnapshot != null)
+                {
+                    target = SmashFireControl.FindLockedTarget(
+                        agents: swarmSnapshot,
+                        aimBearingDeg: action.antennaBearingDeg,
+                        aimElevationDeg: action.antennaElevationDeg,
+                        traineePos: traineePos
+                    );
+                }
+
+                if (target != null)
+                {
+                    KineticEvent ke = SmashFireControl.ComputeKineticEvent(
+                        action: action,
+                        target: target,
+                        t: t,
+                        traineePos: traineePos
+                    );
+
+                    if (ke.hit)
+                    {
+                        target.isNeutralised = true;
+                        target.neutralisedAtMs = t;
+                        target.velocityMs = Vector3.zero;
+                        target.propellerRpm = 0;
+                        target.rfEmitting = false;
+                    }
+
+                    action.kinetic = ke;
+                    return ke;
+                }
+                else
+                {
+                    KineticEvent emptyKe = new KineticEvent(t, "none", false, 999.0f);
+                    action.kinetic = emptyKe;
+                    return emptyKe;
+                }
+            }
+
+            return action.kinetic;
+        }
+
+        /// <summary>
         /// Computes or updates multi-spectral sensor readings from a swarm snapshot and trainee antenna position.
         /// </summary>
         public SensorReadings ComputeSensorReadings(SwarmAgentState[] snapshot, Vector3 antennaPos)
