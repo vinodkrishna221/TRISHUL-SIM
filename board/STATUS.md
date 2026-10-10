@@ -15,7 +15,7 @@
 |---|---|---|---|
 | unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B, US-P2-A, US-P2-B, US-P2-C | — | US-P2-D (Warden review coordination + smoke) |
 | swarm-ai | SA-P1-C (EW deconfliction) | — | SA-P1-D (SMASH fire control) |
-| aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A, AA-P2-B | — | AA-P3-A (Partial-file guard) |
+| aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A, AA-P2-B, AA-P3-A | — | — (Track complete) |
 | ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B | — | UX-P1-C (split-screen) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-10T18:55 IST · Sohail (aar-engine): [AA-P3-A] ✅ Partial-file guard + session manifest hardening live (TelemetryLogger IOException catch & partialFlag, ScorecardComputer 0-byte/read error SCORECARD_COMPUTE_FAILED WS ERROR broadcast, SessionManifest partial:true, startup orphaned session scan, idempotent dir creation) — self-test green on `feat/aar-engine-partial-guard`
 - 2026-10-10T13:10 IST · Sohail (aar-engine): [AA-P2-B] ✅ Warden contract fidelity & timing verified (3× Punjab runs measured: 1438ms, 38ms, 29ms vs ≤10s SLA; zero nulls in 5-line NDJSON spot-check; full Scorecard in <64KB envelope; dual-screen C2/Trainee WS routing confirmed; manifest updated) — self-test green on `feat/aar-engine-warden-review`
 - 2026-10-10T12:47 IST · Sohail (aar-engine): [AA-P2-A] ✅ Tactical Performance Dossier PDF export live (iTextSharp 5.5.13 embedded, NotoSansDevanagari Hindi font, colored doctrine badge, metrics table, threat sparkline, one-click ExportPdf) — self-test green on `feat/aar-engine-pdf-export`
 - 2026-10-10T12:26 IST · Sohail (aar-engine): [AA-P1-B] ✅ Timeline Scrubber data engine live (TimelineIndexer, TimelinePlaybackController, Scorecard.timelineIndex populated, O(log n) <20ms seek & observable scrubber) — self-test green on `feat/aar-engine-timeline-indexer`

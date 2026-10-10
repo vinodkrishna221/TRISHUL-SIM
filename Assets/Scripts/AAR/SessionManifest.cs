@@ -172,6 +172,40 @@ namespace TrishulSim.AAR
             }
         }
 
+        /// <summary>
+        /// Returns all recorded sessions marked with partial: true (failed or incomplete runs per AA-P3-A).
+        /// </summary>
+        public List<SessionSummary> GetPartialSessions()
+        {
+            List<SessionSummary> partials = new List<SessionSummary>();
+            foreach (SessionSummary s in sessions)
+            {
+                if (s != null && s.partial)
+                    partials.Add(s);
+            }
+            return partials;
+        }
+
+        /// <summary>
+        /// Finds all session summaries whose scorecard file does not exist on disk (orphaned sessions per AA-P3-A).
+        /// </summary>
+        public List<SessionSummary> FindOrphanedSessions(string fallbackDirectory = null)
+        {
+            List<SessionSummary> orphaned = new List<SessionSummary>();
+            foreach (SessionSummary s in sessions)
+            {
+                if (s == null) continue;
+                string path = !string.IsNullOrWhiteSpace(s.scoreFilePath) ? s.scoreFilePath :
+                    (!string.IsNullOrWhiteSpace(fallbackDirectory) ? Path.Combine(fallbackDirectory, s.sessionId + ".scorecard.json") : null);
+
+                if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                {
+                    orphaned.Add(s);
+                }
+            }
+            return orphaned;
+        }
+
         public string ToJson(bool pretty = false)
         {
             StringBuilder sb = new StringBuilder(512);

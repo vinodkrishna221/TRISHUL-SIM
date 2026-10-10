@@ -48,7 +48,7 @@
 | AA-P1-B · Timeline Scrubber data engine | Sohail | [x] |
 | AA-P2-A · PDF export (iTextSharp) | Sohail | [x] |
 | AA-P2-B · Warden contract fidelity | Sohail | [x] |
-| AA-P3-A · Partial-file guard + manifest clean-up | Sohail | [ ] |
+| AA-P3-A · Partial-file guard + manifest clean-up | Sohail | [x] |
 | UX-P0-A · UITK shell (C2 + Cockpit layout) | Rani | [ ] |
 | UX-P0-B · Unity Localization + Hindi/English toggle | Rani | [ ] |
 | UX-P1-A · Live sensor suite (RF Waterfall, Doppler, Acoustic) | Rani | [x] |
