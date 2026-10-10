@@ -14,7 +14,7 @@
 | Track | Done | In flight | Next |
 |---|---|---|---|
 | unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B, US-P2-A, US-P2-B, US-P2-C | — | US-P2-D (Warden review coordination + smoke) |
-| swarm-ai | SA-P1-C (EW deconfliction) | — | SA-P1-D (SMASH fire control) |
+| swarm-ai | SA-P1-C (EW deconfliction), SA-P1-D (SMASH fire control) | — | SA-P2-A (extra tactics) |
 | aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A, AA-P2-B | — | AA-P3-A (Partial-file guard) |
 | ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B, UX-P1-D, UX-P2-A | — | UX-P1-C (Split-screen) / UX-P2-B (Bilingual pass) |
 
@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-10T14:50 IST · Uday: SA-P1-D done — SMASH 2000 lead-angle reticle + KineticEvent hit resolution + SwarmManager neutralisation and ALL_NEUTRALISED terminal state; SmashFireControlSelfTest PASSED
 - 2026-10-10T15:52 IST · Vinod (unity-sim): [FIX] ✅ Resolved WebSocket HTTP 400 handshake rejection in WsServer (Mono header parsing), migrated SplitScreen & InstructorC2 EventSystem to InputSystemUIInputModule, and added solid clickable raycast hitboxes for Launch/Abort buttons
 - 2026-10-10T13:10 IST · Sohail (aar-engine): [AA-P2-B] ✅ Warden contract fidelity & timing verified (3× Punjab runs measured: 1438ms, 38ms, 29ms vs ≤10s SLA; zero nulls in 5-line NDJSON spot-check; full Scorecard in <64KB envelope; dual-screen C2/Trainee WS routing confirmed; manifest updated) — self-test green on `feat/aar-engine-warden-review`
 - 2026-10-08T19:55 IST · Rajeswari: UX-P2-A done — ScorecardPanelController PDF export button wired with loading spinner, Process.Start invocation, clipboard fallback, error handling & PdfExporter generating 6-section dossier; ScorecardSelfTest (7/7 suites) PASSED
