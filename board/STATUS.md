@@ -15,7 +15,7 @@
 |---|---|---|---|
 | unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B, US-P2-A, US-P2-B, US-P2-C | — | US-P2-D (Warden review coordination + smoke) |
 | swarm-ai | SA-P1-C (EW deconfliction) | — | SA-P1-D (SMASH fire control) |
-| aar-engine | — | — | 10 Hz telemetry logger + Scorecard renderer |
+| aar-engine | AA-P0-A (TelemetryLogger 10 Hz NDJSON) | — | AA-P0-B (Stub Scorecard compute) |
 | ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B | — | UX-P1-C (split-screen) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-08T18:15 IST · Sohail (aar-engine): [AA-P0-A] ✅ 10 Hz TelemetryLogger live (TelemetryRecord, TelemetryLogger, TraineeActionInputStub) with 1s batch flush, %AppData% NDJSON lifecycle & 30s Punjab verification — self-test green on `feat/aar-engine-telemetry-logger`
 - 2026-10-08T12:35 IST · Vinod (unity-sim): [US-P2-C] ✅ XR scaffold stub configured (com.unity.xr.management + Mock HMD dev settings, VRSentryStub.unity with labeled sphere excluded from demo build per Cut List #1, system info panel "XR-Ready: Yes (WebXR scaffold)") — self-test green on `feat/unity-sim-xr-scaffold`
 - 2026-10-08T11:35 IST · Vinod (unity-sim): [US-P2-B] ✅ IL2CPP standalone build & InnoSetup single-file installer compiled (dist/TRISHUL-SIM-installer-20261008.exe) with clean sandbox install, 60+ FPS verification & Scorecard render — self-test green on `feat/unity-sim-installer`
 - 2026-10-08T12:06 IST · Uday: SA-P1-C done — EwDeconfliction friendlyBlackoutRisk ROE logic + SensorSuiteComputer tick integration complete; EwDeconflictionSelfTest PASSED

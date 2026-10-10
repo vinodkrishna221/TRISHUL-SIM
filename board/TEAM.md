@@ -42,7 +42,7 @@
 | SA-P2-B · Burst + 60 FPS validation | Uday | [ ] |
 | SA-P3-A · Demo seed tuning | Uday | [ ] |
 | SA-P3-B · Mock fixtures | Uday | [ ] |
-| AA-P0-A · TelemetryLogger 10 Hz NDJSON | Sohail | [ ] |
+| AA-P0-A · TelemetryLogger 10 Hz NDJSON | Sohail | [x] |
 | AA-P0-B · Stub Scorecard + SCORECARD_PAYLOAD | Sohail | [ ] |
 | AA-P1-A · Decision Tree Scorer (full metrics) | Sohail | [ ] |
 | AA-P1-B · Timeline Scrubber data engine | Sohail | [ ] |
