@@ -28,6 +28,26 @@ namespace UnityEngine
         public static Vector3 zero { get { return new Vector3(0f, 0f, 0f); } }
         public float sqrMagnitude { get { return (x * x) + (y * y) + (z * z); } }
         public float magnitude { get { return (float)Math.Sqrt(sqrMagnitude); } }
+
+        public static Vector3 operator +(Vector3 a, Vector3 b)
+        {
+            return new Vector3(a.x + b.x, a.y + b.y, a.z + b.z);
+        }
+
+        public static Vector3 operator -(Vector3 a, Vector3 b)
+        {
+            return new Vector3(a.x - b.x, a.y - b.y, a.z - b.z);
+        }
+
+        public static Vector3 operator *(Vector3 a, float d)
+        {
+            return new Vector3(a.x * d, a.y * d, a.z * d);
+        }
+
+        public static Vector3 operator *(float d, Vector3 a)
+        {
+            return new Vector3(a.x * d, a.y * d, a.z * d);
+        }
     }
 }
 #endif

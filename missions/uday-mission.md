@@ -166,7 +166,7 @@ TEST:
   Load ladakh-lac-ridge-01 → 8 agents broad front, all dive at 100m.
   Load loc-mountain-pass-01 → 4 attackers immediately split to 4 compass points.
 DEMO: "4 distinct scenarios, each with different swarm behaviour." (Beat 1 — variety)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
