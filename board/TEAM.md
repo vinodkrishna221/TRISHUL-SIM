@@ -44,7 +44,7 @@
 | SA-P3-B · Mock fixtures | Uday | [ ] |
 | AA-P0-A · TelemetryLogger 10 Hz NDJSON | Sohail | [x] |
 | AA-P0-B · Stub Scorecard + SCORECARD_PAYLOAD | Sohail | [x] |
-| AA-P1-A · Decision Tree Scorer (full metrics) | Sohail | [ ] |
+| AA-P1-A · Decision Tree Scorer (full metrics) | Sohail | [x] |
 | AA-P1-B · Timeline Scrubber data engine | Sohail | [ ] |
 | AA-P2-A · PDF export (iTextSharp) | Sohail | [ ] |
 | AA-P2-B · Warden contract fidelity | Sohail | [ ] |

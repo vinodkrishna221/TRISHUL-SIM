@@ -700,13 +700,79 @@ namespace TrishulSim.AAR
             string dir = GetSessionsDirectory();
             try { Directory.CreateDirectory(dir); } catch { }
 
-            string expectedNdjsonPath = (Logger != null && !string.IsNullOrWhiteSpace(Logger.CurrentSessionFilePath))
+            string expectedNdjsonPath = (Logger != null && !string.IsNullOrWhiteSpace(Logger.CurrentSessionFilePath) && string.Equals(Logger.CurrentSessionId, sessionId, StringComparison.Ordinal) && File.Exists(Logger.CurrentSessionFilePath))
                 ? Logger.CurrentSessionFilePath
                 : Path.Combine(dir, sessionId + ".ndjson");
 
             string completedIso = DateTimeOffset.Now.ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture);
 
-            // In P0: ALL Scorecard metrics are zeros/stubs (AA-P0-B)
+            // Read NDJSON session records if file exists on disk
+            List<TelemetryRecord> records = new List<TelemetryRecord>();
+            bool fileReadAttempted = false;
+            bool fileReadError = false;
+
+            if (File.Exists(expectedNdjsonPath))
+            {
+                fileReadAttempted = true;
+                try
+                {
+                    using (FileStream fs = new FileStream(expectedNdjsonPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    using (StreamReader reader = new StreamReader(fs, Encoding.UTF8))
+                    {
+                        string line;
+                        while ((line = reader.ReadLine()) != null)
+                        {
+                            if (string.IsNullOrWhiteSpace(line))
+                                continue;
+
+                            TelemetryRecord rec;
+                            string err;
+                            if (TelemetryRecord.TryParse(line, out rec, out err))
+                            {
+                                records.Add(rec);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("[ScorecardComputer] Error reading NDJSON file: " + ex.Message);
+                    fileReadError = true;
+                }
+            }
+
+            // Resolve scenario configuration for attackerCount benchmarks
+            ScenarioConfig config = (_lastStartPayload != null && _lastStartPayload.scenarioConfig != null)
+                ? _lastStartPayload.scenarioConfig
+                : null;
+
+            if (config == null)
+            {
+                config = new ScenarioConfig { id = scenarioId ?? "punjab-fog-pincer-01" };
+            }
+
+            DoctrineBenchmarks benchmarks = new DoctrineBenchmarks
+            {
+                timeToDetectionThresholdMs = 15000,
+                roeMinCompliance = 1.0f,
+                kineticMinEfficiency = 0.5f
+            };
+
+            // Compute real ScorecardMetrics via DecisionTreeScorer (AA-P1-A)
+            ScorecardMetrics metrics = DecisionTreeScorer.Score(records, finalSwarmSnapshot, config, benchmarks);
+
+            bool threatDetected = metrics.timeToDetectionMs > 0 ||
+                (records.Count > 0 && !string.Equals(records[0].threatState, ScenarioTickPayload.THREAT_GREEN, StringComparison.OrdinalIgnoreCase));
+            bool doctrinePassed = DecisionTreeScorer.EvaluateDoctrine(metrics, benchmarks, threatDetected);
+
+            long actualDurationMs = durationMs;
+            if (actualDurationMs <= 0 && records.Count > 0)
+            {
+                actualDurationMs = records[records.Count - 1].t;
+            }
+
+            bool isPartial = fileReadError || (!fileReadAttempted && (Logger != null && Logger.TotalTicksWritten > 0));
+
             Scorecard scorecard = new Scorecard
             {
                 sessionId = sessionId,
@@ -715,29 +781,13 @@ namespace TrishulSim.AAR
                 scenarioNameHindi = scenarioNameHindi,
                 traineeId = Scorecard.DefaultTraineeId,
                 completedAtIso = completedIso,
-                durationMs = Math.Max(0L, durationMs),
-                doctrinePassed = false,
-                metrics = new ScorecardMetrics
-                {
-                    timeToDetectionMs = 0,
-                    classificationAccuracy = 0.0f,
-                    roeCompliance = 0.0f,
-                    kineticRounds = 0,
-                    kineticHits = 0,
-                    kineticEfficiency = 0.0f,
-                    agentsNeutralised = 0,
-                    agentsMissed = 0,
-                    prematureEwPenalty = false
-                },
-                doctrineBenchmarks = new DoctrineBenchmarks
-                {
-                    timeToDetectionThresholdMs = 15000,
-                    roeMinCompliance = 1.0f,
-                    kineticMinEfficiency = 0.5f
-                },
-                timelineIndex = new int[0],
+                durationMs = Math.Max(0L, actualDurationMs),
+                doctrinePassed = doctrinePassed,
+                metrics = metrics,
+                doctrineBenchmarks = benchmarks,
+                timelineIndex = new int[0], // populated in AA-P1-B
                 sessionFilePath = expectedNdjsonPath,
-                partial = false,
+                partial = isPartial,
                 version = Scorecard.CurrentVersion
             };
 
@@ -808,7 +858,8 @@ namespace TrishulSim.AAR
                     {
                         await client.SendAsync(envelope.ToJson()).ConfigureAwait(false);
                         Debug.Log("[AAREngine] SCORECARD_PAYLOAD sent");
-                        Debug.Log("[AAREngine] Scorecard broadcast — sessionId: " + scorecard.sessionId + ", metrics: stub");
+                        string metricsLabel = (scorecard.metrics != null && (scorecard.metrics.timeToDetectionMs > 0 || scorecard.metrics.kineticRounds > 0)) ? "real" : "stub";
+                        Debug.Log("[AAREngine] Scorecard broadcast — sessionId: " + scorecard.sessionId + ", metrics: " + metricsLabel);
                     }
                     catch (Exception ex)
                     {
@@ -820,7 +871,8 @@ namespace TrishulSim.AAR
             {
                 // In offline/test mode: still log required contract markers
                 Debug.Log("[AAREngine] SCORECARD_PAYLOAD sent");
-                Debug.Log("[AAREngine] Scorecard broadcast — sessionId: " + scorecard.sessionId + ", metrics: stub");
+                string metricsLabel = (scorecard.metrics != null && (scorecard.metrics.timeToDetectionMs > 0 || scorecard.metrics.kineticRounds > 0)) ? "real" : "stub";
+                Debug.Log("[AAREngine] Scorecard broadcast — sessionId: " + scorecard.sessionId + ", metrics: " + metricsLabel);
             }
 
             Action<Scorecard> broadHandler = OnScorecardBroadcast;

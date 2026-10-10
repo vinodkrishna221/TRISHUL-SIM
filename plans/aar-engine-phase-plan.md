@@ -226,7 +226,7 @@ TEST:
 DEPENDS: AA-P0-A, AA-P0-B, SA-P1-C, SA-P1-D     UNBLOCKS: UX-P1-D (Scorecard Renderer shows real values)
 
 DEMO: ⭐ "Scorecard shows non-zero metrics with pass/fail colours." (Beat 5 — wow-moment resolution)
-PERSONA: aar-engine builder                       STATUS: [ ] todo
+PERSONA: aar-engine builder                       STATUS: [x] done
 ```
 
 ---
