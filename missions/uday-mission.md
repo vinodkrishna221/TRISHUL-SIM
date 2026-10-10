@@ -188,7 +188,7 @@ CONTEXT:
 
 DELIVERABLE: BoidFlockController.cs updated (Burst path if needed) · FPS result logged
 TEST: IL2CPP build + 8 agents running Punjab: Unity Profiler < 16.7ms/frame.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---

@@ -39,7 +39,7 @@
 | SA-P1-C · EW deconfliction / friendlyBlackoutRisk | Uday | [x] |
 | SA-P1-D · SMASH 2000 lead-angle + KineticEvent | Uday | [x] |
 | SA-P2-A · SATURATION_DIVE + MULTI-AXIS_SPLIT tactics | Uday | [x] |
-| SA-P2-B · Burst + 60 FPS validation | Uday | [ ] |
+| SA-P2-B · Burst + 60 FPS validation | Uday | [x] |
 | SA-P3-A · Demo seed tuning | Uday | [ ] |
 | SA-P3-B · Mock fixtures | Uday | [ ] |
 | AA-P0-A · TelemetryLogger 10 Hz NDJSON | Sohail | [x] |

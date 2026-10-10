@@ -70,9 +70,16 @@ namespace TrishulSim.SwarmAI
             get { return _currentScenarioId; }
         }
 
+        private BoidFlockController _flockController;
+        public BoidFlockController FlockController
+        {
+            get { return _flockController; }
+        }
+
         public SwarmManager()
         {
             _agents = new List<SwarmAgentState>();
+            _flockController = new BoidFlockController();
             _allNeutralised = false;
             _allNeutralisedAtMs = null;
             _currentTactic = null;
@@ -207,6 +214,17 @@ namespace TrishulSim.SwarmAI
             {
                 _allNeutralised = true;
                 _allNeutralisedAtMs = currentScenarioTimeMs;
+            }
+        }
+
+        /// <summary>
+        /// Explicitly steps classical Reynolds Boid flocking dynamics on all active agents.
+        /// </summary>
+        public void StepFlocking(float deltaTime)
+        {
+            if (_flockController != null && _agents != null && _agents.Count > 0)
+            {
+                _flockController.Step(_agents, _currentProfile, deltaTime);
             }
         }
 

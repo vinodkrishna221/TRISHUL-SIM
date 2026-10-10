@@ -252,6 +252,18 @@ namespace TrishulSim.Sensors
                 float distM = (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
                 if (distM < 1.0f) distM = 1.0f;
 
+                // SA-P2-B performance optimization: early-out when agent distance > 500m
+                // Beyond 500m, radar return is below -90 dBm threshold and acoustic signature is sub-audible.
+                if (distM > 500.0f)
+                {
+                    if (agent.rfEmitting && agent.rfPowerDbm > maxRfDbm)
+                    {
+                        maxRfDbm = agent.rfPowerDbm;
+                        maxRfFreqGHz = agent.rfFreqGHz;
+                    }
+                    continue;
+                }
+
                 if (agent.rfEmitting && agent.rfPowerDbm > maxRfDbm)
                 {
                     maxRfDbm = agent.rfPowerDbm;

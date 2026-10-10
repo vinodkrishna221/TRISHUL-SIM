@@ -29,6 +29,22 @@ namespace UnityEngine
         public float sqrMagnitude { get { return (x * x) + (y * y) + (z * z); } }
         public float magnitude { get { return (float)Math.Sqrt(sqrMagnitude); } }
 
+        public Vector3 normalized
+        {
+            get
+            {
+                float mag = magnitude;
+                if (mag > 1e-5f)
+                    return new Vector3(x / mag, y / mag, z / mag);
+                return zero;
+            }
+        }
+
+        public static float Distance(Vector3 a, Vector3 b)
+        {
+            return (a - b).magnitude;
+        }
+
         public static Vector3 operator +(Vector3 a, Vector3 b)
         {
             return new Vector3(a.x + b.x, a.y + b.y, a.z + b.z);
