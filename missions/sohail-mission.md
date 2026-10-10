@@ -319,7 +319,7 @@ CONTEXT:
 
 DELIVERABLE: board/STATUS.md updated · 3 timing measurements logged
 TEST: 3 runs; all SCORECARD_PAYLOAD arrivals within 10s of SCENARIO_END. No SCORECARD_COMPUTE_FAILED errors.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
