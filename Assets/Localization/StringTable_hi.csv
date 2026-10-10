@@ -37,6 +37,8 @@ METRIC_PREMATURE_EW,"समयपूर्व ईडब्ल्यू दंड
 DOCTRINE_PASSED,"सिद्धांत उत्तीर्ण"
 DOCTRINE_FAILED,"सिद्धांत अनुत्तीर्ण"
 PDF_EXPORT_BTN,"पीडीएफ निर्यात"
+PDF_EXPORT_SAVED,"पीडीएफ सहेजा गया: {0}"
+PDF_EXPORT_FAILED,"पीडीएफ निर्यात विफल — डिस्क स्थान जांचें"
 EW_JAMMER_PANEL,"ईडब्ल्यू जैमर"
 AZIMUTH_LABEL,"दिगंश"
 ELEVATION_LABEL,"उन्नतांश"

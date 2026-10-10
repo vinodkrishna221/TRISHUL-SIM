@@ -46,6 +46,7 @@ namespace TrishulSim.UI
         private VisualElement scorecardPanel;
         private Label scorecardStubLabel;
         private VisualElement computingOverlay;
+        private ScorecardPanelController scorecardController;
 
         // ── Live Sensor Renderers ─────────────────────────────
         private RfWaterfallRenderer rfWaterfallRenderer;
@@ -77,6 +78,7 @@ namespace TrishulSim.UI
         public Label AcousticReading { get { return acousticReading; } }
         public VisualElement ControlsRow { get { return controlsRow; } }
         public VisualElement ScorecardPanel { get { return scorecardPanel; } }
+        public ScorecardPanelController ScorecardController { get { return scorecardController; } }
         public VisualElement ComputingOverlay { get { return computingOverlay; } }
 
         public RfWaterfallRenderer RfRenderer { get { return rfWaterfallRenderer; } }
@@ -152,6 +154,18 @@ namespace TrishulSim.UI
             scorecardPanel     = root.Q<VisualElement>("scorecard-panel");
             scorecardStubLabel = root.Q<Label>("scorecard-stub-label");
             computingOverlay   = root.Q<VisualElement>("computing-overlay");
+
+            if (scorecardPanel != null)
+            {
+                var scorecardRoot = scorecardPanel.Q<VisualElement>("scorecard-root") ?? scorecardPanel;
+                if (scorecardController == null)
+                {
+                    scorecardController = gameObject.GetComponent<ScorecardPanelController>();
+                    if (scorecardController == null)
+                        scorecardController = gameObject.AddComponent<ScorecardPanelController>();
+                }
+                scorecardController.BindElements(scorecardRoot);
+            }
 
             InitializeRenderers();
             InitializeControllers();
@@ -444,20 +458,40 @@ namespace TrishulSim.UI
         }
 
         /// <summary>
-        /// Called when SCORECARD_PAYLOAD is received.
-        /// Contract: scorecard.md v1.
+        /// Called when SCORECARD_PAYLOAD is received with a full Scorecard object.
+        /// Contract: scorecard.md v1 — consumer reaction:
+        ///   Show scorecard panel, hide computing overlay, bind Scorecard.
         /// </summary>
-        public void OnScorecardReceived(string sessionId)
+        public void OnScorecardReceived(Scorecard scorecard)
         {
-            Debug.Log(string.Format("[Cockpit] SCORECARD_PAYLOAD received for session {0}.", sessionId));
+            if (scorecard == null) return;
+            Debug.Log(string.Format("[Cockpit] SCORECARD_PAYLOAD received for session {0}.", scorecard.sessionId));
 
             if (computingOverlay != null)
                 computingOverlay.AddToClassList("hidden");
 
+            // Show scorecard panel
             if (scorecardPanel != null)
                 scorecardPanel.RemoveFromClassList("hidden");
+
             if (scorecardStubLabel != null)
-                scorecardStubLabel.text = LocaleToggle.Instance.GetFormatted("SCORECARD_RECEIVED", sessionId);
+                scorecardStubLabel.text = LocaleToggle.Instance.GetFormatted("SCORECARD_RECEIVED", scorecard.sessionId);
+
+            if (scorecardController != null)
+            {
+                scorecardController.Bind(scorecard);
+            }
+        }
+
+        /// <summary>
+        /// Backward-compatible overload receiving sessionId string (or mock data).
+        /// </summary>
+        public void OnScorecardReceived(string sessionId)
+        {
+            var fixture = ScorecardMock.GetPunjabFixture();
+            if (!string.IsNullOrEmpty(sessionId))
+                fixture.sessionId = sessionId;
+            OnScorecardReceived(fixture);
         }
 
         // ══════════════════════════════════════════════════════

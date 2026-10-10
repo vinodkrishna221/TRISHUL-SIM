@@ -534,7 +534,7 @@ TEST:
 DEPENDS: UX-P1-C, AA-P1-A, AA-P1-B     UNBLOCKS: UX-P2-A (PDF button target exists)
 
 DEMO: ⭐ "Beat 5 fully visual on both screens simultaneously — judge scrubs to 'the moment he fired'." (Beat 5)
-PERSONA: ui-ux builder                  STATUS: [ ] todo
+PERSONA: ui-ux builder                  STATUS: [x] done
 ```
 
 ---
@@ -580,7 +580,7 @@ TEST:
 DEPENDS: AA-P2-A, UX-P1-D     UNBLOCKS: UX-P2-C (P2 smoke)
 
 DEMO: "Judge gets a PDF in one click." (Beat 6)
-PERSONA: ui-ux builder         STATUS: [ ] todo
+PERSONA: ui-ux builder         STATUS: [x] done
 ```
 
 ---
