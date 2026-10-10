@@ -426,16 +426,20 @@ namespace TrishulSim.Scenarios
                 GameObject esGo = new GameObject("EventSystem");
                 UnityEngine.Object.DontDestroyOnLoad(esGo);
                 existing = esGo.AddComponent<UnityEngine.EventSystems.EventSystem>();
-                esGo.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
-                esGo.AddComponent<SafeBaseInput>();
-                Debug.Log("[ScenarioManager] Programmatically instantiated persistent EventSystem + StandaloneInputModule + SafeBaseInput for UI interactivity.");
             }
-            else
+
+            var sim = existing.GetComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+            if (sim != null)
             {
-                if (existing.GetComponent<SafeBaseInput>() == null)
-                {
-                    existing.gameObject.AddComponent<SafeBaseInput>();
-                }
+                sim.enabled = false;
+                UnityEngine.Object.Destroy(sim);
+            }
+
+            var inputModule = existing.GetComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+            if (inputModule == null)
+            {
+                inputModule = existing.gameObject.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+                Debug.Log("[ScenarioManager] Attached InputSystemUIInputModule to EventSystem for Unity New Input System.");
             }
         }
 
@@ -450,19 +454,49 @@ namespace TrishulSim.Scenarios
             public override bool GetMouseButtonDown(int button)
             {
                 try { return UnityEngine.Input.GetMouseButtonDown(button); }
-                catch (System.InvalidOperationException) { return false; }
+                catch (System.InvalidOperationException)
+                {
+                    var mouse = UnityEngine.InputSystem.Mouse.current;
+                    if (mouse != null)
+                    {
+                        if (button == 0) return mouse.leftButton.wasPressedThisFrame;
+                        if (button == 1) return mouse.rightButton.wasPressedThisFrame;
+                        if (button == 2) return mouse.middleButton.wasPressedThisFrame;
+                    }
+                    return false;
+                }
             }
 
             public override bool GetMouseButtonUp(int button)
             {
                 try { return UnityEngine.Input.GetMouseButtonUp(button); }
-                catch (System.InvalidOperationException) { return false; }
+                catch (System.InvalidOperationException)
+                {
+                    var mouse = UnityEngine.InputSystem.Mouse.current;
+                    if (mouse != null)
+                    {
+                        if (button == 0) return mouse.leftButton.wasReleasedThisFrame;
+                        if (button == 1) return mouse.rightButton.wasReleasedThisFrame;
+                        if (button == 2) return mouse.middleButton.wasReleasedThisFrame;
+                    }
+                    return false;
+                }
             }
 
             public override bool GetMouseButton(int button)
             {
                 try { return UnityEngine.Input.GetMouseButton(button); }
-                catch (System.InvalidOperationException) { return false; }
+                catch (System.InvalidOperationException)
+                {
+                    var mouse = UnityEngine.InputSystem.Mouse.current;
+                    if (mouse != null)
+                    {
+                        if (button == 0) return mouse.leftButton.isPressed;
+                        if (button == 1) return mouse.rightButton.isPressed;
+                        if (button == 2) return mouse.middleButton.isPressed;
+                    }
+                    return false;
+                }
             }
 
             public override Vector2 mousePosition
@@ -470,7 +504,13 @@ namespace TrishulSim.Scenarios
                 get
                 {
                     try { return UnityEngine.Input.mousePosition; }
-                    catch (System.InvalidOperationException) { return Vector2.zero; }
+                    catch (System.InvalidOperationException)
+                    {
+                        var mouse = UnityEngine.InputSystem.Mouse.current;
+                        if (mouse != null)
+                            return mouse.position.ReadValue();
+                        return Vector2.zero;
+                    }
                 }
             }
 
@@ -479,7 +519,13 @@ namespace TrishulSim.Scenarios
                 get
                 {
                     try { return UnityEngine.Input.mouseScrollDelta; }
-                    catch (System.InvalidOperationException) { return Vector2.zero; }
+                    catch (System.InvalidOperationException)
+                    {
+                        var mouse = UnityEngine.InputSystem.Mouse.current;
+                        if (mouse != null)
+                            return mouse.scroll.ReadValue();
+                        return Vector2.zero;
+                    }
                 }
             }
 
@@ -595,6 +641,55 @@ namespace TrishulSim.Scenarios
                 csUI.StatusText = connGo.GetComponent<Text>();
                 csUI.Server = Server;
             }
+
+            EnsureButtonsInteractable();
+#endif
+        }
+
+        public void EnsureButtonsInteractable()
+        {
+#if UNITY_5_3_OR_NEWER
+            if (launchButton == null)
+            {
+                GameObject launchGo = GameObject.Find("LaunchButton");
+                if (launchGo != null)
+                    launchButton = launchGo.GetComponent<Button>();
+            }
+            if (abortButton == null)
+            {
+                GameObject abortGo = GameObject.Find("AbortButton");
+                if (abortGo != null)
+                    abortButton = abortGo.GetComponent<Button>();
+            }
+
+            if (launchButton != null)
+            {
+                var img = launchButton.GetComponent<Image>();
+                if (img == null)
+                {
+                    img = launchButton.gameObject.AddComponent<Image>();
+                    img.color = new Color(0.18f, 0.45f, 0.28f, 0.95f); // MIL-STD 2525 Dark Green
+                }
+                img.raycastTarget = true;
+                launchButton.targetGraphic = img;
+                launchButton.interactable = true;
+            }
+
+            if (abortButton != null)
+            {
+                var img = abortButton.GetComponent<Image>();
+                if (img == null)
+                {
+                    img = abortButton.gameObject.AddComponent<Image>();
+                    img.color = new Color(0.55f, 0.18f, 0.18f, 0.95f); // Crimson Red
+                }
+                img.raycastTarget = true;
+                abortButton.targetGraphic = img;
+                abortButton.interactable = true;
+            }
+
+            SubscribeButton();
+            SubscribeAbortButton();
 #endif
         }
 

@@ -438,8 +438,25 @@ namespace TrishulSim.Network
                 if (context == null)
                     continue;
 
-                if (!context.Request.IsWebSocketRequest)
+                bool isWs = context.Request.IsWebSocketRequest;
+                if (!isWs)
                 {
+                    string upgrade = context.Request.Headers["Upgrade"];
+                    string connection = context.Request.Headers["Connection"];
+                    if (!string.IsNullOrEmpty(upgrade) && string.Equals(upgrade.Trim(), "websocket", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!string.IsNullOrEmpty(connection) && connection.IndexOf("Upgrade", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            isWs = true;
+                        }
+                    }
+                }
+
+                if (!isWs)
+                {
+                    Debug.LogWarning("[WsServer] Non-WS request rejected (HTTP 400). RawUrl=" + context.Request.RawUrl +
+                                     " | Upgrade=" + context.Request.Headers["Upgrade"] +
+                                     " | Connection=" + context.Request.Headers["Connection"]);
                     try
                     {
                         context.Response.StatusCode = 400;
@@ -463,6 +480,7 @@ namespace TrishulSim.Network
                         _clients[session.Id] = session;
                     }
 
+                    Debug.Log("[WsServer] WebSocket client session established: " + session.Id);
                     Task _ = Task.Run(() => ReceiveClientLoopAsync(session, ct));
                 }
                 catch (Exception ex)
