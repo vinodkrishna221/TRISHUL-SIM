@@ -46,7 +46,7 @@
 | AA-P0-B · Stub Scorecard + SCORECARD_PAYLOAD | Sohail | [x] |
 | AA-P1-A · Decision Tree Scorer (full metrics) | Sohail | [x] |
 | AA-P1-B · Timeline Scrubber data engine | Sohail | [x] |
-| AA-P2-A · PDF export (iTextSharp) | Sohail | [ ] |
+| AA-P2-A · PDF export (iTextSharp) | Sohail | [x] |
 | AA-P2-B · Warden contract fidelity | Sohail | [ ] |
 | AA-P3-A · Partial-file guard + manifest clean-up | Sohail | [ ] |
 | UX-P0-A · UITK shell (C2 + Cockpit layout) | Rani | [ ] |
