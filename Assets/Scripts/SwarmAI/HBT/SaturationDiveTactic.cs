@@ -88,6 +88,7 @@ namespace TrishulSim.SwarmAI.HBT
             float totalWidth = (count - 1) * lateralSpacingM;
             float startX = -totalWidth * 0.5f;
             float baseAlt = Profile != null ? Profile.altitudeM : 25.0f;
+            if (baseAlt > 500.0f) baseAlt = 25.0f; // High-altitude terrain elevation (e.g. Ladakh 3800m ASL) normalised to local sim AGL (25m)
 
             for (int i = 0; i < count; i++)
             {
@@ -126,6 +127,7 @@ namespace TrishulSim.SwarmAI.HBT
 
             float speedMs = Profile != null ? Profile.SpeedMs : (100f / 3.6f);
             float cruisingAlt = Profile != null ? Profile.altitudeM : 25.0f;
+            if (cruisingAlt > 500.0f) cruisingAlt = 25.0f; // High-altitude terrain elevation normalised to local sim AGL (25m)
 
             // Check terminal state: all attackers neutralised
             bool anyAttackerActive = false;

@@ -1,0 +1,154 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="TraineeCockpit.uss" />
+    <Style src="ScorecardPanel.uss" />
+    <ui:VisualElement class="cockpit-root">
+        <!-- Threat Indicator -->
+        <ui:VisualElement name="threat-indicator" class="threat-indicator threat-green">
+            <ui:Label name="threat-label" text="GREEN" class="threat-text" />
+        </ui:VisualElement>
+
+        <!-- Sensor Row: 3 panes (RF Waterfall, Micro-Doppler, Acoustic) -->
+        <ui:VisualElement class="sensor-row">
+            <!-- RF Waterfall Pane -->
+            <ui:VisualElement name="rf-waterfall-pane" class="sensor-pane">
+                <ui:Label class="pane-title" text="RF WATERFALL" />
+                <ui:VisualElement name="rf-content" class="sensor-content">
+                    <ui:Label text="[RF Spectrogram — awaiting data]" class="stub-label" />
+                </ui:VisualElement>
+                <ui:VisualElement class="freq-markers">
+                    <ui:Label text="915 MHz" class="freq-marker" />
+                    <ui:Label text="2.4 GHz" class="freq-marker" />
+                    <ui:Label text="5.8 GHz" class="freq-marker" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- Micro-Doppler Radar Pane with Reticle Overlay -->
+            <ui:VisualElement name="doppler-pane" class="sensor-pane">
+                <ui:Label class="pane-title" text="MICRO-DOPPLER RADAR" />
+                <ui:VisualElement name="doppler-content" class="sensor-content">
+                    <ui:Label text="[PPI Scope — awaiting data]" class="stub-label" />
+                    <!-- SMASH 2000 Reticle Overlay -->
+                    <ui:VisualElement name="smash-reticle-overlay" class="smash-reticle-overlay">
+                        <ui:VisualElement name="smash-crosshair" class="smash-crosshair">
+                            <ui:VisualElement class="reticle-ring" />
+                            <ui:VisualElement class="reticle-h-bar" />
+                            <ui:VisualElement class="reticle-v-bar" />
+                            <ui:VisualElement name="smash-lead-vector" class="smash-lead-vector" />
+                        </ui:VisualElement>
+                        <ui:Label name="smash-target-tag" class="smash-target-tag hidden" text="" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:Label name="doppler-reading" text="Doppler: --- Hz" class="sensor-reading" />
+            </ui:VisualElement>
+
+            <!-- Acoustic Sonar Pane -->
+            <ui:VisualElement name="acoustic-pane" class="sensor-pane">
+                <ui:Label class="pane-title" text="ACOUSTIC SONAR" />
+                <ui:VisualElement name="acoustic-content" class="sensor-content">
+                    <ui:Label text="[FFT Bars — awaiting data]" class="stub-label" />
+                </ui:VisualElement>
+                <ui:Label name="acoustic-reading" text="SPL: --- dB" class="sensor-reading" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Controls Row (EW + SMASH — unhidden on SCENARIO_START) -->
+        <ui:VisualElement name="controls-row" class="controls-row hidden">
+            <!-- EW Jammer Controls Panel -->
+            <ui:VisualElement name="ew-panel" class="controls-panel ew-panel">
+                <ui:Label text="EW JAMMER" class="panel-label" />
+                <ui:SliderInt name="ew-azimuth" label="Azimuth" low-value="0" high-value="359" value="0" class="control-slider" />
+                <ui:SliderInt name="ew-elevation" label="Elevation" low-value="-90" high-value="90" value="0" class="control-slider" />
+                <ui:DropdownField name="ew-band" label="Jam Band" class="control-dropdown" />
+                <ui:Toggle name="ew-engage" label="ENGAGE" class="control-toggle" />
+                <ui:Label name="ew-roe-warning" class="roe-warning hidden" text="⚠ ROE VIOLATION — FRIENDLY BLACKOUT" />
+            </ui:VisualElement>
+
+            <!-- SMASH 2000 Fire Control Panel -->
+            <ui:VisualElement name="smash-panel" class="controls-panel smash-panel">
+                <ui:Label text="SMASH 2000 FIRE CONTROL" class="panel-label" />
+                <ui:VisualElement class="smash-status-row">
+                    <ui:Label name="smash-lock-label" text="STANDBY" class="smash-lock-label" />
+                    <ui:Label name="smash-lead-label" text="Lead: ---°" class="smash-lead-label" />
+                </ui:VisualElement>
+                <ui:Button name="fire-btn" text="FIRE — 7.62mm" class="fire-btn" />
+                <ui:Label name="smash-feedback-label" text="" class="smash-feedback-label hidden" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Scorecard Panel (hidden until SCORECARD_PAYLOAD — rendered by UX-P1-D) -->
+        <ui:VisualElement name="scorecard-panel" class="scorecard-panel hidden">
+            <ui:Label name="scorecard-stub-label" text="Scorecard received" class="scorecard-stub hidden" />
+            
+            <ui:VisualElement name="scorecard-root" class="scorecard-root">
+                <!-- Header -->
+                <ui:VisualElement class="scorecard-header">
+                    <ui:Label name="scorecard-title" text="TACTICAL PERFORMANCE SCORECARD" class="scorecard-title" />
+                    <ui:VisualElement class="scorecard-subbar">
+                        <ui:Label name="scenario-name" text="Punjab Border — Zero Visibility Pincer" class="scenario-name" />
+                        <ui:Label name="trainee-id-label" text="Trainee: havildar-rajan" class="trainee-id-label" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="doctrine-badge" class="badge badge-pass">
+                        <ui:Label name="doctrine-text" text="DOCTRINE PASSED" class="badge-text" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- Metrics Table -->
+                <ui:VisualElement class="metrics-section">
+                    <ui:Label text="TACTICAL BENCHMARKS &amp; ROE METRICS" class="section-title" />
+                    <ui:VisualElement class="metrics-header-row">
+                        <ui:Label text="METRIC" class="th-metric" />
+                        <ui:Label text="RECORDED" class="th-value" />
+                        <ui:Label text="BENCHMARK" class="th-benchmark" />
+                        <ui:Label text="VERDICT" class="th-verdict" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="metrics-table" class="metrics-table" />
+                </ui:VisualElement>
+
+                <!-- Timeline Scrubber & Spatial Overlay -->
+                <ui:VisualElement class="timeline-section">
+                    <ui:VisualElement class="timeline-header-bar">
+                        <ui:Label text="TIMELINE REPLAY &amp; SPATIAL RADAR OVERLAY" class="section-title" />
+                        <ui:Label name="timeline-time" text="T+0s" class="timeline-time" />
+                    </ui:VisualElement>
+                    
+                    <ui:Slider name="timeline-slider" low-value="0" high-value="55" class="timeline-slider" />
+                    
+                    <ui:VisualElement class="spatial-radar-container">
+                        <ui:VisualElement name="spatial-overlay" class="spatial-overlay">
+                            <ui:VisualElement class="trainee-marker" />
+                            <ui:VisualElement class="radar-range-ring-1" />
+                            <ui:VisualElement class="radar-range-ring-2" />
+                            <ui:VisualElement class="radar-crosshair-h" />
+                            <ui:VisualElement class="radar-crosshair-v" />
+                            <ui:VisualElement name="drone-blip-container" class="drone-blip-container" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="radar-legend">
+                            <ui:VisualElement class="legend-item">
+                                <ui:VisualElement class="legend-dot dot-decoy" />
+                                <ui:Label text="Decoy (2.4 GHz)" class="legend-text" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="legend-item">
+                                <ui:VisualElement class="legend-dot dot-attacker" />
+                                <ui:Label text="Attacker (5.8 GHz)" class="legend-text" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="legend-item">
+                                <ui:VisualElement class="legend-dot dot-neutralised" />
+                                <ui:Label text="Neutralised" class="legend-text" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- Footer Actions -->
+                <ui:VisualElement class="scorecard-actions">
+                    <ui:Button name="pdf-export-btn" text="Export PDF" class="btn btn-pdf-export" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Computing Overlay (hidden until SCENARIO_END) -->
+        <ui:VisualElement name="computing-overlay" class="computing-overlay hidden">
+            <ui:Label text="Computing Scorecard…" class="computing-text" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

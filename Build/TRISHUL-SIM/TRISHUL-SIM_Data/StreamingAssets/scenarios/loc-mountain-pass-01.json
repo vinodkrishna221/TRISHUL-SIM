@@ -1,0 +1,11 @@
+{
+  "id": "loc-mountain-pass-01",
+  "name": "LoC Mountain Pass — Multi-Axis Split",
+  "nameHindi": "एलओसी पर्वतीय दर्रा — बहु-अक्ष विभाजन",
+  "region": "LOC_MOUNTAIN",
+  "weatherPreset": { "visibility": 80.0, "windSpeedKmh": 35.0, "windBearingDeg": 180.0, "temperature": 2.0, "isNight": true },
+  "swarmProfile": { "agentCount": 5, "decoyCount": 1, "attackerCount": 4, "tacticTree": "MULTI-AXIS_SPLIT", "speedKmh": 80.0, "altitudeM": 45.0, "rfFreqGHz": [0.915], "rfPowerDbm": 20.0 },
+  "durationMaxSecs": 120,
+  "seed": 63918,
+  "version": 1
+}

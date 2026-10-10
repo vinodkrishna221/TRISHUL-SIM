@@ -1,0 +1,11 @@
+{
+  "id": "ladakh-lac-ridge-01",
+  "name": "Ladakh LAC Ridge — High-Altitude Saturation",
+  "nameHindi": "लद्दाख एलएसी रिज — उच्च ऊंचाई संतृप्ति",
+  "region": "LADAKH_LAC",
+  "weatherPreset": { "visibility": 200.0, "windSpeedKmh": 25.0, "windBearingDeg": 315.0, "temperature": -12.0, "isNight": false },
+  "swarmProfile": { "agentCount": 8, "decoyCount": 4, "attackerCount": 4, "tacticTree": "SATURATION_DIVE", "speedKmh": 100.0, "altitudeM": 3800.0, "rfFreqGHz": [2.4, 5.8], "rfPowerDbm": 23.0 },
+  "durationMaxSecs": 120,
+  "seed": 51204,
+  "version": 1
+}
