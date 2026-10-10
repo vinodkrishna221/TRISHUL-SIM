@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-10T15:52 IST · Vinod (unity-sim): [FIX] ✅ Resolved WebSocket HTTP 400 handshake rejection in WsServer (Mono header parsing), migrated SplitScreen & InstructorC2 EventSystem to InputSystemUIInputModule, and added solid clickable raycast hitboxes for Launch/Abort buttons
 - 2026-10-10T13:10 IST · Sohail (aar-engine): [AA-P2-B] ✅ Warden contract fidelity & timing verified (3× Punjab runs measured: 1438ms, 38ms, 29ms vs ≤10s SLA; zero nulls in 5-line NDJSON spot-check; full Scorecard in <64KB envelope; dual-screen C2/Trainee WS routing confirmed; manifest updated) — self-test green on `feat/aar-engine-warden-review`
 - 2026-10-08T19:55 IST · Rajeswari: UX-P2-A done — ScorecardPanelController PDF export button wired with loading spinner, Process.Start invocation, clipboard fallback, error handling & PdfExporter generating 6-section dossier; ScorecardSelfTest (7/7 suites) PASSED
 - 2026-10-10T12:47 IST · Sohail (aar-engine): [AA-P2-A] ✅ Tactical Performance Dossier PDF export live (iTextSharp 5.5.13 embedded, NotoSansDevanagari Hindi font, colored doctrine badge, metrics table, threat sparkline, one-click ExportPdf) — self-test green on `feat/aar-engine-pdf-export`
