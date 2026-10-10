@@ -392,7 +392,7 @@ TEST:
 DEPENDS: UX-P1-A, SA-P1-B-ii, SA-P1-D     UNBLOCKS: UX-P1-C, UX-P1-D
 
 DEMO: ⭐ "Trainee can operate EW and kinetic controls — the interaction at Beat 4." (Beat 4)
-PERSONA: ui-ux builder                     STATUS: [ ] todo
+PERSONA: ui-ux builder                     STATUS: [x] done — 2026-10-06 (verified with UiShellSelfTest PASS)
 ```
 
 ---

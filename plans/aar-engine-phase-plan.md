@@ -108,7 +108,7 @@ TEST:
 DEPENDS: unity-sim P0-A, P0-C     UNBLOCKS: AA-P0-B, UX-P0-A (NDJSON shape frozen)
 
 DEMO: "Session file visible in Explorer growing in real time." (P0 checklist item #5)
-PERSONA: aar-engine builder        STATUS: [ ] todo
+PERSONA: aar-engine builder        STATUS: [x] done
 ```
 
 ---
@@ -159,7 +159,7 @@ TEST:
 DEPENDS: AA-P0-A, unity-sim P0-C     UNBLOCKS: UX-P0-A (SCORECARD_PAYLOAD shape frozen)
 
 DEMO: "'Scorecard received' log line on both screens." (P0 checklist item #6)
-PERSONA: aar-engine builder           STATUS: [ ] todo
+PERSONA: aar-engine builder           STATUS: [x] done
 ```
 
 ---
@@ -226,7 +226,7 @@ TEST:
 DEPENDS: AA-P0-A, AA-P0-B, SA-P1-C, SA-P1-D     UNBLOCKS: UX-P1-D (Scorecard Renderer shows real values)
 
 DEMO: ⭐ "Scorecard shows non-zero metrics with pass/fail colours." (Beat 5 — wow-moment resolution)
-PERSONA: aar-engine builder                       STATUS: [ ] todo
+PERSONA: aar-engine builder                       STATUS: [x] done
 ```
 
 ---
@@ -281,7 +281,7 @@ TEST:
 DEPENDS: AA-P1-A               UNBLOCKS: UX-P1-D (scrub bar now has real data API to call)
 
 DEMO: ⭐ "Scrub bar navigable — judge can replay the exact moment of firing." (Beat 5)
-PERSONA: aar-engine builder   STATUS: [ ] todo
+PERSONA: aar-engine builder   STATUS: [x] done
 ```
 
 ---
@@ -350,7 +350,7 @@ TEST:
 DEPENDS: AA-P1-A               UNBLOCKS: UX-P2-A (PDF export button becomes functional)
 
 DEMO: "Judge gets a PDF in one click — one-click iTextSharp export." (Beat 6)
-PERSONA: aar-engine builder   STATUS: [ ] todo
+PERSONA: aar-engine builder   STATUS: [x] done
 ```
 
 ---
