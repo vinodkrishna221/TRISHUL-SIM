@@ -28,7 +28,7 @@
 | US-P1-B · 4 scenario JSON configs | Vinod | [ ] |
 | US-P2-A · Air-gap validation | Vinod | [ ] |
 | US-P2-B · IL2CPP + InnoSetup installer | Vinod | [ ] |
-| US-P2-C · XR scaffold stub | Vinod | [ ] |
+| US-P2-C · XR scaffold stub | Vinod | [x] |
 | US-P2-D · Warden smoke | Vinod | [ ] |
 | US-P3-A · Submission package coordination | Vinod | [ ] |
 | SA-P0-A · Boids 6-agent spawn | Venu | [ ] |
@@ -42,21 +42,21 @@
 | SA-P2-B · Burst + 60 FPS validation | Uday | [ ] |
 | SA-P3-A · Demo seed tuning | Uday | [ ] |
 | SA-P3-B · Mock fixtures | Uday | [ ] |
-| AA-P0-A · TelemetryLogger 10 Hz NDJSON | Sohail | [ ] |
-| AA-P0-B · Stub Scorecard + SCORECARD_PAYLOAD | Sohail | [ ] |
-| AA-P1-A · Decision Tree Scorer (full metrics) | Sohail | [ ] |
-| AA-P1-B · Timeline Scrubber data engine | Sohail | [ ] |
-| AA-P2-A · PDF export (iTextSharp) | Sohail | [ ] |
-| AA-P2-B · Warden contract fidelity | Sohail | [ ] |
+| AA-P0-A · TelemetryLogger 10 Hz NDJSON | Sohail | [x] |
+| AA-P0-B · Stub Scorecard + SCORECARD_PAYLOAD | Sohail | [x] |
+| AA-P1-A · Decision Tree Scorer (full metrics) | Sohail | [x] |
+| AA-P1-B · Timeline Scrubber data engine | Sohail | [x] |
+| AA-P2-A · PDF export (iTextSharp) | Sohail | [x] |
+| AA-P2-B · Warden contract fidelity | Sohail | [x] |
 | AA-P3-A · Partial-file guard + manifest clean-up | Sohail | [ ] |
 | UX-P0-A · UITK shell (C2 + Cockpit layout) | Rani | [ ] |
 | UX-P0-B · Unity Localization + Hindi/English toggle | Rani | [ ] |
-| UX-P1-A · Live sensor suite (RF Waterfall, Doppler, Acoustic) | Rani | [ ] |
-| UX-P1-B · EW Jammer controls + SMASH reticle | Rani | [ ] |
+| UX-P1-A · Live sensor suite (RF Waterfall, Doppler, Acoustic) | Rani | [x] |
+| UX-P1-B · EW Jammer controls + SMASH reticle | Rani | [x] |
 | UX-P2-D · Full demo-path smoke (all 6 beats) | Rani | [ ] |
 | UX-P1-C · Split-screen layout compatibility | Rajeswari | [ ] |
-| UX-P1-D · Scorecard Renderer + Timeline Scrubber UI | Rajeswari | [ ] |
-| UX-P2-A · PDF Export button wiring | Rajeswari | [ ] |
+| UX-P1-D · Scorecard Renderer + Timeline Scrubber UI | Rajeswari | [x] |
+| UX-P2-A · PDF Export button wiring | Rajeswari | [x] |
 | UX-P2-B · Full bilingual pass | Rajeswari | [ ] |
 | UX-P2-C · Threat-state colour + night/fog ambience | Rajeswari | [ ] |
 | UX-P3-A · Demo-script alignment + UI freeze | Rajeswari | [ ] |

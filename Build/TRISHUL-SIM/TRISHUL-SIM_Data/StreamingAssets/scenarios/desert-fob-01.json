@@ -1,0 +1,11 @@
+{
+  "id": "desert-fob-01",
+  "name": "Desert FOB — Dust Storm Saturation Dive",
+  "nameHindi": "रेगिस्तानी एफओबी — धूल भरी आंधी हमला",
+  "region": "DESERT_FOB",
+  "weatherPreset": { "visibility": 5000.0, "windSpeedKmh": 55.0, "windBearingDeg": 90.0, "temperature": 38.0, "isNight": false },
+  "swarmProfile": { "agentCount": 8, "decoyCount": 2, "attackerCount": 6, "tacticTree": "SATURATION_DIVE", "speedKmh": 110.0, "altitudeM": 15.0, "rfFreqGHz": [2.4, 5.8], "rfPowerDbm": 23.0 },
+  "durationMaxSecs": 120,
+  "seed": 78412,
+  "version": 1
+}

@@ -8,7 +8,21 @@ dist/
 .next/
 *.log
 .DS_Store
+*.exe
+*.cmd
 # tool-generated mirrors (regenerate with scripts/sync.sh)
 .claude/
 .opencode/
 .mcp.json
+*.exe
+powershell.cmd
+
+# Unity generated
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
