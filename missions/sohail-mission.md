@@ -252,7 +252,7 @@ TEST:
 
 PUSH IMMEDIATELY — Rajeswari's UX-P1-D scrub bar needs SetScrubPosition() callable.
 DEMO: ⭐ "Scrub bar navigable — judge replays 'the moment he fired'." (Beat 5)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---

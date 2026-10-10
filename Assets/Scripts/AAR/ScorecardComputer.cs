@@ -773,6 +773,30 @@ namespace TrishulSim.AAR
 
             bool isPartial = fileReadError || (!fileReadAttempted && (Logger != null && Logger.TotalTicksWritten > 0));
 
+            // Compute timelineIndex for Timeline Scrubber data engine (AA-P1-B)
+            int[] timelineIdx = null;
+            if (File.Exists(expectedNdjsonPath))
+            {
+                try
+                {
+                    timelineIdx = TimelineIndexer.BuildIndex(expectedNdjsonPath);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("[ScorecardComputer] Failed to build timeline index from file: " + ex.Message);
+                }
+            }
+
+            if ((timelineIdx == null || timelineIdx.Length == 0) && records != null && records.Count > 0)
+            {
+                timelineIdx = TimelineIndexer.BuildIndexFromRecords(records);
+            }
+
+            if (timelineIdx == null)
+            {
+                timelineIdx = new int[0];
+            }
+
             Scorecard scorecard = new Scorecard
             {
                 sessionId = sessionId,
@@ -785,7 +809,7 @@ namespace TrishulSim.AAR
                 doctrinePassed = doctrinePassed,
                 metrics = metrics,
                 doctrineBenchmarks = benchmarks,
-                timelineIndex = new int[0], // populated in AA-P1-B
+                timelineIndex = timelineIdx,
                 sessionFilePath = expectedNdjsonPath,
                 partial = isPartial,
                 version = Scorecard.CurrentVersion
@@ -825,6 +849,18 @@ namespace TrishulSim.AAR
             }
 
             _lastComputedScorecard = scorecard;
+
+            if (TimelinePlaybackController.Instance != null)
+            {
+                try
+                {
+                    TimelinePlaybackController.Instance.Initialize(scorecard);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("[ScorecardComputer] Failed to initialize TimelinePlaybackController: " + ex.Message);
+                }
+            }
 
             Action<Scorecard> compHandler = OnScorecardComputed;
             if (compHandler != null)

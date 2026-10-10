@@ -281,7 +281,7 @@ TEST:
 DEPENDS: AA-P1-A               UNBLOCKS: UX-P1-D (scrub bar now has real data API to call)
 
 DEMO: ⭐ "Scrub bar navigable — judge can replay the exact moment of firing." (Beat 5)
-PERSONA: aar-engine builder   STATUS: [ ] todo
+PERSONA: aar-engine builder   STATUS: [x] done
 ```
 
 ---
