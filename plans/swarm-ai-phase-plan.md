@@ -524,7 +524,7 @@ TEST:
 DEPENDS: All SA-P1 cards, US-P2-B (IL2CPP build)     UNBLOCKS: US-P2-D (Warden review)
 
 DEMO: "Smooth 60 FPS with full swarm — no frame drops." (Beat 6 judge Q "can it run on a laptop?")
-PERSONA: swarm-ai builder                             STATUS: [ ] todo
+PERSONA: swarm-ai builder                             STATUS: [x] done
 ```
 
 ---
