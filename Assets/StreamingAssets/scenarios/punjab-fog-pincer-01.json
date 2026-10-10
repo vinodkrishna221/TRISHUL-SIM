@@ -1,0 +1,11 @@
+{
+  "id": "punjab-fog-pincer-01",
+  "name": "Punjab Border — Zero Visibility Pincer",
+  "nameHindi": "पंजाब सीमा — शून्य दृश्यता पिंसर",
+  "region": "PUNJAB_RIVERINE",
+  "weatherPreset": { "visibility": 15.0, "windSpeedKmh": 12.0, "windBearingDeg": 270.0, "temperature": 4.0, "isNight": true },
+  "swarmProfile": { "agentCount": 6, "decoyCount": 2, "attackerCount": 4, "tacticTree": "PINCER_LOW_FAST", "speedKmh": 120.0, "altitudeM": 8.0, "rfFreqGHz": [5.825, 2.4], "rfPowerDbm": 23.0 },
+  "durationMaxSecs": 120,
+  "seed": 42819,
+  "version": 1
+}

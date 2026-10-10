@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!129 &1
+PlayerSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 25
+  productGUID: 0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d
+  companyName: TRISHUL
+  productName: TRISHUL-SIM
+  defaultScreenOrientation: 3
+  targetDevice: 2
+  useOnDemandResources: 0
+  accelerometerFrequency: 60
+  actionOnDotNetUnhandledException: 1
+  enableCrashReport: 0
+  submitAnalytics: 0
+  metricsUrl: ""
+  scriptingBackend:
+    Standalone: 1
+  allowUnsafeCode: 0
+  stripEngineCode: 1
+  bakeCollisionMeshes: 1
+  forceSingleInstance: 1
+  runInBackground: 1
+  captureSingleScreen: 0
+  defaultScreenWidth: 1920
+  defaultScreenHeight: 1080
+  defaultIsFullScreen: 1

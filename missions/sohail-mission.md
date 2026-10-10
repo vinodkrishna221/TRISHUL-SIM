@@ -109,7 +109,7 @@ TEST:
   File exists and grows (Explorer shows increasing Size).
   Open in Notepad: each line is valid JSON; line count after 10s ≈ 100.
   Fields: t (increasing by ~100), sessionId (matches), swarmSnapshot (array).
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -149,7 +149,7 @@ TEST:
   scorecard.json exists — open; valid JSON, all metrics=0.
   Instructor C2 Console: "[WsServer] SCORECARD_PAYLOAD received — routing to all clients"
   Trainee Console: "[AAREngine] SCORECARD_PAYLOAD sent"
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -206,7 +206,7 @@ TEST:
 
 PUSH IMMEDIATELY — Rajeswari (UX-P1-D) is waiting for real ScorecardMetrics.
 DEMO: ⭐ "Scorecard shows non-zero metrics with pass/fail colours." (Beat 5 resolution)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -252,7 +252,7 @@ TEST:
 
 PUSH IMMEDIATELY — Rajeswari's UX-P1-D scrub bar needs SetScrubPosition() callable.
 DEMO: ⭐ "Scrub bar navigable — judge replays 'the moment he fired'." (Beat 5)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---

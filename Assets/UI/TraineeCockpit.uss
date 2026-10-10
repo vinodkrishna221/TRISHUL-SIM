@@ -1,6 +1,6 @@
 /* ============================================================
    TraineeCockpit.uss — Trainee Cockpit Stylesheet
-   TRISHUL-SIM · UX-P0-A · MIL-STD-2525 colour palette
+   TRISHUL-SIM · UX-P0-A / UX-P1-A / UX-P1-B · MIL-STD-2525 palette
    ============================================================ */
 
 /* --- Root --- */
@@ -75,7 +75,7 @@
     margin-bottom: 4px;
 }
 
-/* --- Sensor Content (stub grey box, replaced by renderers in UX-P1-A) --- */
+/* --- Sensor Content --- */
 .sensor-content {
     flex-grow: 1;
     background-color: #1A1A1A;
@@ -83,6 +83,7 @@
     min-height: 200px;
     justify-content: center;
     align-items: center;
+    position: relative;
 }
 
 .stub-label {
@@ -112,14 +113,214 @@
     padding: 4px 0;
 }
 
-/* --- Controls Row (EW + SMASH — added in UX-P1-B) --- */
+/* --- SMASH 2000 Reticle Overlay (over Doppler Scope) --- */
+.smash-reticle-overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    justify-content: center;
+    align-items: center;
+}
+
+.smash-crosshair {
+    width: 60px;
+    height: 60px;
+    position: relative;
+    justify-content: center;
+    align-items: center;
+}
+
+.reticle-ring {
+    width: 44px;
+    height: 44px;
+    border-radius: 22px;
+    border-width: 2px;
+    border-color: #00FF00;
+}
+
+.reticle-locked .reticle-ring {
+    border-color: #FFFF00;
+}
+
+.reticle-hit .reticle-ring {
+    border-color: #00FF00;
+    background-color: rgba(0, 255, 0, 0.25);
+}
+
+.reticle-miss .reticle-ring {
+    border-color: #CC0000;
+    background-color: rgba(204, 0, 0, 0.25);
+}
+
+.reticle-h-bar {
+    position: absolute;
+    width: 56px;
+    height: 1px;
+    background-color: rgba(0, 255, 0, 0.7);
+}
+
+.reticle-v-bar {
+    position: absolute;
+    width: 1px;
+    height: 56px;
+    background-color: rgba(0, 255, 0, 0.7);
+}
+
+.smash-lead-vector {
+    position: absolute;
+    width: 12px;
+    height: 2px;
+    background-color: #FFFF00;
+    left: 36px;
+    top: 29px;
+}
+
+.smash-target-tag {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    font-size: 10px;
+    color: #FFFF00;
+    -unity-font-style: bold;
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 2px 4px;
+    border-radius: 2px;
+}
+
+/* --- Controls Row (EW + SMASH) --- */
 .controls-row {
+    flex-direction: row;
     padding: 8px;
     background-color: #141414;
     border-radius: 4px;
     border-width: 1px;
     border-color: #2A2A2A;
     margin-bottom: 8px;
+}
+
+.controls-panel {
+    flex-grow: 1;
+    flex-basis: 0;
+    background-color: #181818;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: #333333;
+    padding: 8px;
+    margin: 0 4px;
+}
+
+.panel-label {
+    font-size: 12px;
+    -unity-font-style: bold;
+    color: #00B300;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    border-bottom-width: 1px;
+    border-bottom-color: #2A2A2A;
+    padding-bottom: 2px;
+}
+
+.control-slider {
+    margin-bottom: 4px;
+    font-size: 11px;
+}
+
+.control-dropdown {
+    margin-bottom: 4px;
+    font-size: 11px;
+}
+
+.control-toggle {
+    margin-bottom: 4px;
+    font-size: 11px;
+}
+
+/* --- ROE Violation Warning --- */
+.roe-warning {
+    font-size: 11px;
+    -unity-font-style: bold;
+    color: #FFFFFF;
+    background-color: #CC0000; /* MIL-STD-2525 RED */
+    padding: 4px 8px;
+    border-radius: 3px;
+    -unity-text-align: middle-center;
+    margin-top: 4px;
+    letter-spacing: 1px;
+}
+
+.roe-warning-active {
+    border-width: 1px;
+    border-color: #FF6666;
+}
+
+/* --- SMASH Fire Control Panel Details --- */
+.smash-status-row {
+    flex-direction: row;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    padding: 4px;
+    background-color: #0F0F0F;
+    border-radius: 3px;
+}
+
+.smash-lock-label {
+    font-size: 11px;
+    -unity-font-style: bold;
+    color: #888888;
+}
+
+.locked-active {
+    color: #FFFF00;
+}
+
+.smash-lead-label {
+    font-size: 11px;
+    color: #00B300;
+    -unity-font-style: bold;
+}
+
+.fire-btn {
+    height: 36px;
+    background-color: #8B0000;
+    color: #FFFFFF;
+    -unity-font-style: bold;
+    font-size: 13px;
+    letter-spacing: 2px;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: #CC0000;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+.fire-btn:hover {
+    background-color: #B22222;
+}
+
+.fire-btn:active {
+    background-color: #FF0000;
+}
+
+.smash-feedback-label {
+    font-size: 12px;
+    -unity-font-style: bold;
+    letter-spacing: 1px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    -unity-text-align: middle-center;
+    margin-top: 4px;
+}
+
+.feedback-hit {
+    background-color: #00B300;
+    color: #FFFFFF;
+}
+
+.feedback-miss {
+    background-color: #CC0000;
+    color: #FFFFFF;
 }
 
 /* --- Scorecard Panel (stub) --- */

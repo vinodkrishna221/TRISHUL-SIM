@@ -107,7 +107,7 @@ TEST:
 
 DEPENDS: —    UNBLOCKS: everyone (push this branch immediately when TEST passes)
 DEMO: "Two-laptop LAN link confirmed — green icon on C2." (Beat 1)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -136,7 +136,7 @@ DELIVERABLE:
 
 TEST:
   Click Launch → Trainee Console: [WsClient] SCENARIO_START received — sessionId: sess-XXXXXXXX
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -157,7 +157,7 @@ CONTEXT:
 DELIVERABLE: ScenarioManager.cs updated with TickLoop + BroadcastScenarioEnd + stub inject
 
 TEST: Run scenario; Console shows SCENARIO_TICK at ~10Hz; SCENARIO_END on abort.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -183,7 +183,7 @@ DELIVERABLE:
 
 TEST: Launch SplitScreen → click Launch (left) → Boids in right pane → Scorecard on both.
 DEMO: "Single laptop running full demo." (Beat 6)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -204,7 +204,7 @@ DELIVERABLE: 4 real JSON files in Assets/StreamingAssets/scenarios/
 
 TEST: ScenarioLibrary.LoadAll() returns 4 configs; dropdown shows all 4 names.
 DEMO: "Scenario library shows 4 entries — no two runs identical." (Beat 1)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -224,7 +224,7 @@ CONTEXT:
 DELIVERABLE: Build artifact at Build/TRISHUL-SIM-airgap-test-YYYYMMDD.exe + evidence log
 TEST: Run .exe with WiFi/Ethernet disabled; full scenario runs; no Task Manager outbound connections.
 DEMO: "No internet active — same binary runs in a Ladakh underground bunker." (Beat 6)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -242,7 +242,7 @@ CONTEXT:
 DELIVERABLE: dist/TRISHUL-SIM-installer-<date>.exe · trishulsim.iss
 TEST: Clean install on target machine → both demo paths complete. FPS ≥60.
 DEMO: "One .exe installs, runs, hits 60 FPS." (Beat 6)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -259,7 +259,7 @@ CONTEXT:
 DELIVERABLE: VRSentryStub.unity + XR Plugin Management installed
 TEST: Open VRSentryStub.unity — no compile errors. NOT in Build Settings (verify).
 DEMO: "'VR-Ready' in system info panel." (Beat 6 judge Q)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -312,4 +312,4 @@ STATUS: [ ] todo
 
 > I, Vinod, have read this brief, understand my cards and the dependency chain, and will push `feat/unity-sim-ws-ipc` by **04 Oct 2026 EOD**.
 
-- [ ] **ACCEPTED** — sign off with your name in team chat and tick this box.
+- [x] **ACCEPTED** — sign off with your name in team chat and tick this box.
