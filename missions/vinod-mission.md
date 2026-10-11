@@ -299,6 +299,172 @@ STATUS: [ ] todo
 
 ---
 
+## ⚡ NEW TRACK — `vr-gamepad` (added 11 Oct 2026)
+
+> Full phase plan → `plans/vr-gamepad-phase-plan.md`
+> Co-owners: Uday (`swarm-ai`) owns VG-P1-C & VG-P1-E · Sohail (`aar-engine`) owns VG-P1-D.
+> Budget: 11h Vinod + 8h Uday + 5h Sohail. Timeline: 11–18 Oct 2026.
+> **This is a SHOULD. If VR is 70% done by 18 Oct, demo desktop mode and show VR as a bonus.**
+
+### VG branch names
+
+| Card | Branch |
+|---|---|
+| VG-P1-A | `feat/vr-gamepad-input-actions` |
+| VG-P1-B | `feat/vr-sentry-post-scene` |
+| VG-P1-C | `feat/vr-hud-panels` *(Uday's branch)* |
+| VG-P1-D | `feat/vr-gyro-head-tracking` *(Sohail's branch)* |
+| VG-P1-E | `feat/vr-spacedesk-mode-toggle` *(Uday's branch)* |
+| VG-P1-F | `feat/vr-integration-smoke` |
+
+### WAITS-ON (VG track)
+
+| Your card | Waits on | Mock path |
+|---|---|---|
+| VG-P1-A | ui-ux-P1-B (EwJammerController.SetAzimuth etc.) | Already done ✅ |
+| VG-P1-C | VG-P1-B (VRRig/StereoHead in scene) | — |
+| VG-P1-D | VG-P1-A (Recalibrate event), VG-P1-B (StereoHead exists) | — |
+| VG-P1-E | VG-P1-B, VG-P1-C, VG-P1-D | Laptop-only stereo (no phone) |
+| VG-P1-F | All VG cards | — |
+
+---
+
+### VG-P1-A · Gamepad Input Actions binding ⭐ [timebox: 3h]
+```
+CONTEXT:
+  Zero-risk card — works with the EXISTING desktop Cockpit HUD, no 3D needed.
+  com.unity.inputsystem 1.20.1 already installed. No .inputactions files in Assets/ yet.
+
+  Gamepad (Gen Game Bluetooth) mapping:
+    Left Stick X   → JammerAzimuth  (±3°/frame at full deflection)
+    D-Pad Y        → JammerElevation (±2°/press, clamp -90 to +90)
+    Right Trigger  → FireSMASH (on performed)
+    A/buttonSouth  → ToggleJammer (on performed)
+    Y/buttonNorth  → BandUp (cycle 2.4→5.825→0.915 GHz)
+    X/buttonWest   → BandDown (reverse cycle)
+    Select         → Recalibrate (fires event for GyroReceiver in VG-P1-D)
+
+  Files to read:
+    • Assets/Scripts/UI/EwJammerController.cs   (SetAzimuth, SetElevation, SetBandGHz, SetEngaged)
+    • Assets/Scripts/UI/SmashReticleController.cs (TriggerFire)
+    • Assets/Scripts/UI/CockpitController.cs     (SetEwParameters, TriggerFireKinetic)
+    • board/contracts/scenario-events.md         (TraineeAction shape)
+
+  Steps:
+    1. Create Assets/Input/TrishulInputActions.inputactions
+       Action Map: "Trainee"
+         JammerAzimuth   Value/Axis: <Gamepad>/leftStick/x + <Keyboard>/a,d
+         JammerElevation Value/Axis: <Gamepad>/dpad/y + <Keyboard>/w,s
+         FireSMASH       Button: <Gamepad>/rightTrigger + <Keyboard>/space
+         ToggleJammer    Button: <Gamepad>/buttonSouth + <Keyboard>/j
+         BandUp          Button: <Gamepad>/buttonNorth + <Keyboard>/equals
+         BandDown        Button: <Gamepad>/buttonWest + <Keyboard>/minus
+         Recalibrate     Button: <Gamepad>/select + <Keyboard>/r
+    2. Create Assets/Scripts/Input/GamepadInputController.cs MonoBehaviour:
+       - Serialized field: CockpitController cockpit (FindAnyObjectByType in Awake fallback)
+       - Serialized field: float azimuthSensitivity = 3f
+       - OnEnable/OnDisable: subscribe/unsubscribe input action events
+       - Update(): accumulate JammerAzimuth 0-359° → SetEwParameters
+       - FireSMASH.performed → TriggerFireKinetic()
+       - ToggleJammer.performed → toggle bool → SetEwParameters
+       - BandUp/BandDown.performed → cycle float[] {2.4f, 5.825f, 0.915f}
+       - public event Action OnRecalibrate (fired on Select press; VG-P1-D subscribes)
+    3. Add GamepadInputController to TraineeCockpitRoot.prefab
+
+  Pre-test step: Pair Gen Game gamepad via Bluetooth → verify in joy.cpl
+
+DELIVERABLE:
+  Assets/Input/TrishulInputActions.inputactions
+  Assets/Scripts/Input/GamepadInputController.cs
+  TraineeCockpitRoot.prefab updated
+
+TEST:
+  Play SplitScreen.unity → launch Punjab scenario.
+  → Left stick moves EW azimuth slider
+  → Right trigger flashes SMASH FIRE button
+  → A toggles EW engage checkbox
+  → Keyboard fallbacks all work
+  Console: [GamepadInput] Gamepad detected: <device name>
+
+DEPENDS: ui-ux-P1-B (done ✅)    UNBLOCKS: VG-P1-D (Sohail's Recalibrate event)
+DEMO: "Havildar Rajan engages jammer and fires SMASH 2000 with a gamepad." (Beat 4)
+STATUS: [ ] todo
+```
+
+---
+
+### VG-P1-B · 3D Nighttime Sentry Post scene [timebox: 5h]
+```
+CONTEXT:
+  Creates the immersive 3D environment. Unity primitives only — no 3D model downloads needed.
+  Target: midnight Punjab border post. Dense fog. Zero drone models (doctrine: zero-visibility).
+
+  Files to read:
+    • docs/PRD.md §3 Beat 4 — "pitch-black screen, two sensor panes, one correct decision"
+    • Assets/Scenes/VRSentryStub.unity — reference for XRRig hierarchy
+    • plans/vr-gamepad-phase-plan.md VG-P1-B CONTEXT (full step list)
+
+  Steps (summary — see phase plan for detail):
+    1. Create Assets/Scenes/VRSentryPost.unity → add to EditorBuildSettings index 3
+    2. Skybox: Procedural skybox, Exposure=0.02, SunSize=0, StarFieldOverlay
+    3. URP Global Volume: Fog (ExponentialSquared, #12122A, Density=0.04) + Bloom (0.8 intensity)
+    4. Watchtower: ground quad 20×20m + 4 railing posts + horizontal rails
+    5. Stereo camera rig on VRRig GameObject:
+       "StereoHead" at (0,1.65,0) with LeftEyeCamera (rect 0,0,0.5,1 / IPD -0.032m)
+       and RightEyeCamera (rect 0.5,0,0.5,1 / IPD +0.032m)
+    6. AudioListener on VRRig (not cameras)
+    7. Add GamepadInputController to VRRig
+
+DELIVERABLE:
+  Assets/Scenes/VRSentryPost.unity
+  Assets/Materials/SkyboxNight.mat
+  Assets/Materials/DarkConcrete.mat
+  Scene in EditorBuildSettings
+
+TEST:
+  Play VRSentryPost → left/right stereo viewports visible → dark fog environment renders.
+  FPS ≥60 with both cameras. No compile errors.
+
+DEPENDS: VG-P1-A    UNBLOCKS: VG-P1-C (Uday's panels), VG-P1-D (Sohail's GyroReceiver needs VRRig)
+DEMO: "In the dark. No flashlight. Only sensor glow." (Beat 4)
+STATUS: [ ] todo
+```
+
+---
+
+### VG-P1-F · Integration smoke + VR demo rehearsal [timebox: 3h]
+```
+CONTEXT:
+  All VG cards done. Structured test card — no new code.
+  Run all 6 demo beats in VR mode. Measure and document latency. Fix bugs.
+  You own this card solo: drive the hardware, verify Uday's floating HUD panels in the headset,
+  and fix any integration or visual alignment issues.
+
+  Full hardware setup required: laptop hotspot ON · phone spacedesk (Display 2) ·
+  phone Chrome gyro sender TAP'd · Gen Game gamepad Bluetooth paired · VR BOX inserted.
+
+  Files to read: docs/PRD.md §3 (6 beats), docs/vr-setup-guide.md, .agents/rules/40-endgame.md
+
+  Steps:
+    1. Run all 6 beats in VR (Beat 1→6 per PRD §3)
+    2. Measure: head tracking latency (subjective), spacedesk FPS, gamepad lag
+    3. If nausea observed: add URP Vignette post-process (radial darkening during rotation)
+    4. Log bugs: board/DECISIONS.md "VG-BUG-001:" etc.
+    5. Update board/STATUS.md: "vr-gamepad: DONE"
+
+DELIVERABLE:
+  board/STATUS.md updated · board/DECISIONS.md VG-BUG entries · docs/vr-setup-guide.md risk notes
+
+TEST:
+  6-beat VR demo without crash. Desktop fallback works after toggle. Gamepad <200ms subjective lag.
+
+DEPENDS: all VG cards    UNBLOCKS: US-P3-A (final submission build)
+DEMO: "6-beat rehearsal — exactly what judges will see." (All beats)
+STATUS: [ ] todo
+```
+
+---
+
 ## Sync expectations
 
 - **Push frequency:** Every ≤60 min. `feat/unity-sim-ws-ipc` must be pushed **today (04 Oct)** — it unblocks 5 other people.

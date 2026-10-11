@@ -44,6 +44,8 @@ namespace TrishulSim.AAR
         private WsClient _subscribedClient;
         private int _tickCount;
         private bool _isSessionActive;
+        private bool _partialFlag;
+        private bool _simulateDiskWriteFailure;
 
         public event Action<string, string> OnSessionStarted; // (sessionId, filePath)
         public event Action<TelemetryRecord> OnRecordLogged;
@@ -53,6 +55,27 @@ namespace TrishulSim.AAR
         {
             get { return sessionsDirectoryOverride; }
             set { sessionsDirectoryOverride = value; }
+        }
+
+        public bool IsPartial
+        {
+            get { return _partialFlag; }
+            set { _partialFlag = value; }
+        }
+
+        public bool PartialFlag
+        {
+            get { return _partialFlag; }
+            set { _partialFlag = value; }
+        }
+
+        /// <summary>
+        /// Test hook allowing automated tests to simulate disk write failures / write protection.
+        /// </summary>
+        public bool SimulateDiskWriteFailure
+        {
+            get { return _simulateDiskWriteFailure; }
+            set { _simulateDiskWriteFailure = value; }
         }
 
         public WsClient Client
@@ -225,6 +248,7 @@ namespace TrishulSim.AAR
                 CurrentSessionId = sessionId;
                 CurrentScenarioId = !string.IsNullOrWhiteSpace(scenarioId) ? scenarioId : "punjab-fog-pincer-01";
                 _tickCount = 0;
+                _partialFlag = false;
 
                 try
                 {
@@ -247,6 +271,7 @@ namespace TrishulSim.AAR
                     _writer = null;
                     _fileStream = null;
                     _isSessionActive = false;
+                    _partialFlag = true;
                     Debug.LogError("[TelemetryLogger] Failed to create session file: " + ex.Message);
                 }
             }
@@ -257,8 +282,14 @@ namespace TrishulSim.AAR
         /// </summary>
         public void LogScenarioTick(ScenarioTickPayload tick)
         {
-            if (!_isSessionActive || _writer == null || tick == null)
+            if (!_isSessionActive || tick == null)
                 return;
+
+            if (_writer == null)
+            {
+                _partialFlag = true;
+                return;
+            }
 
             string scId = !string.IsNullOrEmpty(CurrentScenarioId) ? CurrentScenarioId : "punjab-fog-pincer-01";
             TelemetryRecord record = TelemetryRecord.FromTickPayload(tick, scId);
@@ -274,19 +305,28 @@ namespace TrishulSim.AAR
         /// <summary>
         /// Appends a TelemetryRecord line to the session NDJSON file.
         /// Batches disk flush every 10 ticks (1s) to keep disk write overhead low.
+        /// Hardened with try/catch IOException partial-file guard (AA-P3-A).
         /// </summary>
         public void LogRecord(TelemetryRecord record)
         {
-            if (!_isSessionActive || _writer == null || record == null)
+            if (!_isSessionActive || record == null)
                 return;
 
             lock (_writeLock)
             {
                 if (_writer == null)
+                {
+                    _partialFlag = true;
                     return;
+                }
 
                 try
                 {
+                    if (_simulateDiskWriteFailure)
+                    {
+                        throw new IOException("Simulated disk write failure on write-protected storage.");
+                    }
+
                     string line = record.ToJson();
                     _writer.WriteLine(line);
                     _tickCount++;
@@ -300,8 +340,14 @@ namespace TrishulSim.AAR
                     if (handler != null)
                         handler(record);
                 }
+                catch (IOException ex)
+                {
+                    _partialFlag = true;
+                    Debug.LogWarning("[TelemetryLogger] IOException during telemetry write — continuing in partial mode: " + ex.Message);
+                }
                 catch (Exception ex)
                 {
+                    _partialFlag = true;
                     Debug.LogWarning("[TelemetryLogger] IOException during telemetry write — continuing in partial mode: " + ex.Message);
                 }
             }
@@ -338,7 +384,7 @@ namespace TrishulSim.AAR
                 string path = CurrentSessionFilePath;
                 int count = _tickCount;
 
-                Debug.Log("[TelemetryLogger] SCENARIO_END — session closed: " + path + " (ticks: " + count + ", reason: " + (reason ?? "NORMAL") + ")");
+                Debug.Log("[TelemetryLogger] SCENARIO_END — session closed: " + path + " (ticks: " + count + ", partial: " + _partialFlag + ", reason: " + (reason ?? "NORMAL") + ")");
 
                 Action<string, int> handler = OnSessionClosed;
                 if (handler != null)
