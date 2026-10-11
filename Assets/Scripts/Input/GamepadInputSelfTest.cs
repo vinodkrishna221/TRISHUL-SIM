@@ -20,6 +20,7 @@ using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using TrishulSim.UI;
+using UnityEngine.UIElements;
 
 namespace TrishulSim.Input
 {
@@ -68,6 +69,18 @@ namespace TrishulSim.Input
 
             TestPrefabAndSceneWireIntegrity();
             Console.WriteLine("[PASS] TestPrefabAndSceneWireIntegrity");
+
+            TestCockpitStatePreservationAndSync();
+            Console.WriteLine("[PASS] TestCockpitStatePreservationAndSync");
+
+            TestAzimuthBoundaryModuloPush();
+            Console.WriteLine("[PASS] TestAzimuthBoundaryModuloPush");
+
+            TestCanonicalJsonControlSchemes();
+            Console.WriteLine("[PASS] TestCanonicalJsonControlSchemes");
+
+            TestNullSafetyWithoutCockpit();
+            Console.WriteLine("[PASS] TestNullSafetyWithoutCockpit");
         }
 
         public static void TestInputActionsFileAndBindings()
@@ -290,6 +303,134 @@ namespace TrishulSim.Input
             Assert(File.Exists(scenePath), "SplitScreen.unity must exist");
             string sceneContent = File.ReadAllText(scenePath, Encoding.UTF8);
             Assert(sceneContent.Contains("GamepadInputController"), "SplitScreen.unity must wire GamepadInputController on TraineeCockpitRoot");
+        }
+
+        public static void TestCockpitStatePreservationAndSync()
+        {
+            var cockpit = new CockpitController();
+            var mockRoot = new VisualElement { name = "cockpit-root" };
+            var controlsRow = new VisualElement { name = "controls-row" };
+            var ewPanel = new VisualElement { name = "ew-panel" };
+            var sliderAz = new SliderInt { name = "ew-azimuth", lowValue = 0, highValue = 359, value = 0 };
+            var sliderEl = new SliderInt { name = "ew-elevation", lowValue = -90, highValue = 90, value = 0 };
+            var dropdownBand = new DropdownField { name = "ew-band" };
+            var toggleEngage = new Toggle { name = "ew-engage", value = false };
+            var labelRoeWarning = new Label { name = "ew-roe-warning", text = "" };
+
+            ewPanel.Add(sliderAz);
+            ewPanel.Add(sliderEl);
+            ewPanel.Add(dropdownBand);
+            ewPanel.Add(toggleEngage);
+            ewPanel.Add(labelRoeWarning);
+            controlsRow.Add(ewPanel);
+            mockRoot.Add(controlsRow);
+
+            cockpit.BindElements(mockRoot);
+            Assert(cockpit.EwController != null, "EwController must be bound");
+
+            // 1. External state set (e.g. sentry moves UI sliders)
+            cockpit.SetEwParameters(247, 15, 2.4f, false);
+            Assert(cockpit.EwController.AzimuthDeg == 247, "EwController azimuth must be 247°");
+            Assert(cockpit.EwController.ElevationDeg == 15, "EwController elevation must be 15°");
+            Assert(Math.Abs(cockpit.EwController.SelectedBandGHz - 2.4f) < 0.01f, "EwController band must be 2.4 GHz");
+
+            var controller = new GamepadInputController();
+            controller.Cockpit = cockpit;
+            controller.SyncWithCockpitState();
+
+            Assert(Math.Abs(controller.CurrentAzimuth - 247f) < 0.001f, "Controller must sync azimuth to 247°");
+            Assert(controller.CurrentElevation == 15, "Controller must sync elevation to 15°");
+            Assert(Math.Abs(controller.CurrentBandGHz - 2.4f) < 0.01f, "Controller must sync band to 2.4 GHz");
+            Assert(!controller.CurrentEngaged, "Controller must sync engaged to false");
+
+            // 2. Trainee presses ToggleJammer (A button)
+            controller.ToggleJammer();
+            Assert(controller.CurrentEngaged == true, "Trainee engaged jammer");
+            Assert(cockpit.EwController.IsEngaged == true, "Cockpit EwController engaged must be true");
+            Assert(cockpit.EwController.AzimuthDeg == 247, "Azimuth must be preserved at 247°, not reset to 0°");
+            Assert(cockpit.EwController.ElevationDeg == 15, "Elevation must be preserved at 15°, not reset to 0°");
+
+            // 3. Trainee presses BandUp (Y button)
+            controller.StepBand(1);
+            Assert(Math.Abs(cockpit.EwController.SelectedBandGHz - 5.825f) < 0.01f, "BandUp from 2.4 must cycle to 5.825 GHz");
+            Assert(cockpit.EwController.AzimuthDeg == 247, "Azimuth must remain 247° after band step");
+            Assert(cockpit.EwController.ElevationDeg == 15, "Elevation must remain 15° after band step");
+
+            // 4. Trainee presses D-Pad Up (elevation +2°)
+            controller.ApplyElevationStep(1.0f);
+            Assert(cockpit.EwController.ElevationDeg == 17, "Elevation must step to 17°");
+            Assert(cockpit.EwController.AzimuthDeg == 247, "Azimuth must remain 247° after elevation step");
+
+            // 5. External change to azimuth via UI slider (e.g. to 310°)
+            cockpit.SetEwParameters(310, 17, 5.825f, true);
+            // Now stick nudges azimuth right (+1.0 -> +3°)
+            controller.ApplyAzimuthDelta(1.0f);
+            Assert(cockpit.EwController.AzimuthDeg == 313, "Azimuth must accumulate from 310° to 313°, not snap back to previous local angle");
+        }
+
+        public static void TestAzimuthBoundaryModuloPush()
+        {
+            var cockpit = new CockpitController();
+            var mockRoot = new VisualElement { name = "cockpit-root" };
+            var controlsRow = new VisualElement { name = "controls-row" };
+            var ewPanel = new VisualElement { name = "ew-panel" };
+            var sliderAz = new SliderInt { name = "ew-azimuth", lowValue = 0, highValue = 359, value = 0 };
+            var sliderEl = new SliderInt { name = "ew-elevation", lowValue = -90, highValue = 90, value = 0 };
+            var dropdownBand = new DropdownField { name = "ew-band" };
+            var toggleEngage = new Toggle { name = "ew-engage", value = false };
+            var labelRoeWarning = new Label { name = "ew-roe-warning", text = "" };
+
+            ewPanel.Add(sliderAz);
+            ewPanel.Add(sliderEl);
+            ewPanel.Add(dropdownBand);
+            ewPanel.Add(toggleEngage);
+            ewPanel.Add(labelRoeWarning);
+            controlsRow.Add(ewPanel);
+            mockRoot.Add(controlsRow);
+            cockpit.BindElements(mockRoot);
+
+            var controller = new GamepadInputController();
+            controller.Cockpit = cockpit;
+
+            // Step azimuth to exactly 359.7°
+            // Initial is 0; +119 full steps of 3° = 357°
+            for (int i = 0; i < 119; i++)
+            {
+                controller.ApplyAzimuthDelta(1.0f);
+            }
+            Assert(Math.Abs(controller.CurrentAzimuth - 357f) < 0.01f, "Azimuth at 357°");
+            // Add 0.9 deflection: 0.9 * 3 = 2.7° -> 359.7°
+            controller.ApplyAzimuthDelta(0.9f);
+            Assert(controller.CurrentAzimuth > 359.5f && controller.CurrentAzimuth < 360f, "Current azimuth must be in [359.5, 360)");
+            Assert(cockpit.EwController.AzimuthDeg == 0, "RoundToInt(359.7) wrapped via modulo must be 0, never 360");
+        }
+
+        public static void TestCanonicalJsonControlSchemes()
+        {
+            string json = GamepadInputController.CanonicalInputActionsJson;
+            Assert(json.Contains("\"controlSchemes\""), "CanonicalInputActionsJson must define controlSchemes");
+            Assert(json.Contains("\"name\": \"Gamepad\""), "CanonicalInputActionsJson must have Gamepad scheme");
+            Assert(json.Contains("\"name\": \"Keyboard\""), "CanonicalInputActionsJson must have Keyboard scheme");
+            Assert(json.Contains("<Gamepad>/leftStick/x"), "CanonicalInputActionsJson must bind leftStick/x");
+            Assert(json.Contains("<Keyboard>/a"), "CanonicalInputActionsJson must bind Keyboard a");
+        }
+
+        public static void TestNullSafetyWithoutCockpit()
+        {
+            var controller = new GamepadInputController();
+            controller.Cockpit = null;
+
+            // Verify none of these throw NullReferenceException
+            controller.ApplyAzimuthDelta(1.0f);
+            controller.ApplyElevationStep(1.0f);
+            controller.ApplyElevationStep(-1.0f);
+            controller.ToggleJammer();
+            controller.StepBand(1);
+            controller.StepBand(-1);
+            controller.TriggerFire();
+            controller.TriggerRecalibrate();
+            controller.PushStateToCockpit();
+            controller.SyncWithCockpitState();
         }
 
         private static void Assert(bool condition, string message)

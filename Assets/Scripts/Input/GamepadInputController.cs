@@ -116,6 +116,7 @@ namespace TrishulSim.Input
 
         private void Start()
         {
+            ResolveCockpit();
             SyncWithCockpitState();
             DetectConnectedGamepad();
         }
@@ -125,25 +126,50 @@ namespace TrishulSim.Input
             ResolveCockpit();
             InitializeInputActions();
             SubscribeActions();
+            DetectConnectedGamepad();
+#if UNITY_5_3_OR_NEWER
+            InputSystem.onDeviceChange -= HandleDeviceChange;
+            InputSystem.onDeviceChange += HandleDeviceChange;
+#endif
         }
 
         private void OnDisable()
         {
             UnsubscribeActions();
+#if UNITY_5_3_OR_NEWER
+            InputSystem.onDeviceChange -= HandleDeviceChange;
+#endif
+        }
+
+        private void OnDestroy()
+        {
+#if UNITY_5_3_OR_NEWER
+            if (runtimeActions != null)
+            {
+                UnityEngine.Object.Destroy(runtimeActions);
+                runtimeActions = null;
+            }
+#endif
         }
 
         private void Update()
         {
             ResolveCockpit();
 
-            float stickX = 0f;
 #if UNITY_5_3_OR_NEWER
+            if (runtimeActions == null)
+            {
+                InitializeInputActions();
+                SubscribeActions();
+            }
+
+            float stickX = 0f;
             if (jammerAzimuthAction != null)
             {
                 stickX = jammerAzimuthAction.ReadValue<float>();
             }
-#endif
             ApplyAzimuthDelta(stickX);
+#endif
         }
 
         // ══════════════════════════════════════════════════════
@@ -233,14 +259,13 @@ namespace TrishulSim.Input
             {
                 UnityEngine.Debug.Log(string.Format("[GamepadInput] Gamepad detected: {0}", Gamepad.current.displayName));
             }
-            InputSystem.onDeviceChange += HandleDeviceChange;
 #endif
         }
 
 #if UNITY_5_3_OR_NEWER
         private void HandleDeviceChange(InputDevice device, InputDeviceChange change)
         {
-            if (device is Gamepad && change == InputDeviceChange.Added)
+            if (device is Gamepad && (change == InputDeviceChange.Added || change == InputDeviceChange.Reconnected || change == InputDeviceChange.Enabled))
             {
                 UnityEngine.Debug.Log(string.Format("[GamepadInput] Gamepad detected: {0}", device.displayName));
             }
@@ -339,6 +364,19 @@ namespace TrishulSim.Input
         {
             if (UnityEngine.Mathf.Abs(stickX) > 0.05f)
             {
+                if (cockpit != null && cockpit.EwController != null)
+                {
+                    int cockpitAz = cockpit.EwController.AzimuthDeg;
+                    int localAzInt = ((UnityEngine.Mathf.RoundToInt(currentAzimuth) % 360) + 360) % 360;
+                    if (Math.Abs(cockpitAz - localAzInt) > 1)
+                    {
+                        currentAzimuth = cockpitAz;
+                    }
+                    currentElevation = cockpit.EwController.ElevationDeg;
+                    currentBandGHz = cockpit.EwController.SelectedBandGHz;
+                    currentEngaged = cockpit.EwController.IsEngaged;
+                }
+
                 currentAzimuth += stickX * azimuthSensitivity;
                 // Wrap 0-359°
                 currentAzimuth = ((currentAzimuth % 360f) + 360f) % 360f;
@@ -354,11 +392,25 @@ namespace TrishulSim.Input
         {
             if (val > 0.1f)
             {
+                if (cockpit != null && cockpit.EwController != null)
+                {
+                    currentAzimuth = cockpit.EwController.AzimuthDeg;
+                    currentElevation = cockpit.EwController.ElevationDeg;
+                    currentBandGHz = cockpit.EwController.SelectedBandGHz;
+                    currentEngaged = cockpit.EwController.IsEngaged;
+                }
                 currentElevation = UnityEngine.Mathf.Clamp(currentElevation + 2, -90, 90);
                 PushStateToCockpit();
             }
             else if (val < -0.1f)
             {
+                if (cockpit != null && cockpit.EwController != null)
+                {
+                    currentAzimuth = cockpit.EwController.AzimuthDeg;
+                    currentElevation = cockpit.EwController.ElevationDeg;
+                    currentBandGHz = cockpit.EwController.SelectedBandGHz;
+                    currentEngaged = cockpit.EwController.IsEngaged;
+                }
                 currentElevation = UnityEngine.Mathf.Clamp(currentElevation - 2, -90, 90);
                 PushStateToCockpit();
             }
@@ -380,7 +432,17 @@ namespace TrishulSim.Input
         /// </summary>
         public void ToggleJammer()
         {
-            currentEngaged = !currentEngaged;
+            if (cockpit != null && cockpit.EwController != null)
+            {
+                currentAzimuth = cockpit.EwController.AzimuthDeg;
+                currentElevation = cockpit.EwController.ElevationDeg;
+                currentBandGHz = cockpit.EwController.SelectedBandGHz;
+                currentEngaged = !cockpit.EwController.IsEngaged;
+            }
+            else
+            {
+                currentEngaged = !currentEngaged;
+            }
             PushStateToCockpit();
         }
 
@@ -390,6 +452,22 @@ namespace TrishulSim.Input
         /// </summary>
         public void StepBand(int direction)
         {
+            if (cockpit != null && cockpit.EwController != null)
+            {
+                currentAzimuth = cockpit.EwController.AzimuthDeg;
+                currentElevation = cockpit.EwController.ElevationDeg;
+                currentEngaged = cockpit.EwController.IsEngaged;
+
+                for (int i = 0; i < availableBands.Length; i++)
+                {
+                    if (UnityEngine.Mathf.Abs(availableBands[i] - cockpit.EwController.SelectedBandGHz) < 0.05f)
+                    {
+                        currentBandIndex = i;
+                        break;
+                    }
+                }
+            }
+
             if (direction > 0)
             {
                 currentBandIndex = (currentBandIndex + 1) % availableBands.Length;
@@ -422,8 +500,9 @@ namespace TrishulSim.Input
         {
             if (cockpit != null)
             {
+                int safeAzimuth = ((UnityEngine.Mathf.RoundToInt(currentAzimuth) % 360) + 360) % 360;
                 cockpit.SetEwParameters(
-                    UnityEngine.Mathf.RoundToInt(currentAzimuth),
+                    safeAzimuth,
                     currentElevation,
                     currentBandGHz,
                     currentEngaged
@@ -653,6 +732,30 @@ namespace TrishulSim.Input
                     ""action"": ""Recalibrate"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                }
+            ]
+        }
+    ],
+    ""controlSchemes"": [
+        {
+            ""name"": ""Gamepad"",
+            ""bindingGroup"": ""Gamepad"",
+            ""devices"": [
+                {
+                    ""devicePath"": ""<Gamepad>"",
+                    ""isOptional"": false,
+                    ""isOR"": false
+                }
+            ]
+        },
+        {
+            ""name"": ""Keyboard"",
+            ""bindingGroup"": ""Keyboard"",
+            ""devices"": [
+                {
+                    ""devicePath"": ""<Keyboard>"",
+                    ""isOptional"": false,
+                    ""isOR"": false
                 }
             ]
         }
