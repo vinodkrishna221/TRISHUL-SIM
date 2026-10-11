@@ -86,7 +86,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TrishulSim.Input.GamepadInputController
   cockpit: {fileID: 8446667284254712030}
   azimuthSensitivity: 3
-  inputActionsAsset: {fileID: 11400000, guid: 93b28c0296f54ab6c4b2b228c4500001, type: 2}
+  inputActionsAsset: {fileID: 0}
 --- !u!1 &200000000
 GameObject:
   m_ObjectHideFlags: 0

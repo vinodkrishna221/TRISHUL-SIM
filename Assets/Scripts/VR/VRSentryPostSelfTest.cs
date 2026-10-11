@@ -183,7 +183,7 @@ namespace TrishulSim.VR
             Assert(File.Exists(metaPath), "DarkConcrete.mat.meta must exist at " + metaPath);
 
             string yaml = File.ReadAllText(matPath, Encoding.UTF8);
-            Assert(yaml.Contains("guid: 933532a4fcc9baf4a8c42a048039a5ee"), "DarkConcrete.mat must use Universal Render Pipeline/Lit shader");
+            Assert(yaml.Contains("guid: 933532a4fcc9baf4fa0491de14d08ed7"), "DarkConcrete.mat must use Universal Render Pipeline/Lit shader");
             Assert(yaml.Contains("m_Name: DarkConcrete"), "Material name must be DarkConcrete");
 
             // Check base color values around 0.15
