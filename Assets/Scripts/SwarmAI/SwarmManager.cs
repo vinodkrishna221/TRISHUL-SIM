@@ -170,8 +170,9 @@ namespace TrishulSim.SwarmAI
         /// SA-P0-A Step 3: Seeds UnityEngine.Random.InitState(seed), spawns agentCount BoidAgent instances
         /// (first decoyCount marked as decoys with blue sphere tint, remaining as attackers with red sphere tint)
         /// in coherent formation, and binds the scenario tactic tree.
+        /// SA-P1-A Step 4: Passes WeatherPreset.temperature to SensorSuiteComputer for ISO 9613-1 correction.
         /// </summary>
-        public void OnScenarioStart(SwarmProfile profile, int seed, string scenarioId = "punjab-fog-pincer-01", Vector3? targetOrigin = null)
+        public void OnScenarioStart(SwarmProfile profile, int seed, string scenarioId = "punjab-fog-pincer-01", Vector3? targetOrigin = null, float? temperatureCelsius = null)
         {
             OnScenarioEnd();
 
@@ -227,13 +228,13 @@ namespace TrishulSim.SwarmAI
             {
                 _sensorSuiteComputer = new SensorSuiteComputer();
             }
-            _sensorSuiteComputer.ConfigureScenario(_currentScenarioId);
+            _sensorSuiteComputer.ConfigureScenario(_currentScenarioId, null, temperatureCelsius);
             _lastSensorReadings = _sensorSuiteComputer.ComputeSensorReadings(_agents.ToArray(), _antennaPosition);
         }
 
         /// <summary>
         /// SA-P0-A Step 3 & 4: Overload accepting SCENARIO_START JSON payload or ScenarioConfig JSON string.
-        /// Parses seed, scenarioId, and SwarmProfile, then spawns the seeded Boid flock.
+        /// Parses seed, scenarioId, WeatherPreset.temperature, and SwarmProfile, then spawns the seeded Boid flock.
         /// </summary>
         public void OnScenarioStart(string scenarioStartOrConfigJson, int seedOverride = -1)
         {
@@ -254,7 +255,10 @@ namespace TrishulSim.SwarmAI
                 profile = SwarmMock.GetPunjabProfile();
             }
 
-            OnScenarioStart(profile, parsedSeed, scenarioId, Vector3.zero);
+            float parsedTemp = ExtractJsonFloat(scenarioStartOrConfigJson ?? string.Empty, "temperature", float.NaN);
+            float? tempOverride = !float.IsNaN(parsedTemp) ? (float?)parsedTemp : null;
+
+            OnScenarioStart(profile, parsedSeed, scenarioId, Vector3.zero, tempOverride);
         }
 
         /// <summary>
@@ -353,6 +357,7 @@ namespace TrishulSim.SwarmAI
 
             SwarmProfile profile = null;
             SwarmAgentState[] agents = null;
+            float? parsedTempOverride = null;
 
             // Check if scenario JSON exists on disk in StreamingAssets
             string jsonPath = Path.Combine(Directory.GetCurrentDirectory(), "Assets", "StreamingAssets", "scenarios", _currentScenarioId + ".json");
@@ -362,6 +367,11 @@ namespace TrishulSim.SwarmAI
                 {
                     string jsonContent = File.ReadAllText(jsonPath);
                     profile = ParseProfileFromJson(jsonContent);
+                    float parsedTemp = ExtractJsonFloat(jsonContent, "temperature", float.NaN);
+                    if (!float.IsNaN(parsedTemp))
+                    {
+                        parsedTempOverride = parsedTemp;
+                    }
                 }
                 catch
                 {
@@ -415,6 +425,12 @@ namespace TrishulSim.SwarmAI
 
             _currentProfile = profile;
             LoadAgents(agents);
+
+            if (_sensorSuiteComputer == null)
+            {
+                _sensorSuiteComputer = new SensorSuiteComputer();
+            }
+            _sensorSuiteComputer.ConfigureScenario(_currentScenarioId, null, parsedTempOverride);
 
             // Bind HBT tactic tree via TacticTreeFactory (SA-P2-A core requirement)
             string tacticName = profile != null ? profile.tacticTree : "PINCER_LOW_FAST";
