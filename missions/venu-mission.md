@@ -213,7 +213,7 @@ DELIVERABLE:
 TEST:
   Punjab: 6 agents spawn ~300m out, flock toward origin. Decoys oscillate laterally at higher alt.
   Console: "PINCER SPLIT TRIGGERED" when lead attacker hits 150m mark.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---

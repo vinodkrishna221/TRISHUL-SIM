@@ -279,7 +279,7 @@ TEST:
 DEPENDS: SA-P0-A               UNBLOCKS: SA-P1-B-ii
 
 DEMO: "Plumbing for pincer split — all agents approaching in formation." (Beat 3 setup)
-PERSONA: swarm-ai builder     STATUS: [ ] todo
+PERSONA: swarm-ai builder     STATUS: [x] done
 ```
 
 ---

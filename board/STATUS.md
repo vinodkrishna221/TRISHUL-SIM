@@ -14,7 +14,7 @@
 | Track | Done | In flight | Next |
 |---|---|---|---|
 | unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B, US-P2-A, US-P2-B, US-P2-C | — | US-P2-D (Warden review coordination + smoke) |
-| swarm-ai | SA-P0-A, SA-P0-B, SA-P1-A, SA-P1-C, SA-P1-D, SA-P2-A, SA-P2-B (Burst pass) | — | SA-P1-B-i (HBT PINCER approach) / SA-P3-A (Demo seed tuning) |
+| swarm-ai | SA-P0-A, SA-P0-B, SA-P1-A, SA-P1-B-i, SA-P1-C, SA-P1-D, SA-P2-A, SA-P2-B (Burst pass) | — | SA-P1-B-ii (HBT PINCER execution + EW evasion) / SA-P3-A (Demo seed tuning) |
 | aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A, AA-P2-B | — | AA-P3-A (Partial-file guard) |
 | ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B, UX-P1-D, UX-P2-A | — | UX-P1-C (Split-screen) / UX-P2-B (Bilingual pass) |
 
@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-11T17:01 IST · Venu: SA-P1-B-i done — TacticTree base + TacticState enum, PincerLowFastTactic APPROACH + SPLIT_TRIGGER (~300m spawn, decoys at altitudeM+5m with seed-driven 15m/8s sinusoidal lateral oscillation, attackers at altitudeM with Boid weight modulation, "PINCER SPLIT TRIGGERED" console log at <=150m), SwarmManager RegisterTacticTree wiring; PincerApproachSelfTest PASSED
 - 2026-10-11T16:35 IST · Venu: SA-P1-A done — DopplerPhysics (ComputeBladeTipHz, 4-blade 343 m/s radial Doppler shift), AcousticPhysics (ComputeSplDb 85 dB SWL + ISO 9613-1 temperature correction, LogSumSpl dB energy addition), SensorSuiteComputer & SwarmManager WeatherPreset.temperature wiring; DopplerAcousticSelfTest PASSED
 - 2026-10-11T12:23 IST · Venu: SA-P0-B done — RfPhysics static class (ComputeFriisDbm, ComputeRadarReturnDbm), SensorSuiteComputer MonoBehaviour (rfWaterfallPeakDbm, rfWaterfallPeakGHz, radarDetectedCount > -90 dBm, P1 placeholders dopplerPeakHz=0.0f/acousticSplDb=0.0f), and SwarmManager registration + SCENARIO_TICK injection; RfPhysicsSelfTest PASSED
 - 2026-10-11T11:52 IST · Venu: SA-P0-A done — BoidAgent MonoBehaviour (all 13 Entity 2 fields, decoy RCS 0.08/9800 RPM blue sphere vs attacker RCS 0.012/11400 RPM red sphere), BoidFlockController Update() + 3 rules, SwarmManager OnScenarioStart(seed)/OnScenarioEnd()/InjectSwarmSnapshot() + WS lifecycle wiring, and SwarmAgentVisual.prefab; BoidsSpawnSelfTest PASSED
