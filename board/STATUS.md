@@ -17,6 +17,7 @@
 | swarm-ai | SA-P0-A, SA-P0-B, SA-P1-A, SA-P1-B-i, SA-P1-B-ii, SA-P1-C, SA-P1-D, SA-P2-A, SA-P2-B (Burst pass) | — | SA-P3-A (Demo seed tuning) |
 | aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A, AA-P2-B, AA-P3-A | — | — (Track complete) |
 | ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B, UX-P1-D, UX-P2-A | — | UX-P1-C (Split-screen) / UX-P2-B (Bilingual pass) |
+| vr-gamepad | VG-P1-A | — | VG-P1-B (3D Sentry Post) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
 
@@ -47,6 +48,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-11T16:35 IST · Vinod: VG-P1-A done — TrishulInputActions.inputactions + GamepadInputController wired to TraineeCockpitRoot & SplitScreen; Left stick ±3°/frame azimuth wrap, D-pad ±2° elevation clamp [-90,90], Right trigger SMASH fire, A toggle jammer, Y/X band cycle (2.4/5.825/0.915 GHz), Select OnRecalibrate event, keyboard fallbacks confirmed; GamepadInputSelfTest (11/11 suites) PASSED
 - 2026-10-11T17:22 IST · Venu: SA-P1-B-ii done — PincerLowFastTactic SPLIT/PINCER/DIVE_ATTACK/NEUTRALISED/EXCLUSION_BREACH states (decoy ±45° peel + 20m climb, Pair A 0° / Pair B 180° pincer, 5s post-split RF silence, 2m skim at <=50m, 20m EXCLUSION_BREACH), BoidAgent.CheckEvasion(EWJammerState) (±30° seed-alternated steer + 3s RF silence + freq hop), SwarmManager BroadcastScenarioEnd("ALL_NEUTRALISED" / "EXCLUSION_BREACH"); PincerExecutionSelfTest PASSED
 - 2026-10-11T17:01 IST · Venu: SA-P1-B-i done — TacticTree base + TacticState enum, PincerLowFastTactic APPROACH + SPLIT_TRIGGER (~300m spawn, decoys at altitudeM+5m with seed-driven 15m/8s sinusoidal lateral oscillation, attackers at altitudeM with Boid weight modulation, "PINCER SPLIT TRIGGERED" console log at <=150m), SwarmManager RegisterTacticTree wiring; PincerApproachSelfTest PASSED
 - 2026-10-11T16:35 IST · Venu: SA-P1-A done — DopplerPhysics (ComputeBladeTipHz, 4-blade 343 m/s radial Doppler shift), AcousticPhysics (ComputeSplDb 85 dB SWL + ISO 9613-1 temperature correction, LogSumSpl dB energy addition), SensorSuiteComputer & SwarmManager WeatherPreset.temperature wiring; DopplerAcousticSelfTest PASSED
