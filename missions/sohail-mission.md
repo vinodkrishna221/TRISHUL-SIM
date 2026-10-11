@@ -346,6 +346,76 @@ STATUS: [ ] todo
 
 ---
 
+## ⚡ NEW TRACK — `vr-gamepad` (added 11 Oct 2026)
+
+> Full phase plan → `plans/vr-gamepad-phase-plan.md`
+> You own: **VG-P1-D** (Phone gyroscope head tracking via WebSocket)
+> Budget: ~5h. Timeline: 11–18 Oct 2026.
+> **Depends on VG-P1-A (Vinod's Recalibrate event) and VG-P1-B (Vinod's 3D scene) being done first, though you can build Part A (HTML + PowerShell server) immediately.**
+
+### VG branch names (Sohail's)
+
+| Card | Branch |
+|---|---|
+| VG-P1-D | `feat/vr-gyro-head-tracking` |
+
+### WAITS-ON (Sohail's VG card)
+
+| Your card | Waits on | Mock path |
+|---|---|---|
+| VG-P1-D | VG-P1-A (OnRecalibrate event), VG-P1-B (VRRig/StereoHead exist) | Build `docs/vr-gyro-sender.html`, `docs/serve-gyro.ps1`, and `GyroReceiver.cs` standalone on an empty test Transform before VRRig lands |
+
+---
+
+### VG-P1-D · Phone gyroscope head tracking via WebSocket [timebox: 5h]
+```
+CONTEXT:
+  TWO parts:
+    A) Gyro sender — tiny HTML page served from laptop, opened in phone Chrome
+    B) Gyro receiver — WebSocket server in Unity (port 9800) rotating StereoHead
+
+  Files to read:
+    • Assets/Scripts/Network/WsServer.cs (copy the HttpListener pattern for port 9800)
+    • board/contracts/websocket-ipc.md (confirm port 9700 is game IPC; 9800 is free)
+    • plans/vr-gamepad-phase-plan.md VG-P1-D CONTEXT (full HTML code + PowerShell server)
+
+  Steps:
+    PART A — create docs/vr-gyro-sender.html (WebSocket client sending {a,b,g} on deviceorientation)
+             create docs/serve-gyro.ps1 (PowerShell HttpListener serving the HTML on :8080,
+             auto-replacing LAPTOP_IP with actual IP)
+    PART B — create Assets/Scripts/VR/GyroReceiver.cs MonoBehaviour on VRRig:
+      - WebSocket server on port 9800 (same HttpListener pattern as WsServer.cs)
+      - Parse {a=alpha/yaw, b=beta/pitch, g=gamma/roll}
+      - targetRot = Quaternion.Euler(-b + pitchOffset, a - yawOffset, -g)
+      - StereoHead.localRotation = Quaternion.Slerp(current, targetRot, 15f * Time.deltaTime)
+      - Calibrate: on GamepadInputController.OnRecalibrate event → zero offsets to current angles
+      - No message for 2s → hold last rotation, log [GyroReceiver] DISCONNECTED
+      - public bool IsConnected (used by VG-P1-E for status badge)
+    Wire: in GamepadInputController Recalibrate.performed → OnRecalibrate?.Invoke()
+          in GyroReceiver.Start() → subscribe to GamepadInputController.OnRecalibrate
+
+DELIVERABLE:
+  docs/vr-gyro-sender.html
+  docs/serve-gyro.ps1
+  Assets/Scripts/VR/GyroReceiver.cs
+  GamepadInputController.cs updated (OnRecalibrate event)
+  GyroReceiver component on VRRig in VRSentryPost.unity
+
+TEST:
+  Run serve-gyro.ps1 → phone Chrome → http://LAPTOP_IP:8080 → tap TRACKING.
+  Console: [GyroReceiver] Client connected from PHONE_IP.
+  Rotate phone → StereoHead rotates in Scene view.
+  Press Select on gamepad → rotation resets to forward.
+  Kill phone connection → no NullRef; last rotation held.
+
+DEPENDS: VG-P1-A (OnRecalibrate event), VG-P1-B (VRRig/StereoHead exist)
+UNBLOCKS: VG-P1-E (IsConnected used for status badge)
+DEMO: "Trainee turns head — radar scope follows left. Acoustic sonar follows right." (Beat 3)
+PERSONA: Sohail (aar-engine)   STATUS: [ ] todo
+```
+
+---
+
 ## Sync expectations
 
 - **Push AA-P0-A the same day as Vinod's US-P0-C lands** — Rani needs NDJSON shape frozen for UX-P0-A stub.
@@ -353,6 +423,7 @@ STATUS: [ ] todo
 - **Push AA-P1-B immediately** — Rajeswari needs TimelinePlaybackController.SetScrubPosition().
 - **If Uday's SA-P1-C/D are delayed:** Test scorer with AarTestFixture (hard-coded TelemetryRecord list).
 - **PRs:** Tag Rajeswari as reviewer for AA-P1-A/B (she consumes your API directly).
+- **VG-P1-D:** Start Part A (`vr-gyro-sender.html` + `serve-gyro.ps1`) immediately; wire to `VRRig` once Vinod's VG-P1-B lands. Tag Vinod in PR.
 
 ---
 

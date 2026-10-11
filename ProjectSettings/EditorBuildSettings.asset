@@ -15,4 +15,6 @@ EditorBuildSettings:
     path: Assets/Scenes/TraineeCockpit.unity
     guid: b1b2c3d4e5f647898a1b2c3d4e5f6002
   m_configObjects:
+    com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 302c07966934cbc4ea7529d37b8290da, type: 2}
     xr.sdk.mock-hmd.settings: {fileID: 11400000, guid: e1a5df835e611c44bb6bc9b5c2ec9b32, type: 2}

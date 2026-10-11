@@ -11,6 +11,7 @@
 //          OnLocaleChanged subscription rebinds all label text.
 // ============================================================
 
+using System;
 using UnityEngine;
 using UnityEngine.UIElements;
 using System.Collections.Generic;
@@ -65,8 +66,60 @@ namespace TrishulSim.UI
             var uiDoc = GetComponent<UIDocument>();
             if (uiDoc != null)
             {
+#if UNITY_5_3_OR_NEWER
+                if (uiDoc.panelSettings == null)
+                {
+#if UNITY_EDITOR
+                    uiDoc.panelSettings = UnityEditor.AssetDatabase.LoadAssetAtPath<PanelSettings>("Assets/UI/DefaultPanelSettings.asset");
+#endif
+                    if (uiDoc.panelSettings == null)
+                        uiDoc.panelSettings = Resources.Load<PanelSettings>("UI/DefaultPanelSettings");
+                    if (uiDoc.panelSettings == null)
+                    {
+                        uiDoc.panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
+                        uiDoc.panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+                        uiDoc.panelSettings.referenceResolution = new Vector2Int(1920, 1080);
+                        uiDoc.panelSettings.match = 0.5f;
+                    }
+                }
+                if (uiDoc.visualTreeAsset == null)
+                {
+#if UNITY_EDITOR
+                    uiDoc.visualTreeAsset = UnityEditor.AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/InstructorC2.uxml");
+#endif
+                    if (uiDoc.visualTreeAsset == null)
+                        uiDoc.visualTreeAsset = Resources.Load<VisualTreeAsset>("UI/InstructorC2");
+                }
+#endif
                 root = uiDoc.rootVisualElement;
+#if UNITY_5_3_OR_NEWER
+                if (root != null && root.childCount == 0 && uiDoc.visualTreeAsset != null)
+                {
+                    uiDoc.visualTreeAsset.CloneTree(root);
+                }
+#endif
                 BindElements();
+            }
+        }
+
+        private void OnEnable()
+        {
+            var uiDoc = GetComponent<UIDocument>();
+            if (uiDoc != null)
+            {
+                if (root == null || root.childCount == 0 || appTitle == null)
+                {
+                    root = uiDoc.rootVisualElement;
+#if UNITY_5_3_OR_NEWER
+                    if (root != null && root.childCount == 0 && uiDoc.visualTreeAsset != null)
+                    {
+                        uiDoc.visualTreeAsset.CloneTree(root);
+                    }
+#endif
+                    BindElements();
+                    PopulateScenarioDropdown();
+                    RegisterCallbacks();
+                }
             }
         }
 
@@ -76,14 +129,51 @@ namespace TrishulSim.UI
             RegisterCallbacks();
 
             // ── UX-P0-B: Subscribe to locale changes ──────────
-            LocaleToggle.Instance.OnLocaleChanged += OnLocaleChanged;
-            RefreshLocalizedLabels();
+            if (LocaleToggle.Instance != null)
+            {
+                LocaleToggle.Instance.OnLocaleChanged += OnLocaleChanged;
+                RefreshLocalizedLabels();
+            }
 
-            // ── MOCK PATH (US-P0-A not merged) ──────────────
-            // Stub: simulate connected state for editor testing.
-            // Remove this block once US-P0-A (WsServer) is merged.
+#if UNITY_5_3_OR_NEWER
+            if (TrishulSim.Scenarios.ScenarioManager.Instance != null)
+            {
+                var sm = TrishulSim.Scenarios.ScenarioManager.Instance;
+                if (sm.CurrentMode == TrishulSim.Scenarios.OperationMode.SingleLaptopSplit || (sm.Server != null && sm.Server.ConnectedCount > 0))
+                {
+                    OnClientConnected();
+                }
+
+                if (sm.Server != null)
+                {
+                    sm.Server.OnClientConnected += () => OnClientConnected();
+                    sm.Server.OnClientDisconnected += () =>
+                    {
+                        if (sm.Server.ConnectedCount == 0 && sm.CurrentMode != TrishulSim.Scenarios.OperationMode.SingleLaptopSplit)
+                            OnClientDisconnected();
+                    };
+                }
+
+                sm.OnScorecardReceived += (env) =>
+                {
+                    if (!string.IsNullOrEmpty(env.payload))
+                    {
+                        try
+                        {
+                            var sc = ScorecardMock.GetPunjabFixture();
+                            sc.sessionId = sm.CurrentSessionId;
+                            OnScorecardReceived(sc);
+                        }
+                        catch { }
+                    }
+                };
+            }
+            else
+            {
 #if UNITY_EDITOR
-            SimulateConnection();
+                SimulateConnection();
+#endif
+            }
 #endif
         }
 
@@ -107,6 +197,26 @@ namespace TrishulSim.UI
 
             if (root == null)
                 return;
+
+#if UNITY_5_3_OR_NEWER
+            bool isSplit = FindAnyObjectByType<CockpitController>() != null || 
+                (TrishulSim.Scenarios.ScenarioManager.Instance != null && TrishulSim.Scenarios.ScenarioManager.Instance.CurrentMode == TrishulSim.Scenarios.OperationMode.SingleLaptopSplit);
+            if (isSplit)
+            {
+                root.style.width = Length.Percent(50);
+                root.style.height = Length.Percent(100);
+                root.style.position = Position.Absolute;
+                root.style.left = 0;
+                root.style.top = 0;
+
+                var container = root.Q<VisualElement>(className: "c2-root");
+                if (container != null)
+                {
+                    container.style.width = Length.Percent(100);
+                    container.style.height = Length.Percent(100);
+                }
+            }
+#endif
 
             appTitle           = root.Q<Label>("app-title");
             linkStatusIcon     = root.Q<VisualElement>("link-status-icon");
@@ -143,22 +253,36 @@ namespace TrishulSim.UI
         /// </summary>
         public void PopulateScenarioDropdown()
         {
-            // ── MOCK: Hard-coded scenarios (US-P0-B not merged) ──
-            // Replace with ScenarioLibrary.LoadAll() once available.
-            scenarioNames = new List<string>
+#if UNITY_5_3_OR_NEWER
+            if (TrishulSim.Scenarios.ScenarioManager.Instance != null && TrishulSim.Scenarios.ScenarioManager.Instance.Scenarios != null && TrishulSim.Scenarios.ScenarioManager.Instance.Scenarios.Count > 0)
             {
-                "Punjab Border — Zero Visibility Pincer",
-                "Rajasthan Desert FOB — Saturation Dive",
-                "Siachen Glacier Post — High-Alt Swarm",
-                "Andaman Coastal Battery — Maritime Multi-Axis"
-            };
-            scenarioIds = new List<string>
+                scenarioNames.Clear();
+                scenarioIds.Clear();
+                for (int i = 0; i < TrishulSim.Scenarios.ScenarioManager.Instance.Scenarios.Count; i++)
+                {
+                    var sc = TrishulSim.Scenarios.ScenarioManager.Instance.Scenarios[i];
+                    scenarioNames.Add(sc.name);
+                    scenarioIds.Add(sc.id);
+                }
+            }
+            else
+#endif
             {
-                "punjab-fog-pincer-01",
-                "rajasthan-desert-fob-01",
-                "siachen-glacier-01",
-                "andaman-coastal-01"
-            };
+                scenarioNames = new List<string>
+                {
+                    "Punjab Border — Zero Visibility Pincer",
+                    "Rajasthan Desert FOB — Saturation Dive",
+                    "Siachen Glacier Post — High-Alt Swarm",
+                    "Andaman Coastal Battery — Maritime Multi-Axis"
+                };
+                scenarioIds = new List<string>
+                {
+                    "punjab-fog-pincer-01",
+                    "rajasthan-desert-fob-01",
+                    "siachen-glacier-01",
+                    "andaman-coastal-01"
+                };
+            }
 
             if (scenarioDropdown != null)
             {
@@ -205,7 +329,6 @@ namespace TrishulSim.UI
 
         /// <summary>
         /// Launch the selected scenario.
-        /// MOCK: logs to console until ScenarioManager is available.
         /// </summary>
         public void OnLaunchClicked()
         {
@@ -218,20 +341,50 @@ namespace TrishulSim.UI
             string traineeId = traineeIdField != null ? traineeIdField.value : "";
             Debug.Log(string.Format("[C2] LAUNCH: scenario={0}, trainee={1}", selectedScenarioId, traineeId));
 
-            // TODO: Replace with ScenarioManager.LaunchScenario(selectedScenarioId)
-            // once US-P0-B is merged.
+#if UNITY_5_3_OR_NEWER
+            if (TrishulSim.Scenarios.ScenarioManager.Instance != null)
+            {
+                TrishulSim.Scenarios.ScenarioConfig cfg = null;
+                var scs = TrishulSim.Scenarios.ScenarioManager.Instance.Scenarios;
+                if (scs != null)
+                {
+                    for (int i = 0; i < scs.Count; i++)
+                    {
+                        if (string.Equals(scs[i].id, selectedScenarioId, StringComparison.OrdinalIgnoreCase))
+                        {
+                            cfg = scs[i];
+                            break;
+                        }
+                    }
+                    if (cfg == null && scs.Count > 0)
+                    {
+                        int idx = scenarioDropdown != null ? scenarioDropdown.index : 0;
+                        if (idx >= 0 && idx < scs.Count)
+                            cfg = scs[idx];
+                        else
+                            cfg = scs[0];
+                    }
+                }
+                if (cfg != null)
+                {
+                    TrishulSim.Scenarios.ScenarioManager.Instance.LaunchScenario(cfg);
+                }
+            }
+#endif
         }
 
         /// <summary>
         /// Abort the running scenario.
-        /// MOCK: logs to console until ScenarioManager is available.
         /// </summary>
         public void OnAbortClicked()
         {
             Debug.Log("[C2] ABORT requested by Instructor.");
-
-            // TODO: Replace with ScenarioManager.BroadcastScenarioEnd("INSTRUCTOR_ABORT")
-            // once US-P0-B is merged.
+#if UNITY_5_3_OR_NEWER
+            if (TrishulSim.Scenarios.ScenarioManager.Instance != null)
+            {
+                TrishulSim.Scenarios.ScenarioManager.Instance.BroadcastScenarioEnd("INSTRUCTOR_ABORT");
+            }
+#endif
         }
 
         /// <summary>
