@@ -17,7 +17,7 @@
 | swarm-ai | SA-P0-A, SA-P0-B, SA-P1-A, SA-P1-B-i, SA-P1-B-ii, SA-P1-C, SA-P1-D, SA-P2-A, SA-P2-B (Burst pass) | — | SA-P3-A (Demo seed tuning) |
 | aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A, AA-P2-B, AA-P3-A | — | — (Track complete) |
 | ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B, UX-P1-D, UX-P2-A | — | UX-P1-C (Split-screen) / UX-P2-B (Bilingual pass) |
-| vr-gamepad | VG-P1-A | — | VG-P1-B (3D Sentry Post) |
+| vr-gamepad | VG-P1-A, VG-P1-B | — | VG-P1-C (Floating 3D Sensor HUD) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
 
@@ -48,6 +48,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-11T18:45 IST · Vinod: VG-P1-B done — 3D Nighttime Sentry Post scene (Assets/Scenes/VRSentryPost.unity) registered in EditorBuildSettings at index 3; Full-moon lighting (Directional Light Moonlight #C8D8E8, 0.3 intensity, soft shadows), Procedural SkyboxNight.mat, DarkConcrete.mat watchtower platform (20x20m ground quad + 4 cylindrical posts + 4 rails), VRRig stereo rig with LeftEye/RightEye camera viewport halves (0,0,0.5,1 and 0.5,0,0.5,1, IPD 0.064m), AudioListener & GamepadInputController wired; RenderSettings ExponentialSquared fog (#12122A, density 0.03); VRSentryPostSelfTest (14/14 suites) PASSED
 - 2026-10-11T16:35 IST · Vinod: VG-P1-A done — TrishulInputActions.inputactions + GamepadInputController wired to TraineeCockpitRoot & SplitScreen; Left stick ±3°/frame azimuth wrap, D-pad ±2° elevation clamp [-90,90], Right trigger SMASH fire, A toggle jammer, Y/X band cycle (2.4/5.825/0.915 GHz), Select OnRecalibrate event, keyboard fallbacks confirmed; GamepadInputSelfTest (11/11 suites) PASSED
 - 2026-10-11T17:22 IST · Venu: SA-P1-B-ii done — PincerLowFastTactic SPLIT/PINCER/DIVE_ATTACK/NEUTRALISED/EXCLUSION_BREACH states (decoy ±45° peel + 20m climb, Pair A 0° / Pair B 180° pincer, 5s post-split RF silence, 2m skim at <=50m, 20m EXCLUSION_BREACH), BoidAgent.CheckEvasion(EWJammerState) (±30° seed-alternated steer + 3s RF silence + freq hop), SwarmManager BroadcastScenarioEnd("ALL_NEUTRALISED" / "EXCLUSION_BREACH"); PincerExecutionSelfTest PASSED
 - 2026-10-11T17:01 IST · Venu: SA-P1-B-i done — TacticTree base + TacticState enum, PincerLowFastTactic APPROACH + SPLIT_TRIGGER (~300m spawn, decoys at altitudeM+5m with seed-driven 15m/8s sinusoidal lateral oscillation, attackers at altitudeM with Boid weight modulation, "PINCER SPLIT TRIGGERED" console log at <=150m), SwarmManager RegisterTacticTree wiring; PincerApproachSelfTest PASSED

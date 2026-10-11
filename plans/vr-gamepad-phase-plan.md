@@ -166,7 +166,7 @@ TEST:
 DEPENDS: VG-P1-A (GamepadInputController to attach)   UNBLOCKS: VG-P1-C (HUD panels need rig), VG-P1-D (GyroReceiver attaches to VRRig)
 
 DEMO: "In the dark. No flashlight. Only sensor glow." (Beat 4 atmosphere)
-PERSONA: Vinod (unity-sim)   STATUS: [ ] todo
+PERSONA: Vinod (unity-sim)   STATUS: [x] done — 2026-10-11 (verified with VRSentryPostSelfTest PASS)
 ```
 
 ---
