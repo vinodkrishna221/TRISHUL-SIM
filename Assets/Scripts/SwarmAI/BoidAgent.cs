@@ -1,10 +1,11 @@
 // ============================================================
-// BoidAgent.cs — Per-Agent Boid Component & SwarmAgentState Mirror
-// TRISHUL-SIM · SA-P0-A · swarm-ai track (Venu)
+// BoidAgent.cs — Per-Agent Boid Component, SwarmAgentState Mirror & EW Evasion
+// TRISHUL-SIM · SA-P0-A / SA-P1-B-ii · swarm-ai track (Venu)
 //
 // MonoBehaviour per swarm agent holding all Entity 2 SwarmAgentState fields,
-// initializing decoy/attacker signatures from SwarmProfile, and driving
-// the visual sphere representation (red = attacker, blue = decoy).
+// initializing decoy/attacker signatures from SwarmProfile, executing dynamic
+// EW evasion (seed-alternated ±30° heading steer + 3s RF silence + frequency hop),
+// and driving the visual sphere representation (red = attacker, blue = decoy).
 // Contract: board/contracts/scenario-events.md, docs/SCHEMA.md Entity 2
 // ============================================================
 
@@ -75,9 +76,9 @@ namespace UnityEngine
 namespace TrishulSim.SwarmAI
 {
     /// <summary>
-    /// MonoBehaviour per swarm agent (SA-P0-A Step 1).
-    /// Holds all required Entity 2 SwarmAgentState fields and manages
-    /// decoy (blue sphere, RCS 0.08, 9800 RPM) vs attacker (red sphere, RCS 0.012, 11400 RPM) state.
+    /// MonoBehaviour per swarm agent (SA-P0-A Step 1 & SA-P1-B-ii Step 2).
+    /// Holds all required Entity 2 SwarmAgentState fields, manages decoy vs attacker state,
+    /// and executes dynamic EW evasion (CheckEvasion: ±30° steer, 3s RF silence, frequency-hop).
     /// </summary>
     public class BoidAgent : MonoBehaviour
     {
@@ -86,6 +87,11 @@ namespace TrishulSim.SwarmAI
         public const float ATTACKER_RCS_M2 = 0.012f;
         public const int DECOY_PROPELLER_RPM = 9800;
         public const int ATTACKER_PROPELLER_RPM = 11400;
+
+        // ── SA-P1-B-ii EW Evasion Constants ──────────────────────────────
+        public const float EW_EVASION_CONE_HALF_ANGLE_DEG = 15.0f;
+        public const float EW_EVASION_STEER_OFFSET_DEG = 30.0f;
+        public const float EW_EVASION_SILENCE_DURATION_SEC = 3.0f;
 
         public static readonly Color AttackerTintColor = new Color(0.95f, 0.15f, 0.15f, 1.0f); // Red = Attacker
         public static readonly Color DecoyTintColor = new Color(0.15f, 0.45f, 0.95f, 1.0f);    // Blue = Decoy
@@ -106,10 +112,15 @@ namespace TrishulSim.SwarmAI
         public bool isNeutralised = false;
         [NonSerialized] public long? neutralisedAtMs = null;
 
-        // ── Visual & Backing State ───────────────────────────────────────
+        // ── Seed, Visual & EW Evasion Backing State ──────────────────────
+        public int agentSeed = 42819;
         private SwarmAgentState _linkedState;
         private Color _visualColor = AttackerTintColor;
         private float _ewSilentTimerSec = 0f;
+        private int _evasionHopCount = 0;
+        private float[] _availableFreqGHz = new float[] { 5.825f, 2.4f };
+
+        public event Action<BoidAgent, long> OnAgentNeutralised;
 
         public Color VisualColor
         {
@@ -119,6 +130,16 @@ namespace TrishulSim.SwarmAI
         public SwarmAgentState LinkedState
         {
             get { return _linkedState; }
+        }
+
+        public float EwSilentRemainingSec
+        {
+            get { return _ewSilentTimerSec; }
+        }
+
+        public int EvasionHopCount
+        {
+            get { return _evasionHopCount; }
         }
 
         /// <summary>
@@ -132,10 +153,12 @@ namespace TrishulSim.SwarmAI
             SwarmProfile profile,
             Vector3 spawnPosition,
             Vector3 initialVelocity,
-            SwarmAgentState linkedState = null)
+            SwarmAgentState linkedState = null,
+            int seed = 42819)
         {
             agentId = "agent-" + index;
             isDecoy = decoy;
+            agentSeed = seed;
 
             float baseAlt = profile != null ? profile.altitudeM : 8.0f;
             altitudeM = spawnPosition.y > 0.001f ? spawnPosition.y : baseAlt;
@@ -148,10 +171,12 @@ namespace TrishulSim.SwarmAI
 
             if (profile != null && profile.rfFreqGHz != null && profile.rfFreqGHz.Length > 0)
             {
-                rfFreqGHz = profile.rfFreqGHz[0];
+                _availableFreqGHz = (float[])profile.rfFreqGHz.Clone();
+                rfFreqGHz = _availableFreqGHz[0];
             }
             else
             {
+                _availableFreqGHz = new float[] { 5.825f, 2.4f };
                 rfFreqGHz = decoy ? 2.4f : 5.825f;
             }
 
@@ -173,6 +198,7 @@ namespace TrishulSim.SwarmAI
             isNeutralised = false;
             neutralisedAtMs = null;
             _ewSilentTimerSec = 0f;
+            _evasionHopCount = 0;
 
             _linkedState = linkedState ?? new SwarmAgentState();
             SyncToState(_linkedState);
@@ -189,6 +215,32 @@ namespace TrishulSim.SwarmAI
 
             _linkedState = state;
             SyncFromState(state);
+        }
+
+        /// <summary>
+        /// SA-P1-B-ii Step 3: Neutralises this agent, stopping movement, zeroing propellerRpm,
+        /// suppressing RF emission, recording neutralisedAtMs, and notifying SwarmManager.
+        /// </summary>
+        public void Neutralise(long currentTimeMs)
+        {
+            isNeutralised = true;
+            neutralisedAtMs = currentTimeMs;
+            velocityMs = Vector3.zero;
+            propellerRpm = 0;
+            rfEmitting = false;
+            _ewSilentTimerSec = 0f;
+            _visualColor = NeutralisedTintColor;
+
+            if (_linkedState != null)
+            {
+                SyncToState(_linkedState);
+            }
+            UpdateVisualTransformAndTint();
+
+            if (OnAgentNeutralised != null)
+            {
+                OnAgentNeutralised(this, currentTimeMs);
+            }
         }
 
         /// <summary>
@@ -238,6 +290,9 @@ namespace TrishulSim.SwarmAI
 
             if (isNeutralised)
             {
+                velocityMs = Vector3.zero;
+                propellerRpm = 0;
+                rfEmitting = false;
                 _visualColor = NeutralisedTintColor;
             }
             else
@@ -262,13 +317,32 @@ namespace TrishulSim.SwarmAI
         }
 
         /// <summary>
-        /// Evaluates dynamic EW jammer evasion on this agent (SA-P1-B-ii hook).
-        /// If jammer is engaged and within 15° of agent bearing, steers ±30° off heading and suppresses RF for 3s.
+        /// SA-P1-B-ii Step 2: Evaluates dynamic EW jammer evasion on this agent.
+        /// If ewJammerState.engaged == true AND bearingDeg is within 15° of agent bearing:
+        /// steers ±30° off current heading (seed-alternated), sets rfEmitting = false for 3s,
+        /// and performs frequency-hop across available RF bands.
         /// </summary>
-        public bool CheckEvasion(EWJammerState ew, Vector3 originPos = default(Vector3), float deltaTime = 0.1f)
+        public bool CheckEvasion(EWJammerState ew)
+        {
+            return CheckEvasion(ew, Vector3.zero, 0.1f, null);
+        }
+
+        /// <summary>
+        /// Evaluates dynamic EW jammer evasion with configurable origin, deltaTime, and optional seed override.
+        /// </summary>
+        public bool CheckEvasion(EWJammerState ew, Vector3 originPos, float deltaTime = 0.1f, int? seedOverride = null)
         {
             if (isNeutralised)
+            {
+                velocityMs = Vector3.zero;
+                propellerRpm = 0;
+                rfEmitting = false;
+                if (_linkedState != null)
+                {
+                    SyncToState(_linkedState);
+                }
                 return false;
+            }
 
             if (_ewSilentTimerSec > 0f)
             {
@@ -278,28 +352,55 @@ namespace TrishulSim.SwarmAI
                     _ewSilentTimerSec = 0f;
                     rfEmitting = true;
                 }
+                else
+                {
+                    rfEmitting = false;
+                }
             }
 
             if (ew == null || !ew.engaged)
+            {
+                if (_linkedState != null)
+                {
+                    SyncToState(_linkedState);
+                }
                 return false;
+            }
 
             Vector3 fromOrigin = positionWorld - originPos;
             float agentBearing = ComputeHeadingDeg(fromOrigin);
             float angularDiff = EwDeconfliction.ComputeAngularDistance(ew.bearingDeg, agentBearing);
 
-            if (angularDiff <= 15.0f)
+            if (angularDiff <= EW_EVASION_CONE_HALF_ANGLE_DEG)
             {
-                float steerSign = (agentId != null && (agentId.GetHashCode() & 1) == 0) ? 1.0f : -1.0f;
-                float steerRad = (30.0f * steerSign) * ((float)Math.PI / 180.0f);
-                float cosA = (float)Math.Cos(steerRad);
-                float sinA = (float)Math.Sin(steerRad);
+                int seedVal = seedOverride.HasValue ? seedOverride.Value : agentSeed;
+                int agentIdx = ParseAgentIndex(agentId);
+                bool steerRight = (((seedVal + agentIdx + _evasionHopCount) & 1) == 0);
+                float steerSign = steerRight ? 1.0f : -1.0f;
+                float steerOffsetDeg = EW_EVASION_STEER_OFFSET_DEG * steerSign;
+                _evasionHopCount++;
 
-                float vx = (velocityMs.x * cosA) + (velocityMs.z * sinA);
-                float vz = (-velocityMs.x * sinA) + (velocityMs.z * cosA);
+                float horizSpeed = (float)Math.Sqrt((velocityMs.x * velocityMs.x) + (velocityMs.z * velocityMs.z));
+                if (horizSpeed < 0.001f)
+                {
+                    horizSpeed = 120.0f / 3.6f;
+                }
+
+                float currentHeading = (velocityMs.sqrMagnitude > 0.0001f)
+                    ? ComputeHeadingDeg(velocityMs)
+                    : headingDeg;
+                float newHeadingDeg = NormalizeAngle360(currentHeading + steerOffsetDeg);
+                float newHeadingRad = newHeadingDeg * ((float)Math.PI / 180.0f);
+
+                float vx = (float)Math.Sin(newHeadingRad) * horizSpeed;
+                float vz = (float)Math.Cos(newHeadingRad) * horizSpeed;
                 velocityMs = new Vector3(vx, velocityMs.y, vz);
-                headingDeg = ComputeHeadingDeg(velocityMs);
+                headingDeg = newHeadingDeg;
+
+                // Suppress RF for 3s and frequency-hop (SA-P1-B-ii Step 2)
                 rfEmitting = false;
-                _ewSilentTimerSec = 3.0f;
+                _ewSilentTimerSec = EW_EVASION_SILENCE_DURATION_SEC;
+                HopFrequency();
 
                 if (_linkedState != null)
                 {
@@ -308,7 +409,51 @@ namespace TrishulSim.SwarmAI
                 return true;
             }
 
+            if (_linkedState != null)
+            {
+                SyncToState(_linkedState);
+            }
             return false;
+        }
+
+        private void HopFrequency()
+        {
+            if (_availableFreqGHz != null && _availableFreqGHz.Length > 1)
+            {
+                for (int i = 0; i < _availableFreqGHz.Length; i++)
+                {
+                    if (Math.Abs(_availableFreqGHz[i] - rfFreqGHz) > 0.01f)
+                    {
+                        rfFreqGHz = _availableFreqGHz[i];
+                        return;
+                    }
+                }
+            }
+
+            // Fallback dual-band hop between 5.825 GHz and 2.4 GHz
+            rfFreqGHz = (Math.Abs(rfFreqGHz - 5.825f) < 0.1f) ? 2.4f : 5.825f;
+        }
+
+        private static int ParseAgentIndex(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+                return 0;
+            int dash = id.LastIndexOf('-');
+            if (dash >= 0 && dash + 1 < id.Length)
+            {
+                int parsed;
+                if (int.TryParse(id.Substring(dash + 1), out parsed))
+                    return parsed;
+            }
+            return Math.Abs(id.GetHashCode()) & 0x7FFF;
+        }
+
+        private static float NormalizeAngle360(float deg)
+        {
+            float mod = deg % 360.0f;
+            if (mod < 0.0f)
+                mod += 360.0f;
+            return mod;
         }
 
         /// <summary>

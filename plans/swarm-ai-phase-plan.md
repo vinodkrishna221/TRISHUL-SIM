@@ -335,7 +335,7 @@ TEST:
 DEPENDS: SA-P1-B-i             UNBLOCKS: UX-P1-B (EW + SMASH controls become meaningful), SA-P1-C
 
 DEMO: ⭐ "4 FPV munitions executing low-level pincer in pitch-black fog — the wow moment." (Beat 4)
-PERSONA: swarm-ai builder     STATUS: [ ] todo
+PERSONA: swarm-ai builder     STATUS: [x] done
 ```
 
 ---

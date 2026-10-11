@@ -42,6 +42,9 @@ namespace TrishulSim.SwarmAI
         private List<BoidAgent> _boidAgents;
         private bool _allNeutralised;
         private long? _allNeutralisedAtMs;
+        private bool _exclusionBreached;
+        private long? _exclusionBreachedAtMs;
+        private string _lastScenarioEndReason;
         private TacticTree _currentTactic;
         private SwarmProfile _currentProfile;
         private string _currentScenarioId;
@@ -53,6 +56,8 @@ namespace TrishulSim.SwarmAI
         public GameObject swarmAgentPrefab;
         public event Action<SwarmAgentState[]> OnSwarmSnapshotInjected;
         public event Action<SensorReadings> OnSensorReadingsInjected;
+        public event Action<string> OnScenarioEndTriggered;
+        public Action<string> ScenarioEndBroadcaster { get; set; }
 
         public IReadOnlyList<BoidAgent> BoidAgents
         {
@@ -103,6 +108,21 @@ namespace TrishulSim.SwarmAI
             get { return _allNeutralisedAtMs; }
         }
 
+        public bool ExclusionBreached
+        {
+            get { return _exclusionBreached; }
+        }
+
+        public long? ExclusionBreachedAtMs
+        {
+            get { return _exclusionBreachedAtMs; }
+        }
+
+        public string LastScenarioEndReason
+        {
+            get { return _lastScenarioEndReason; }
+        }
+
         public TacticTree CurrentTactic
         {
             get { return _currentTactic; }
@@ -134,6 +154,9 @@ namespace TrishulSim.SwarmAI
             _lastSensorReadings = new SensorReadings();
             _allNeutralised = false;
             _allNeutralisedAtMs = null;
+            _exclusionBreached = false;
+            _exclusionBreachedAtMs = null;
+            _lastScenarioEndReason = null;
             _currentTactic = null;
             _currentProfile = null;
             _currentScenarioId = string.Empty;
@@ -149,6 +172,9 @@ namespace TrishulSim.SwarmAI
             _agents.Clear();
             _allNeutralised = false;
             _allNeutralisedAtMs = null;
+            _exclusionBreached = false;
+            _exclusionBreachedAtMs = null;
+            _lastScenarioEndReason = null;
 
             if (agentArray != null)
             {
@@ -159,6 +185,7 @@ namespace TrishulSim.SwarmAI
                     {
                         _agents.Add(state);
                         BoidAgent boid = CreateBoidAgentInstance(i, state.isDecoy);
+                        boid.agentSeed = _currentSeed;
                         boid.BindState(state);
                         _boidAgents.Add(boid);
                     }
@@ -218,7 +245,7 @@ namespace TrishulSim.SwarmAI
 
                 SwarmAgentState state = new SwarmAgentState();
                 BoidAgent boid = CreateBoidAgentInstance(i, isDecoy);
-                boid.InitializeFromProfile(i, isDecoy, _currentProfile, spawnPos, initialVel, state);
+                boid.InitializeFromProfile(i, isDecoy, _currentProfile, spawnPos, initialVel, state, seed);
 
                 _agents.Add(state);
                 _boidAgents.Add(boid);
@@ -304,6 +331,9 @@ namespace TrishulSim.SwarmAI
             _currentTactic = null;
             _allNeutralised = false;
             _allNeutralisedAtMs = null;
+            _exclusionBreached = false;
+            _exclusionBreachedAtMs = null;
+            _lastScenarioEndReason = null;
             _lastSensorReadings = new SensorReadings();
         }
 
@@ -328,14 +358,21 @@ namespace TrishulSim.SwarmAI
             {
                 agent = go.AddComponent<BoidAgent>();
             }
+            agent.OnAgentNeutralised += HandleBoidAgentNeutralised;
             return agent;
 #else
             GameObject go = new GameObject(objName);
             go.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
             BoidAgent agent = new BoidAgent();
             agent.gameObject = go;
+            agent.OnAgentNeutralised += HandleBoidAgentNeutralised;
             return agent;
 #endif
+        }
+
+        private void HandleBoidAgentNeutralised(BoidAgent boid, long neutralisedAtMs)
+        {
+            EvaluateAllNeutralised(neutralisedAtMs);
         }
 
         private void DestroySpawnedBoidAgents()
@@ -348,6 +385,7 @@ namespace TrishulSim.SwarmAI
                 BoidAgent boid = _boidAgents[i];
                 if (boid != null)
                 {
+                    boid.OnAgentNeutralised -= HandleBoidAgentNeutralised;
                     MonoBehaviour.Destroy(boid.gameObject);
                 }
             }
@@ -470,7 +508,8 @@ namespace TrishulSim.SwarmAI
         }
 
         /// <summary>
-        /// Advances the active swarm tactic tree and updates agent kinematics.
+        /// Advances the active swarm tactic tree, updates agent kinematics, and checks
+        /// EXCLUSION_BREACH and ALL_NEUTRALISED terminal conditions (SA-P1-B-ii).
         /// </summary>
         public void Tick(float deltaTime, long currentScenarioTimeMs, EWJammerState ewJammer = null, Vector3? traineePos = null)
         {
@@ -483,11 +522,102 @@ namespace TrishulSim.SwarmAI
 
             SyncBoidAgentsFromStates();
 
-            // Continuously verify ALL_NEUTRALISED state
+            // SA-P1-B-ii: Check EXCLUSION_BREACH terminal condition -> BroadcastScenarioEnd("EXCLUSION_BREACH")
+            if (_currentTactic != null && _currentTactic.ExclusionBreached && !_exclusionBreached)
+            {
+                _exclusionBreached = true;
+                _exclusionBreachedAtMs = _currentTactic.ExclusionBreachedAtMs ?? currentScenarioTimeMs;
+                BroadcastScenarioEnd("EXCLUSION_BREACH");
+            }
+
+            // SA-P1-B-ii Step 3: Check ALL_NEUTRALISED terminal condition -> BroadcastScenarioEnd("ALL_NEUTRALISED")
+            EvaluateAllNeutralised(currentScenarioTimeMs);
+        }
+
+        /// <summary>
+        /// SA-P1-B-ii Step 3: Neutralises an agent by ID, stops movement, sets propellerRpm = 0,
+        /// records neutralisedAtMs, and checks ALL_NEUTRALISED.
+        /// </summary>
+        public bool NeutraliseAgent(string agentId, long currentScenarioTimeMs)
+        {
+            SwarmAgentState target = GetAgentById(agentId);
+            if (target == null)
+                return false;
+
+            target.isNeutralised = true;
+            target.neutralisedAtMs = currentScenarioTimeMs;
+            target.velocityMs = Vector3.zero;
+            target.propellerRpm = 0;
+            target.rfEmitting = false;
+            SyncBoidAgentsFromStates();
+
+            EvaluateAllNeutralised(currentScenarioTimeMs);
+            return true;
+        }
+
+        private void EvaluateAllNeutralised(long currentScenarioTimeMs)
+        {
             if (!_allNeutralised && CheckAllAttackersNeutralised())
             {
                 _allNeutralised = true;
                 _allNeutralisedAtMs = currentScenarioTimeMs;
+                if (_currentTactic != null && _currentTactic.CurrentState != TacticState.NEUTRALISED)
+                {
+                    _currentTactic.Tick(0.0f, currentScenarioTimeMs, null, Vector3.zero);
+                }
+                BroadcastScenarioEnd("ALL_NEUTRALISED");
+            }
+        }
+
+        /// <summary>
+        /// SA-P1-B-ii: Signals SCENARIO_END with the specified terminal reason ("EXCLUSION_BREACH" or "ALL_NEUTRALISED"),
+        /// notifying ScenarioEndBroadcaster / OnScenarioEndTriggered and ScenarioManager.Instance if loaded.
+        /// </summary>
+        public void BroadcastScenarioEnd(string reason)
+        {
+            if (string.IsNullOrEmpty(reason))
+                return;
+
+            _lastScenarioEndReason = reason;
+            string logMsg = "[SwarmManager] SCENARIO_END triggered: " + reason;
+            Console.WriteLine(logMsg);
+#if UNITY_5_3_OR_NEWER
+            Debug.Log(logMsg);
+#endif
+
+            if (ScenarioEndBroadcaster != null)
+            {
+                ScenarioEndBroadcaster(reason);
+            }
+            if (OnScenarioEndTriggered != null)
+            {
+                OnScenarioEndTriggered(reason);
+            }
+
+            // Invoke ScenarioManager.Instance.BroadcastScenarioEnd(reason) if ScenarioManager is present in AppDomain
+            try
+            {
+                Type smType = Type.GetType("TrishulSim.Scenarios.ScenarioManager");
+                if (smType != null)
+                {
+                    var prop = smType.GetProperty("Instance", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                    if (prop != null)
+                    {
+                        object smInstance = prop.GetValue(null, null);
+                        if (smInstance != null)
+                        {
+                            var method = smType.GetMethod("BroadcastScenarioEnd", new Type[] { typeof(string) });
+                            if (method != null)
+                            {
+                                method.Invoke(smInstance, new object[] { reason });
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore if ScenarioManager is not active in standalone test runner
             }
         }
 
@@ -661,12 +791,8 @@ namespace TrishulSim.SwarmAI
                 target.rfEmitting = false;
                 SyncBoidAgentsFromStates();
 
-                // Check terminal condition: all attackers neutralised
-                if (CheckAllAttackersNeutralised())
-                {
-                    _allNeutralised = true;
-                    _allNeutralisedAtMs = t;
-                }
+                // Check terminal condition: all attackers neutralised -> BroadcastScenarioEnd("ALL_NEUTRALISED")
+                EvaluateAllNeutralised(t);
             }
 
             action.kinetic = kineticEvent;
