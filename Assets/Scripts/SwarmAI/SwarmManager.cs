@@ -23,7 +23,7 @@ namespace TrishulSim.SwarmAI
     /// Manages agents, runs active HBT tactics, produces SCENARIO_TICK swarmSnapshot,
     /// resolves kinetic engagements, and signals terminal conditions.
     /// </summary>
-    public class SwarmManager
+    public class SwarmManager : MonoBehaviour
     {
         private static SwarmManager _instance;
         public static SwarmManager Instance
@@ -39,11 +39,26 @@ namespace TrishulSim.SwarmAI
         }
 
         private List<SwarmAgentState> _agents;
+        private List<BoidAgent> _boidAgents;
         private bool _allNeutralised;
         private long? _allNeutralisedAtMs;
         private TacticTree _currentTactic;
         private SwarmProfile _currentProfile;
         private string _currentScenarioId;
+        private int _currentSeed;
+
+        public GameObject swarmAgentPrefab;
+        public event Action<SwarmAgentState[]> OnSwarmSnapshotInjected;
+
+        public IReadOnlyList<BoidAgent> BoidAgents
+        {
+            get { return _boidAgents; }
+        }
+
+        public int CurrentSeed
+        {
+            get { return _currentSeed; }
+        }
 
         public bool AllNeutralised
         {
@@ -79,19 +94,22 @@ namespace TrishulSim.SwarmAI
         public SwarmManager()
         {
             _agents = new List<SwarmAgentState>();
+            _boidAgents = new List<BoidAgent>();
             _flockController = new BoidFlockController();
             _allNeutralised = false;
             _allNeutralisedAtMs = null;
             _currentTactic = null;
             _currentProfile = null;
             _currentScenarioId = string.Empty;
+            _currentSeed = 42819;
         }
 
         /// <summary>
-        /// Initialises swarm from an array of agent states (e.g. Punjab fixture).
+        /// Initialises swarm from an array of agent states (e.g. Punjab fixture) and creates/binds BoidAgent components.
         /// </summary>
         public void LoadAgents(SwarmAgentState[] agentArray)
         {
+            DestroySpawnedBoidAgents();
             _agents.Clear();
             _allNeutralised = false;
             _allNeutralisedAtMs = null;
@@ -100,10 +118,172 @@ namespace TrishulSim.SwarmAI
             {
                 for (int i = 0; i < agentArray.Length; i++)
                 {
-                    if (agentArray[i] != null)
+                    SwarmAgentState state = agentArray[i];
+                    if (state != null)
                     {
-                        _agents.Add(agentArray[i]);
+                        _agents.Add(state);
+                        BoidAgent boid = CreateBoidAgentInstance(i, state.isDecoy);
+                        boid.BindState(state);
+                        _boidAgents.Add(boid);
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// SA-P0-A Step 3: Seeds UnityEngine.Random.InitState(seed), spawns agentCount BoidAgent instances
+        /// (first decoyCount marked as decoys with blue sphere tint, remaining as attackers with red sphere tint)
+        /// in coherent formation, and binds the scenario tactic tree.
+        /// </summary>
+        public void OnScenarioStart(SwarmProfile profile, int seed, string scenarioId = "punjab-fog-pincer-01", Vector3? targetOrigin = null)
+        {
+            OnScenarioEnd();
+
+            _currentScenarioId = string.IsNullOrEmpty(scenarioId) ? "punjab-fog-pincer-01" : scenarioId;
+            _currentProfile = profile != null ? profile.Clone() : SwarmMock.GetPunjabProfile();
+            _currentSeed = seed;
+            Vector3 origin = targetOrigin.HasValue ? targetOrigin.Value : Vector3.zero;
+
+            // SA-P0-A Step 3: Seed procedural RNG deterministically
+            UnityEngine.Random.InitState(seed);
+
+            int totalAgents = _currentProfile.agentCount > 0 ? _currentProfile.agentCount : 6;
+            int decoyCount = _currentProfile.decoyCount >= 0 ? _currentProfile.decoyCount : 2;
+            float baseAlt = _currentProfile.altitudeM > 0f ? _currentProfile.altitudeM : 8.0f;
+            float speedMs = _currentProfile.SpeedMs > 0f ? _currentProfile.SpeedMs : (120.0f / 3.6f);
+
+            // Spawn coherent formation around approach corridor (~260m out, within 20m neighbour radius so Boids cohere)
+            float baseRangeM = 260.0f;
+            float formationSpacingM = 3.2f;
+            float halfWidth = ((totalAgents - 1) * formationSpacingM) * 0.5f;
+
+            for (int i = 0; i < totalAgents; i++)
+            {
+                bool isDecoy = i < decoyCount;
+                float jitterX = UnityEngine.Random.Range(-0.8f, 0.8f);
+                float jitterZ = UnityEngine.Random.Range(-1.2f, 1.2f);
+                float jitterY = UnityEngine.Random.Range(-0.4f, 0.4f);
+
+                float spawnX = (i * formationSpacingM) - halfWidth + jitterX;
+                float spawnY = (isDecoy ? (baseAlt + 2.0f) : baseAlt) + jitterY;
+                float spawnZ = baseRangeM + (isDecoy ? -4.0f : 0.0f) + jitterZ;
+
+                Vector3 spawnPos = new Vector3(spawnX, spawnY, spawnZ);
+                Vector3 toTarget = new Vector3(origin.x - spawnPos.x, 0.0f, origin.z - spawnPos.z);
+                Vector3 dir = toTarget.sqrMagnitude > 0.001f ? toTarget.normalized : new Vector3(0f, 0f, -1f);
+                Vector3 initialVel = dir * speedMs;
+
+                SwarmAgentState state = new SwarmAgentState();
+                BoidAgent boid = CreateBoidAgentInstance(i, isDecoy);
+                boid.InitializeFromProfile(i, isDecoy, _currentProfile, spawnPos, initialVel, state);
+
+                _agents.Add(state);
+                _boidAgents.Add(boid);
+            }
+
+            string tacticName = !string.IsNullOrEmpty(_currentProfile.tacticTree)
+                ? _currentProfile.tacticTree
+                : "PINCER_LOW_FAST";
+            _currentTactic = TacticTreeFactory.Create(tacticName);
+            _currentTactic.Initialize(_currentProfile, seed, _agents, origin);
+        }
+
+        /// <summary>
+        /// SA-P0-A Step 3 & 4: Overload accepting SCENARIO_START JSON payload or ScenarioConfig JSON string.
+        /// Parses seed, scenarioId, and SwarmProfile, then spawns the seeded Boid flock.
+        /// </summary>
+        public void OnScenarioStart(string scenarioStartOrConfigJson, int seedOverride = -1)
+        {
+            string scenarioId = ExtractJsonString(scenarioStartOrConfigJson, "scenarioId");
+            if (string.IsNullOrEmpty(scenarioId))
+            {
+                scenarioId = ExtractJsonString(scenarioStartOrConfigJson, "id");
+            }
+            if (string.IsNullOrEmpty(scenarioId))
+            {
+                scenarioId = "punjab-fog-pincer-01";
+            }
+
+            int parsedSeed = seedOverride > 0 ? seedOverride : ExtractJsonInt(scenarioStartOrConfigJson, "seed", 42819);
+            SwarmProfile profile = ParseProfileFromJson(scenarioStartOrConfigJson);
+            if (profile == null)
+            {
+                profile = SwarmMock.GetPunjabProfile();
+            }
+
+            OnScenarioStart(profile, parsedSeed, scenarioId, Vector3.zero);
+        }
+
+        /// <summary>
+        /// SA-P0-A Step 3: Destroys all spawned BoidAgent instances, halts active HBT, and clears swarm state.
+        /// </summary>
+        public void OnScenarioEnd()
+        {
+            DestroySpawnedBoidAgents();
+            _agents.Clear();
+            _currentTactic = null;
+            _allNeutralised = false;
+            _allNeutralisedAtMs = null;
+        }
+
+        private BoidAgent CreateBoidAgentInstance(int index, bool isDecoy)
+        {
+            string objName = "SwarmAgentVisual_" + index + (isDecoy ? "_Decoy" : "_Attacker");
+#if UNITY_5_3_OR_NEWER
+            GameObject go = null;
+            if (swarmAgentPrefab != null)
+            {
+                go = UnityEngine.Object.Instantiate(swarmAgentPrefab);
+                go.name = objName;
+            }
+            else
+            {
+                go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                go.name = objName;
+                go.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+            }
+            BoidAgent agent = go.GetComponent<BoidAgent>();
+            if (agent == null)
+            {
+                agent = go.AddComponent<BoidAgent>();
+            }
+            return agent;
+#else
+            GameObject go = new GameObject(objName);
+            go.transform.localScale = new Vector3(1.5f, 1.5f, 1.5f);
+            BoidAgent agent = new BoidAgent();
+            agent.gameObject = go;
+            return agent;
+#endif
+        }
+
+        private void DestroySpawnedBoidAgents()
+        {
+            if (_boidAgents == null)
+                return;
+
+            for (int i = 0; i < _boidAgents.Count; i++)
+            {
+                BoidAgent boid = _boidAgents[i];
+                if (boid != null)
+                {
+                    MonoBehaviour.Destroy(boid.gameObject);
+                }
+            }
+            _boidAgents.Clear();
+        }
+
+        private void SyncBoidAgentsFromStates()
+        {
+            if (_boidAgents == null || _agents == null)
+                return;
+
+            int count = Math.Min(_boidAgents.Count, _agents.Count);
+            for (int i = 0; i < count; i++)
+            {
+                if (_boidAgents[i] != null && _agents[i] != null)
+                {
+                    _boidAgents[i].SyncFromState(_agents[i]);
                 }
             }
         }
@@ -124,6 +304,7 @@ namespace TrishulSim.SwarmAI
         public void LoadScenario(string scenarioId, int seed = 42819, Vector3? targetOrigin = null)
         {
             _currentScenarioId = scenarioId ?? "punjab-fog-pincer-01";
+            _currentSeed = seed;
             Vector3 origin = targetOrigin.HasValue ? targetOrigin.Value : Vector3.zero;
 
             SwarmProfile profile = null;
@@ -209,6 +390,8 @@ namespace TrishulSim.SwarmAI
                 _currentTactic.Tick(deltaTime, currentScenarioTimeMs, ewJammer, pos);
             }
 
+            SyncBoidAgentsFromStates();
+
             // Continuously verify ALL_NEUTRALISED state
             if (!_allNeutralised && CheckAllAttackersNeutralised())
             {
@@ -225,6 +408,7 @@ namespace TrishulSim.SwarmAI
             if (_flockController != null && _agents != null && _agents.Count > 0)
             {
                 _flockController.Step(_agents, _currentProfile, deltaTime);
+                SyncBoidAgentsFromStates();
             }
         }
 
@@ -234,6 +418,47 @@ namespace TrishulSim.SwarmAI
         public SwarmAgentState[] GetSwarmSnapshot()
         {
             return _agents.ToArray();
+        }
+
+        /// <summary>
+        /// SA-P0-A Step 3 & 4: Called by ScenarioManager / TickLoop before each SCENARIO_TICK broadcast.
+        /// Returns current SwarmAgentState[] and invokes registered snapshot consumer callbacks.
+        /// </summary>
+        public SwarmAgentState[] InjectSwarmSnapshot(Action<SwarmAgentState[]> targetInjector = null)
+        {
+            SwarmAgentState[] snapshot = GetSwarmSnapshot();
+            if (targetInjector != null)
+            {
+                targetInjector(snapshot);
+            }
+            if (OnSwarmSnapshotInjected != null)
+            {
+                OnSwarmSnapshotInjected(snapshot);
+            }
+            return snapshot;
+        }
+
+        /// <summary>
+        /// SA-P0-A Step 4: Handles WebSocket IPC messages (SCENARIO_START, SCENARIO_TICK, SCENARIO_END).
+        /// </summary>
+        public void HandleWsMessage(string messageType, string payloadJson = null)
+        {
+            if (string.IsNullOrEmpty(messageType))
+                return;
+
+            if (string.Equals(messageType, "SCENARIO_START", StringComparison.OrdinalIgnoreCase))
+            {
+                OnScenarioStart(payloadJson ?? string.Empty);
+            }
+            else if (string.Equals(messageType, "SCENARIO_END", StringComparison.OrdinalIgnoreCase))
+            {
+                OnScenarioEnd();
+            }
+            else if (string.Equals(messageType, "SCENARIO_TICK", StringComparison.OrdinalIgnoreCase))
+            {
+                StepFlocking(0.1f);
+                InjectSwarmSnapshot();
+            }
         }
 
         /// <summary>
@@ -303,6 +528,7 @@ namespace TrishulSim.SwarmAI
                 target.velocityMs = Vector3.zero;
                 target.propellerRpm = 0;
                 target.rfEmitting = false;
+                SyncBoidAgentsFromStates();
 
                 // Check terminal condition: all attackers neutralised
                 if (CheckAllAttackersNeutralised())

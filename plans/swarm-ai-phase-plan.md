@@ -107,7 +107,7 @@ TEST:
 DEPENDS: unity-sim P0-A, P0-C     UNBLOCKS: AA-P0-A, UX-P0-A (shape frozen), SA-P0-B
 
 DEMO: "6 moving dots visible on Trainee Cockpit." (Beat 2 first hint)
-PERSONA: swarm-ai builder          STATUS: [ ] todo
+PERSONA: swarm-ai builder          STATUS: [x] done
 ```
 
 ---
