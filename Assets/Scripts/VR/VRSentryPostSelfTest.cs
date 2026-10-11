@@ -47,6 +47,22 @@ namespace TrishulSim.VR
         }
 #endif
 
+#if UNITY_EDITOR
+        [UnityEditor.MenuItem("TRISHUL-SIM/Tests/Run VR Sentry Post Self-Test")]
+        public static void RunFromEditorMenu()
+        {
+            try
+            {
+                RunAllTests();
+                UnityEngine.Debug.Log("[PASS] All VG-P1-B 3D Nighttime Sentry Post scene tests passed successfully.");
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogError("[FAIL] " + ex.Message + "\n" + ex.StackTrace);
+            }
+        }
+#endif
+
         public static void RunAllTests()
         {
             Console.WriteLine("=== Running TRISHUL-SIM VG-P1-B 3D Nighttime Sentry Post Self-Test ===");
@@ -150,6 +166,12 @@ namespace TrishulSim.VR
             float exposure = float.Parse(expMatch.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
             Assert(exposure >= 0.2f && exposure <= 0.4f,
                 string.Format("SkyboxNight exposure ({0}) should be calibrated for full-moon night illumination (~0.25-0.35)", exposure));
+
+            // Check moon disk is enabled for full-moon night scenery (_SunDisk > 0)
+            Match diskMatch = Regex.Match(yaml, @"_SunDisk:\s*([0-9]+)");
+            Assert(diskMatch.Success, "SkyboxNight.mat must define _SunDisk");
+            int sunDisk = int.Parse(diskMatch.Groups[1].Value);
+            Assert(sunDisk > 0, "SkyboxNight.mat must enable moon disk (_SunDisk > 0) for full-moon scenery");
         }
 
         public static void TestDarkConcreteMaterial()
@@ -187,6 +209,12 @@ namespace TrishulSim.VR
             // Skybox material GUID reference
             Assert(yaml.Contains("guid: f1b2c3d4e5f647898a1b2c3d4e5f8001"),
                 "RenderSettings m_SkyboxMaterial must reference SkyboxNight.mat GUID");
+
+            // Ambient mode: Trilight (1)
+            Assert(yaml.Contains("m_AmbientMode: 1"), "RenderSettings must use Trilight ambient mode (m_AmbientMode: 1)");
+
+            // Sunlight link to Moonlight directional light (100000002)
+            Assert(yaml.Contains("m_Sun: {fileID: 100000002}"), "RenderSettings m_Sun must link to Moonlight Directional Light");
         }
 
         public static void TestMoonlightDirectionalLight()
@@ -272,15 +300,13 @@ namespace TrishulSim.VR
             Assert(yaml.Contains("AudioListener:"), "Scene must contain AudioListener component");
             Assert(yaml.Contains("m_GameObject: {fileID: 200000000}"), "AudioListener must be attached to VRRig GameObject");
 
-            // AudioListener must NOT be attached to LeftEyeCamera (220000000) or RightEyeCamera (230000000)
-            Assert(!yaml.Contains("m_GameObject: {fileID: 220000000}\n  m_Enabled: 1\n--- !u!81"),
-                "AudioListener must not be on LeftEyeCamera");
-            Assert(!yaml.Contains("m_GameObject: {fileID: 230000000}\n  m_Enabled: 1\n--- !u!81"),
-                "AudioListener must not be on RightEyeCamera");
-
-            // Count total AudioListeners in scene (must be exactly 1)
-            int listenerCount = Regex.Matches(yaml, @"--- !u!81\s+&").Count;
-            Assert(listenerCount == 1, string.Format("Expected exactly 1 AudioListener in scene, found {0}", listenerCount));
+            // Extract all AudioListener blocks (classID 81) and ensure none are on cameras
+            MatchCollection listenerBlocks = Regex.Matches(yaml, @"--- !u!81 &.*?(?=(?:--- !u!|\z))", RegexOptions.Singleline);
+            Assert(listenerBlocks.Count == 1, string.Format("Expected exactly 1 AudioListener in scene, found {0}", listenerBlocks.Count));
+            string singleListener = listenerBlocks[0].Value;
+            Assert(singleListener.Contains("m_GameObject: {fileID: 200000000}"), "AudioListener must be attached to VRRig (fileID 200000000)");
+            Assert(!singleListener.Contains("220000000"), "AudioListener must not be attached to LeftEyeCamera");
+            Assert(!singleListener.Contains("230000000"), "AudioListener must not be attached to RightEyeCamera");
         }
 
         public static void TestGamepadInputControllerAttachedToVRRig()
@@ -305,6 +331,12 @@ namespace TrishulSim.VR
             Assert(yaml.Contains("m_Mesh: {fileID: 10210"), "GroundQuad must use Unity built-in Quad mesh (fileID 10210)");
             Assert(yaml.Contains("guid: f1b2c3d4e5f647898a1b2c3d4e5f8002"),
                 "Watchtower elements must reference DarkConcrete material GUID");
+
+            // GroundQuad scale and horizontal floor orientation
+            Assert(yaml.Contains("m_LocalScale: {x: 20, y: 20, z: 1}") || yaml.Contains("m_LocalScale: {x: 20, y: 1, z: 20}"),
+                "GroundQuad scale must span 20x20m watchtower floor platform");
+            Assert(yaml.Contains("x: 90, y: 0, z: 0") || yaml.Contains("x: 0.7071068, y: 0, z: 0, w: 0.7071068"),
+                "GroundQuad must be oriented horizontally (90 deg pitch)");
 
             // 4 Railing Posts
             Assert(yaml.Contains("m_Name: RailingPost_FL"), "Watchtower must contain RailingPost_FL");
