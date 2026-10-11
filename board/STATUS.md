@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-11T18:42 IST · Uday: VG-P1-C code-complete — VRHudController (4-panel RenderTexture blit + MIL-STD-2525 threat torus), VRHudSetup editor menu (one-click scene assembly), VRHudSelfTest (5/5 structural); awaiting VG-P1-B (Vinod: 3D scene) for visual integration test on `feat/vr-hud-panels`
 - 2026-10-10T15:25 IST Â· Uday: SA-P2-B done â€” BoidFlockController classical 3 rules + double-buffering, Burst/Job System BoidStepJob, radar loop >500m early-out; 1000-frame 8-agent Punjab benchmark at 0.0021 ms/frame (>400,000 FPS, <16.7ms budget); BurstPerformanceSelfTest PASSED
 - 2026-10-10T15:08 IST Â· Uday: SA-P2-A done â€” SATURATION_DIVE broad front + 100m simultaneous dive + 4s freq hop, MULTI-AXIS_SPLIT 4 cardinal vectors + 915 MHz, TacticTreeFactory dynamic binding; TacticTreesSelfTest PASSED
 - 2026-10-10T14:50 IST Â· Uday: SA-P1-D done â€” SMASH 2000 lead-angle reticle + KineticEvent hit resolution + SwarmManager neutralisation and ALL_NEUTRALISED terminal state; SmashFireControlSelfTest PASSED
