@@ -33,7 +33,7 @@
 | US-P3-A · Submission package coordination | Vinod | [ ] |
 | SA-P0-A · Boids 6-agent spawn | Venu | [x] |
 | SA-P0-B · Friis RF model | Venu | [x] |
-| SA-P1-A · Doppler + Acoustic physics | Venu | [ ] |
+| SA-P1-A · Doppler + Acoustic physics | Venu | [x] |
 | SA-P1-B-i · HBT PINCER approach | Venu | [ ] |
 | SA-P1-B-ii · HBT PINCER execution + EW evasion | Venu | [ ] |
 | SA-P1-C · EW deconfliction / friendlyBlackoutRisk | Uday | [x] |

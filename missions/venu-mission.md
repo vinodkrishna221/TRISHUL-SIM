@@ -176,7 +176,7 @@ TEST:
   Punjab (temp 4°C, 6 agents at 50m, rpm 11400):
   dopplerPeakHz in range 200–800 Hz, varying with approach velocity.
   acousticSplDb > 40 dB at 50m.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---

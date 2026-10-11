@@ -89,9 +89,11 @@ namespace TrishulSim.Sensors
     {
         // ── State ─────────────────────────────────────────────
         public bool friendlyVhfActive;
+        public float ambientTemperatureCelsius;
         public EWJammerState currentEwState;
         public SensorReadings currentReadings;
         public string activeScenarioId;
+        private float[] _splBuffer = new float[16];
 
         public SensorReadings CurrentSensorReadings
         {
@@ -101,16 +103,17 @@ namespace TrishulSim.Sensors
         public SensorSuiteComputer()
         {
             friendlyVhfActive = true;
+            ambientTemperatureCelsius = AcousticPhysics.DEFAULT_TEMP_CELSIUS;
             currentEwState = new EWJammerState();
             currentReadings = new SensorReadings();
             activeScenarioId = "punjab-fog-pincer-01";
         }
 
         /// <summary>
-        /// Configures scenario parameters.
-        /// Punjab scenario (punjab-fog-pincer-01): friendlyVhfActive = true.
+        /// Configures scenario parameters including friendly VHF ROE state and WeatherPreset.temperature.
+        /// Punjab scenario (punjab-fog-pincer-01): friendlyVhfActive = true, temperature = 4.0°C.
         /// </summary>
-        public void ConfigureScenario(string scenarioId, bool? vhfActiveOverride = null)
+        public void ConfigureScenario(string scenarioId, bool? vhfActiveOverride = null, float? temperatureOverride = null)
         {
             activeScenarioId = scenarioId;
             if (vhfActiveOverride.HasValue)
@@ -122,6 +125,39 @@ namespace TrishulSim.Sensors
                 // Doctrinal default: Punjab border forward post has friendly VHF active
                 friendlyVhfActive = string.IsNullOrEmpty(scenarioId) || scenarioId.StartsWith("punjab", StringComparison.OrdinalIgnoreCase);
             }
+
+            if (temperatureOverride.HasValue)
+            {
+                ambientTemperatureCelsius = temperatureOverride.Value;
+            }
+            else
+            {
+                ambientTemperatureCelsius = InferDefaultTemperatureCelsius(scenarioId);
+            }
+        }
+
+        /// <summary>
+        /// SA-P1-A Step 4: Sets WeatherPreset.temperature (°C) for ISO 9613-1 acoustic attenuation correction.
+        /// </summary>
+        public void SetWeatherTemperature(float temperatureCelsius)
+        {
+            ambientTemperatureCelsius = temperatureCelsius;
+        }
+
+        private static float InferDefaultTemperatureCelsius(string scenarioId)
+        {
+            if (string.IsNullOrEmpty(scenarioId))
+                return AcousticPhysics.DEFAULT_TEMP_CELSIUS;
+
+            string clean = scenarioId.ToLowerInvariant();
+            if (clean.Contains("ladakh"))
+                return -12.0f;
+            if (clean.Contains("loc"))
+                return 2.0f;
+            if (clean.Contains("desert"))
+                return 38.0f;
+
+            return 4.0f; // Punjab riverine fog default (4.0°C)
         }
 
         /// <summary>
@@ -228,13 +264,23 @@ namespace TrishulSim.Sensors
         }
 
         /// <summary>
-        /// SA-P0-B Step 2: Computes multi-spectral sensor readings from a swarm snapshot and trainee antenna position.
-        /// - rfWaterfallPeakDbm: iterate emitting agents -> compute Friis -> return max power agent's dBm
-        /// - rfWaterfallPeakGHz: frequency of max-power agent
-        /// - radarDetectedCount: count agents where two-way radar return > -90 dBm
-        /// - dopplerPeakHz = 0.0f; acousticSplDb = 0.0f (P1 placeholders)
+        /// SA-P0-B Step 2 / SA-P1-A Step 3: Computes multi-spectral sensor readings from a swarm snapshot and trainee antenna position.
+        /// Uses configured WeatherPreset.temperature (ambientTemperatureCelsius) for ISO 9613-1 acoustic attenuation.
         /// </summary>
         public SensorReadings ComputeSensorReadings(SwarmAgentState[] snapshot, Vector3 antennaPos)
+        {
+            return ComputeSensorReadings(snapshot, antennaPos, ambientTemperatureCelsius);
+        }
+
+        /// <summary>
+        /// SA-P1-A Step 3 & 4: Computes multi-spectral sensor readings with explicit WeatherPreset.temperature (°C):
+        /// - rfWaterfallPeakDbm: iterate emitting agents -> compute Friis -> return max power agent's dBm
+        /// - rfWaterfallPeakGHz: frequency of max-power agent
+        /// - dopplerPeakHz: peak blade-tip harmonic across all non-neutralised agents (DopplerPhysics.ComputeBladeTipHz)
+        /// - acousticSplDb: log-sum-exp SPL across all non-neutralised agents with ISO 9613-1 temp correction (AcousticPhysics)
+        /// - radarDetectedCount: count agents where two-way radar return > -90 dBm
+        /// </summary>
+        public SensorReadings ComputeSensorReadings(SwarmAgentState[] snapshot, Vector3 antennaPos, float tempCelsius)
         {
             if (snapshot == null || snapshot.Length == 0)
             {
@@ -242,9 +288,16 @@ namespace TrishulSim.Sensors
                 return currentReadings;
             }
 
+            if (_splBuffer == null || _splBuffer.Length < snapshot.Length)
+            {
+                _splBuffer = new float[snapshot.Length];
+            }
+
             float maxRfDbm = float.NegativeInfinity;
             float maxRfFreqGHz = 0.0f;
             bool foundEmitting = false;
+            float dopplerPeakHz = 0.0f;
+            int activeSplCount = 0;
             int radarHits = 0;
 
             for (int i = 0; i < snapshot.Length; i++)
@@ -271,6 +324,24 @@ namespace TrishulSim.Sensors
                     }
                 }
 
+                // SA-P1-A Step 1 & 3: Doppler blade-tip harmonic peak across non-neutralised agents
+                if (agent.propellerRpm > 0)
+                {
+                    float bladeTipHz = DopplerPhysics.ComputeBladeTipHz(agent, antennaPos);
+                    if (bladeTipHz > dopplerPeakHz)
+                    {
+                        dopplerPeakHz = bladeTipHz;
+                    }
+
+                    // SA-P1-A Step 2 & 3: Acoustic BPF SPL with ISO 9613-1 temperature correction
+                    float agentSplDb = AcousticPhysics.ComputeSplDb(agent, antennaPos, tempCelsius);
+                    if (agentSplDb > 0.0f)
+                    {
+                        _splBuffer[activeSplCount] = agentSplDb;
+                        activeSplCount++;
+                    }
+                }
+
                 // SA-P2-B performance optimization: early-out when agent distance > 500m
                 // Beyond 500m, two-way radar return is well below -90 dBm threshold.
                 if (distM > 500.0f)
@@ -289,11 +360,15 @@ namespace TrishulSim.Sensors
                 maxRfFreqGHz = 0.0f;
             }
 
+            float acousticSplDb = activeSplCount > 0
+                ? AcousticPhysics.LogSumSpl(_splBuffer, activeSplCount)
+                : 0.0f;
+
             currentReadings = new SensorReadings(
                 maxRfFreqGHz,
                 maxRfDbm,
-                0.0f,
-                0.0f,
+                dopplerPeakHz,
+                acousticSplDb,
                 radarHits
             );
 

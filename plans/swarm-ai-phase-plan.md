@@ -227,7 +227,7 @@ TEST:
 DEPENDS: SA-P0-B               UNBLOCKS: UX-P1-A (Doppler scope, Acoustic FFT driven by these values)
 
 DEMO: "Doppler scope shows 220 Hz spike on approach." (Beat 3)
-PERSONA: swarm-ai builder     STATUS: [ ] todo
+PERSONA: swarm-ai builder     STATUS: [x] done
 ```
 
 ---

@@ -82,10 +82,10 @@ namespace TrishulSim.Sensors
                 "Initial rfWaterfallPeakDbm must be a negative float, got " + initialReadings.rfWaterfallPeakDbm);
             Assert(Math.Abs(initialReadings.rfWaterfallPeakGHz - 5.825f) < 0.001f,
                 "Initial rfWaterfallPeakGHz must be 5.825 GHz, got " + initialReadings.rfWaterfallPeakGHz);
-            Assert(Math.Abs(initialReadings.dopplerPeakHz - 0.0f) < 0.0001f,
-                "dopplerPeakHz must be 0.0f (P1 placeholder)");
-            Assert(Math.Abs(initialReadings.acousticSplDb - 0.0f) < 0.0001f,
-                "acousticSplDb must be 0.0f (P1 placeholder)");
+            Assert(initialReadings.dopplerPeakHz >= 0.0f,
+                "dopplerPeakHz must be non-negative");
+            Assert(initialReadings.acousticSplDb >= 0.0f,
+                "acousticSplDb must be non-negative");
 
             int initialRadarCount = initialReadings.radarDetectedCount;
             float prevPeakDbm = initialReadings.rfWaterfallPeakDbm;
@@ -280,8 +280,8 @@ namespace TrishulSim.Sensors
                 "When no active agent is emitting RF, rfWaterfallPeakGHz must be 0.0 GHz");
             Assert(r1.radarDetectedCount == 1,
                 "Silent non-neutralised agent at 60m must still be counted by radar (neutralised agent excluded)");
-            Assert(r1.dopplerPeakHz == 0.0f && r1.acousticSplDb == 0.0f,
-                "dopplerPeakHz and acousticSplDb must be 0.0f placeholders in SA-P0-B");
+            Assert(r1.dopplerPeakHz >= 0.0f && r1.acousticSplDb >= 0.0f,
+                "dopplerPeakHz and acousticSplDb must be non-negative");
 
             Console.WriteLine("[PASS] SensorSuiteComputer Filtering & P1 Placeholders PASSED");
         }
