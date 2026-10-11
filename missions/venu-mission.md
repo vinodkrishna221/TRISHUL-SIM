@@ -253,7 +253,7 @@ TEST:
 
 PUSH THIS BRANCH IMMEDIATELY WHEN DONE — Uday (SA-P1-C, SA-P1-D) is waiting.
 DEMO: ⭐ "4 FPV munitions executing low-level pincer in pitch-black fog." (Beat 4 wow moment)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---

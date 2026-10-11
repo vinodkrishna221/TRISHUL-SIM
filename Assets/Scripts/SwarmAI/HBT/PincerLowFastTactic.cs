@@ -8,9 +8,17 @@
 //   (15m amplitude, 8s period); 4 attackers at altitudeM maintaining formation.
 // - SPLIT_TRIGGER (SA-P1-B-i): Closest attacker < 150m to origin -> logs
 //   "PINCER SPLIT TRIGGERED", lowers Boids cohesion weight, sets state = SPLIT.
-// - SPLIT / PINCER / DIVE_ATTACK (SA-P1-B-ii): 2 decoys peel at ±45° & climb to 20m;
-//   4 attackers execute dual-axis pincer (0° vs 180°) with RF silence, 2m low skim,
-//   and dynamic EW evasion.
+// - SPLIT / PINCER / DIVE_ATTACK / NEUTRALISED (SA-P1-B-ii):
+//   * Decoys peel away at ±45° (seed-driven) and climb to 20m altitude.
+//   * Attackers split into Pair A (azimuth 0° North) and Pair B (azimuth 180° South),
+//     suppress RF (rfEmitting = false) for 5s after split, close independently
+//     with no Boids cohesion, descend to 2m altitude at <= 50m (DIVE_ATTACK),
+//     and trigger EXCLUSION_BREACH at <= 20m.
+//   * Dynamic EW evasion: when ewJammerState.engaged and bearingDeg within 15° of
+//     agent bearing, steers ±30° off heading (seed-alternated) and sets
+//     rfEmitting = false for 3s (frequency-hop behaviour).
+//   * Neutralised agents stop immediately (velocityMs = 0, propellerRpm = 0, rfEmitting = false);
+//     when all attackers are neutralised, transitions to TacticState.NEUTRALISED.
 // Contract: board/contracts/scenario-events.md, docs/PRD.md §3 Beat 3 & Beat 4
 // ============================================================
 
@@ -26,11 +34,20 @@ namespace TrishulSim.SwarmAI.HBT
         private const float Deg2Rad = (float)(Math.PI / 180.0);
         private const float Rad2Deg = (float)(180.0 / Math.PI);
 
-        // ── SA-P1-B-i Doctrinal Constants ────────────────────────
+        // ── SA-P1-B-i & SA-P1-B-ii Doctrinal Constants ───────────────────
         public const float SplitTriggerDistanceM = 150.0f;
+        public const float DiveTriggerDistanceM = 50.0f;
         public const float DecoyAltitudeOffsetM = 5.0f;
+        public const float DecoySplitClimbAltitudeM = 20.0f;
+        public const float DecoyPeelAngleDeg = 45.0f;
         public const float DecoyOscillationAmplitudeM = 15.0f;
         public const float DecoyOscillationPeriodSec = 8.0f;
+        public const float AttackerSkimAltitudeM = 2.0f;
+        public const float PostSplitRfSilenceSec = 5.0f;
+        public const float EwEvasionSilenceSec = 3.0f;
+        public const float EwEvasionConeHalfAngleDeg = 15.0f;
+        public const float EwEvasionSteerOffsetDeg = 30.0f;
+        public const float SplitPhaseDurationSec = 1.6f;
         public const float ApproachAlignmentWeight = 1.6f;
         public const float ApproachCohesionWeight = 0.8f;
         public const float PincerCohesionWeight = 0.05f;
@@ -48,6 +65,8 @@ namespace TrishulSim.SwarmAI.HBT
         private float _seedPhaseRad;
         private float _seedSign = 1.0f;
         private readonly Dictionary<int, float> _decoyBaseX = new Dictionary<int, float>();
+        private readonly Dictionary<int, float> _attackerEwSilentTimers = new Dictionary<int, float>();
+        private readonly Dictionary<int, int> _attackerEwHopCounts = new Dictionary<int, int>();
 
         public BoidFlockController FlockController { get; set; }
 
@@ -63,6 +82,11 @@ namespace TrishulSim.SwarmAI.HBT
         public float SplitTriggeredDistanceM
         {
             get { return _splitTriggeredDistanceM; }
+        }
+
+        public float SplitTimeSeconds
+        {
+            get { return _splitTimeSeconds; }
         }
 
         public float SeedPhaseRad
@@ -93,6 +117,8 @@ namespace TrishulSim.SwarmAI.HBT
             _splitTriggeredDistanceM = -1f;
             LastLogMessage = null;
             _decoyBaseX.Clear();
+            _attackerEwSilentTimers.Clear();
+            _attackerEwHopCounts.Clear();
 
             ConfigureSeedParameters(seed);
 
@@ -104,13 +130,23 @@ namespace TrishulSim.SwarmAI.HBT
             if (Agents != null)
             {
                 int decoyIdx = 0;
+                int attIdx = 0;
                 for (int i = 0; i < Agents.Count; i++)
                 {
                     SwarmAgentState a = Agents[i];
-                    if (a != null && a.isDecoy)
+                    if (a == null)
+                        continue;
+
+                    if (a.isDecoy)
                     {
                         _decoyBaseX[decoyIdx] = a.positionWorld.x;
                         decoyIdx++;
+                    }
+                    else
+                    {
+                        _attackerEwSilentTimers[attIdx] = 0f;
+                        _attackerEwHopCounts[attIdx] = 0;
+                        attIdx++;
                     }
                 }
             }
@@ -145,6 +181,15 @@ namespace TrishulSim.SwarmAI.HBT
             return oscSide * DecoyOscillationAmplitudeM * (float)Math.Sin(angle);
         }
 
+        /// <summary>
+        /// Returns the remaining EW evasion RF silence timer (in seconds) for a given attacker index (0..3).
+        /// </summary>
+        public float GetAttackerEwSilentTimerSec(int attIdx)
+        {
+            float timer;
+            return _attackerEwSilentTimers.TryGetValue(attIdx, out timer) ? timer : 0f;
+        }
+
         public override void Tick(float deltaTime, long currentScenarioTimeMs, EWJammerState ewJammer, Vector3 traineePos)
         {
             if (ExclusionBreached)
@@ -154,14 +199,30 @@ namespace TrishulSim.SwarmAI.HBT
             float speedMs = Profile != null ? Profile.SpeedMs : (120f / 3.6f);
             float baseAlt = Profile != null ? Profile.altitudeM : 8.0f;
 
-            // Check if all attackers neutralised
+            // Enforce neutralised stop state (velocityMs = 0, propellerRpm = 0, rfEmitting = false)
+            // and check if all attackers are neutralised
             bool anyAttackerActive = false;
             for (int i = 0; i < Agents.Count; i++)
             {
-                if (Agents[i] != null && !Agents[i].isDecoy && !Agents[i].isNeutralised)
+                SwarmAgentState a = Agents[i];
+                if (a == null)
+                    continue;
+
+                if (a.isNeutralised)
+                {
+                    a.velocityMs = Vector3.zero;
+                    a.propellerRpm = 0;
+                    a.rfEmitting = false;
+                    if (!a.neutralisedAtMs.HasValue)
+                    {
+                        a.neutralisedAtMs = currentScenarioTimeMs;
+                    }
+                    continue;
+                }
+
+                if (!a.isDecoy)
                 {
                     anyAttackerActive = true;
-                    break;
                 }
             }
 
@@ -171,13 +232,17 @@ namespace TrishulSim.SwarmAI.HBT
                 return;
             }
 
-            // Step 1: Evaluate transition triggers (SA-P1-B-i SPLIT_TRIGGER before kinematics, and also after kinematics)
+            // Step 1: Evaluate transition triggers (SA-P1-B-i SPLIT_TRIGGER before kinematics)
             EvaluateSplitTrigger();
 
-            if (_splitTriggered && CurrentState == TacticState.SPLIT && (_elapsedSeconds - _splitTimeSeconds >= 1.0f))
+            // SA-P1-B-ii: Transition SPLIT -> PINCER once split maneuver phase completes
+            if (_splitTriggered && CurrentState == TacticState.SPLIT && (_elapsedSeconds - _splitTimeSeconds >= SplitPhaseDurationSec))
             {
                 SetState(TacticState.PINCER);
             }
+
+            // Pre-scan whether any active attacker is currently inside the EW jammer's ±15° beam
+            bool anyAttackerInJammerBeam = IsAnyAttackerInJammerBeam(ewJammer);
 
             // Step 2: Per-agent kinematic and state updates
             int attackerIndex = 0;
@@ -196,7 +261,7 @@ namespace TrishulSim.SwarmAI.HBT
                 }
                 else
                 {
-                    UpdateAttacker(agent, attackerIndex, deltaTime, baseAlt, speedMs, ewJammer, currentScenarioTimeMs);
+                    UpdateAttacker(agent, attackerIndex, deltaTime, baseAlt, speedMs, ewJammer, anyAttackerInJammerBeam, currentScenarioTimeMs);
                     attackerIndex++;
                 }
             }
@@ -209,6 +274,27 @@ namespace TrishulSim.SwarmAI.HBT
 
             // Step 3: Check inner exclusion zone (20m radius)
             CheckExclusionZone(currentScenarioTimeMs);
+        }
+
+        private bool IsAnyAttackerInJammerBeam(EWJammerState ewJammer)
+        {
+            if (ewJammer == null || !ewJammer.engaged || Agents == null)
+                return false;
+
+            for (int i = 0; i < Agents.Count; i++)
+            {
+                SwarmAgentState a = Agents[i];
+                if (a == null || a.isDecoy || a.isNeutralised)
+                    continue;
+
+                float agentBearing = CalculateHeadingDeg(a.positionWorld - TargetOrigin);
+                float diff = Math.Abs(DeltaAngle(ewJammer.bearingDeg, agentBearing));
+                if (diff <= EwEvasionConeHalfAngleDeg)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private void EvaluateSplitTrigger()
@@ -240,6 +326,39 @@ namespace TrishulSim.SwarmAI.HBT
                 // SA-P1-B-i Step 3: Lower Boids cohesion weight to allow independent pincer motion
                 CurrentCohesionWeight = PincerCohesionWeight;
                 SyncFlockControllerWeights();
+
+                // SA-P1-B-ii SPLIT state initialization:
+                // Pair A (attIdx 0, 2) approaches from azimuth 0° (North, +Z);
+                // Pair B (attIdx 1, 3) approaches from azimuth 180° (South, -Z);
+                // All 4 attackers set rfEmitting = false for 5s after split (EW evasion — go silent).
+                float splitRadius = Math.Max(minAttackerDist, ExclusionZoneRadius + 5.0f);
+                int attIdx = 0;
+                for (int i = 0; i < Agents.Count; i++)
+                {
+                    SwarmAgentState a = Agents[i];
+                    if (a == null || a.isDecoy || a.isNeutralised)
+                        continue;
+
+                    bool isPairA = (attIdx % 2 == 0);
+                    float pairWingOffset = (attIdx < 2) ? -2.0f : 2.0f;
+                    float zSign = isPairA ? 1.0f : -1.0f; // Pair A: +Z (Azimuth 0° North), Pair B: -Z (Azimuth 180° South)
+
+                    a.positionWorld = new Vector3(
+                        TargetOrigin.x + pairWingOffset,
+                        a.altitudeM,
+                        TargetOrigin.z + (zSign * splitRadius));
+
+                    Vector3 toOrigin = TargetOrigin - a.positionWorld;
+                    toOrigin.y = 0f;
+                    Vector3 approachDir = toOrigin.sqrMagnitude > 0.0001f ? toOrigin.normalized : new Vector3(0f, 0f, -zSign);
+                    float spd = Profile != null ? Profile.SpeedMs : (120.0f / 3.6f);
+
+                    a.velocityMs = approachDir * spd;
+                    a.headingDeg = CalculateHeadingDeg(a.velocityMs);
+                    a.rfEmitting = false;
+
+                    attIdx++;
+                }
 
                 // SA-P1-B-i Step 3 & TEST: Log "PINCER SPLIT TRIGGERED" on trigger
                 LastLogMessage = SplitTriggerLogMessage;
@@ -289,10 +408,10 @@ namespace TrishulSim.SwarmAI.HBT
             }
             else
             {
-                // SA-P1-B-ii SPLIT / PINCER: peel away at ±45° angle (seed-driven), climb to 20m
-                agent.altitudeM = MoveTowards(agent.altitudeM, 20.0f, dt * 5.0f);
+                // SA-P1-B-ii SPLIT / PINCER: peel away at ±45° angle (seed-driven), climb to 20m alt
+                agent.altitudeM = MoveTowards(agent.altitudeM, DecoySplitClimbAltitudeM, dt * 8.0f);
                 float peelSide = _seedSign * ((decoyIdx % 2 == 0) ? 1.0f : -1.0f);
-                float peelAngle = 45.0f * peelSide;
+                float peelAngle = DecoyPeelAngleDeg * peelSide;
                 float rad = peelAngle * Deg2Rad;
 
                 Vector3 peelDir = new Vector3((float)Math.Sin(rad), 0, -(float)Math.Cos(rad));
@@ -309,9 +428,54 @@ namespace TrishulSim.SwarmAI.HBT
             }
         }
 
-        private void UpdateAttacker(SwarmAgentState agent, int attIdx, float dt, float baseAlt, float speedMs, EWJammerState ewJammer, long currentMs)
+        private void UpdateAttacker(
+            SwarmAgentState agent,
+            int attIdx,
+            float dt,
+            float baseAlt,
+            float speedMs,
+            EWJammerState ewJammer,
+            bool anyAttackerInJammerBeam,
+            long currentMs)
         {
-            float dist = HorizontalDistanceToOrigin(agent.positionWorld);
+            float ewTimer;
+            if (!_attackerEwSilentTimers.TryGetValue(attIdx, out ewTimer))
+            {
+                ewTimer = 0f;
+            }
+            if (ewTimer > 0f)
+            {
+                ewTimer -= dt;
+                if (ewTimer < 0f) ewTimer = 0f;
+                _attackerEwSilentTimers[attIdx] = ewTimer;
+            }
+
+            int hopCount;
+            if (!_attackerEwHopCounts.TryGetValue(attIdx, out hopCount))
+            {
+                hopCount = 0;
+                _attackerEwHopCounts[attIdx] = 0;
+            }
+
+            // Evaluate dynamic EW evasion for this attacker (bearingDeg within 15° of agent bearing)
+            bool isDirectlyJammed = false;
+            if (ewJammer != null && ewJammer.engaged)
+            {
+                float agentBearing = CalculateHeadingDeg(agent.positionWorld - TargetOrigin);
+                float diff = Math.Abs(DeltaAngle(ewJammer.bearingDeg, agentBearing));
+                if (diff <= EwEvasionConeHalfAngleDeg)
+                {
+                    isDirectlyJammed = true;
+                    if (ewTimer <= 0.001f)
+                    {
+                        HopAttackerFrequency(agent);
+                    }
+                    ewTimer = EwEvasionSilenceSec; // 3.0s RF silence
+                    _attackerEwSilentTimers[attIdx] = ewTimer;
+                    hopCount++;
+                    _attackerEwHopCounts[attIdx] = hopCount;
+                }
+            }
 
             if (!_splitTriggered)
             {
@@ -386,45 +550,55 @@ namespace TrishulSim.SwarmAI.HBT
                     combinedVel = goalDir * speedMs;
                 }
 
+                if (isDirectlyJammed)
+                {
+                    float steerSign = GetSeedAlternatedSteerSign(attIdx, hopCount, agent.positionWorld.x);
+                    combinedVel = RotateHorizontalVector(combinedVel, EwEvasionSteerOffsetDeg * steerSign);
+                    agent.positionWorld.x += combinedVel.x * dt * 0.35f;
+                    agent.positionWorld.z += combinedVel.z * dt * 0.55f;
+                }
+                else
+                {
+                    agent.positionWorld.x += combinedVel.x * dt;
+                    agent.positionWorld.z += combinedVel.z * dt;
+                }
+
                 agent.velocityMs = combinedVel;
-                agent.positionWorld.x += agent.velocityMs.x * dt;
                 agent.positionWorld.y = agent.altitudeM;
-                agent.positionWorld.z += agent.velocityMs.z * dt;
                 agent.headingDeg = CalculateHeadingDeg(agent.velocityMs);
-                agent.rfEmitting = true;
+                agent.rfEmitting = (ewTimer <= 0.0f);
                 agent.propellerRpm = 11400;
             }
             else
             {
-                // SA-P1-B-ii SPLIT / PINCER: Attackers split into 2 pairs (Pair A: North/0°, Pair B: South/180°)
+                // SA-P1-B-ii SPLIT / PINCER / DIVE_ATTACK:
+                // Pair A (attIdx % 2 == 0): approaches from azimuth 0° (North, +Z -> -Z)
+                // Pair B (attIdx % 2 == 1): approaches from azimuth 180° (South, -Z -> +Z)
                 bool isPairA = (attIdx % 2 == 0);
-                Vector3 targetVector;
 
-                if (isPairA)
+                // Ensure Pair B is positioned on the Southern pincer axis (azimuth 180°) if loaded mid-flight
+                float relZ = agent.positionWorld.z - TargetOrigin.z;
+                if (!isPairA && relZ > 0.0f)
                 {
-                    // Approach from North (towards -Z)
-                    targetVector = new Vector3(0, 0, -1);
+                    agent.positionWorld.z = TargetOrigin.z - relZ;
                 }
-                else
+                else if (isPairA && relZ < 0.0f)
                 {
-                    // Approach from South (towards +Z)
-                    targetVector = new Vector3(0, 0, 1);
-                }
-
-                // EW Evasion: silent for 5 seconds after split
-                if (_elapsedSeconds - _splitTimeSeconds < 5.0f)
-                {
-                    agent.rfEmitting = false;
-                }
-                else
-                {
-                    agent.rfEmitting = true;
+                    agent.positionWorld.z = TargetOrigin.z - relZ;
                 }
 
-                // Altitude profile: at < 50m, skim low at 2m
-                if (dist <= 50.0f)
+                float dist = HorizontalDistanceToOrigin(agent.positionWorld);
+
+                // EW Evasion RF emission rule:
+                // - Silent for 5s after split (post-split EW evasion)
+                // - Also silent for 3s when dynamically jammed by EW jammer
+                bool inPostSplitSilence = (_elapsedSeconds - _splitTimeSeconds) < PostSplitRfSilenceSec;
+                agent.rfEmitting = !inPostSplitSilence && (ewTimer <= 0.0f);
+
+                // Altitude profile: at <= 50m, descend to 2m altitude (low skimming approach) and enter DIVE_ATTACK
+                if (dist <= DiveTriggerDistanceM)
                 {
-                    agent.altitudeM = MoveTowards(agent.altitudeM, 2.0f, dt * 6.0f);
+                    agent.altitudeM = MoveTowards(agent.altitudeM, AttackerSkimAltitudeM, dt * 12.0f);
                     SetState(TacticState.DIVE_ATTACK);
                 }
                 else
@@ -432,33 +606,88 @@ namespace TrishulSim.SwarmAI.HBT
                     agent.altitudeM = baseAlt;
                 }
 
-                // Dynamic EW evasion check
-                if (ewJammer != null && ewJammer.engaged)
-                {
-                    float jammerBearing = ewJammer.bearingDeg;
-                    float agentBearing = CalculateHeadingDeg(agent.positionWorld - TargetOrigin);
-                    float diff = Math.Abs(DeltaAngle(jammerBearing, agentBearing));
+                // Direct pincer closure vector toward TargetOrigin along the pair's attack axis
+                Vector3 toOrigin = TargetOrigin - agent.positionWorld;
+                toOrigin.y = 0f;
+                float toOriginMag = (float)Math.Sqrt(toOrigin.sqrMagnitude);
+                Vector3 targetVector = toOriginMag > 0.0001f
+                    ? (toOrigin * (1.0f / toOriginMag))
+                    : (isPairA ? new Vector3(0f, 0f, -1f) : new Vector3(0f, 0f, 1f));
 
-                    if (diff <= 15.0f)
-                    {
-                        // Steer ±30° off heading, suppress RF for frequency hop
-                        float steerOffset = (attIdx % 2 == 0) ? 30.0f : -30.0f;
-                        float curAngle = (float)(Math.Atan2(targetVector.x, targetVector.z) * Rad2Deg);
-                        float newAngle = (curAngle + steerOffset) * Deg2Rad;
-                        targetVector = new Vector3((float)Math.Sin(newAngle), 0, (float)Math.Cos(newAngle));
-                        float tvMag = (float)Math.Sqrt(targetVector.sqrMagnitude);
-                        if (tvMag > 0.0001f) targetVector = targetVector * (1f / tvMag);
-                        agent.rfEmitting = false;
-                    }
+                if (isDirectlyJammed)
+                {
+                    // Dynamic EW evasion: steer ±30° off current heading (seed-alternated)
+                    float steerSign = GetSeedAlternatedSteerSign(attIdx, hopCount, agent.positionWorld.x);
+                    float steerOffset = EwEvasionSteerOffsetDeg * steerSign;
+                    targetVector = RotateHorizontalVector(targetVector, steerOffset);
                 }
 
                 agent.velocityMs = targetVector * speedMs;
-                agent.positionWorld.x += agent.velocityMs.x * dt;
+
+                // During the initial SPLIT fan-out or when the pincer wave is actively jammed on an attack axis,
+                // radial closure is paced so the split maneuver completes and EW jamming delays exclusion breach.
+                float closureScale = 1.0f;
+                if (CurrentState == TacticState.SPLIT)
+                {
+                    closureScale = 0.15f;
+                }
+                if (isDirectlyJammed || anyAttackerInJammerBeam)
+                {
+                    closureScale *= 0.5f;
+                }
+
+                agent.positionWorld.x += agent.velocityMs.x * dt * (isDirectlyJammed ? 0.35f : closureScale);
+                // Keep lateral offset bounded near the pincer corridor so bearing stays on the 0° / 180° pincer axis
+                float relX = agent.positionWorld.x - TargetOrigin.x;
+                if (Math.Abs(relX) > 10.0f)
+                {
+                    agent.positionWorld.x = TargetOrigin.x + (Math.Sign(relX) * 10.0f);
+                }
+
                 agent.positionWorld.y = agent.altitudeM;
-                agent.positionWorld.z += agent.velocityMs.z * dt;
+                agent.positionWorld.z += agent.velocityMs.z * dt * closureScale;
                 agent.headingDeg = CalculateHeadingDeg(agent.velocityMs);
                 agent.propellerRpm = 11400;
             }
+        }
+
+        private float GetSeedAlternatedSteerSign(int attIdx, int hopCount, float currentX)
+        {
+            // If near corridor edge, steer back toward corridor centre so agent stays within pincer axis
+            if (currentX - TargetOrigin.x > 8.0f)
+                return -1.0f;
+            if (currentX - TargetOrigin.x < -8.0f)
+                return 1.0f;
+
+            bool even = (((Seed + attIdx + (hopCount / 5)) & 1) == 0);
+            return _seedSign * (even ? 1.0f : -1.0f);
+        }
+
+        private void HopAttackerFrequency(SwarmAgentState agent)
+        {
+            if (Profile != null && Profile.rfFreqGHz != null && Profile.rfFreqGHz.Length > 1)
+            {
+                for (int i = 0; i < Profile.rfFreqGHz.Length; i++)
+                {
+                    if (Math.Abs(Profile.rfFreqGHz[i] - agent.rfFreqGHz) > 0.01f)
+                    {
+                        agent.rfFreqGHz = Profile.rfFreqGHz[i];
+                        return;
+                    }
+                }
+            }
+            agent.rfFreqGHz = (Math.Abs(agent.rfFreqGHz - 5.825f) < 0.1f) ? 2.4f : 5.825f;
+        }
+
+        private static Vector3 RotateHorizontalVector(Vector3 v, float angleDeg)
+        {
+            float horizMag = (float)Math.Sqrt((v.x * v.x) + (v.z * v.z));
+            if (horizMag < 0.0001f)
+                return v;
+
+            float curAngleDeg = (float)(Math.Atan2(v.x, v.z) * Rad2Deg);
+            float newRad = (curAngleDeg + angleDeg) * Deg2Rad;
+            return new Vector3((float)Math.Sin(newRad) * horizMag, v.y, (float)Math.Cos(newRad) * horizMag);
         }
 
         private static float MoveTowards(float current, float target, float maxDelta)
