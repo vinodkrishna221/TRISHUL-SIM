@@ -129,6 +129,40 @@ namespace TrishulSim.AAR
             }
         }
 
+        private sealed class LogWarningScope : IDisposable
+        {
+            private readonly Action<string> _handler;
+#if UNITY_5_3_OR_NEWER
+            private readonly Application.LogCallback _callback;
+#endif
+
+            public LogWarningScope(Action<string> handler)
+            {
+                _handler = handler;
+#if !UNITY_5_3_OR_NEWER
+                Debug.OnLogWarning += _handler;
+#else
+                _callback = (msg, stack, type) =>
+                {
+                    if (type == LogType.Warning && _handler != null)
+                    {
+                        _handler(msg);
+                    }
+                };
+                Application.logMessageReceived += _callback;
+#endif
+            }
+
+            public void Dispose()
+            {
+#if !UNITY_5_3_OR_NEWER
+                Debug.OnLogWarning -= _handler;
+#else
+                Application.logMessageReceived -= _callback;
+#endif
+            }
+        }
+
         /// <summary>
         /// Suite 1: Verifies EnsureSessionsDirectoryExists is completely idempotent and race-condition free.
         /// </summary>
@@ -184,7 +218,7 @@ namespace TrishulSim.AAR
                     capturedWarning = msg;
                 }
             };
-            Debug.OnLogWarning += logWarningHandler;
+            var warningScope = new LogWarningScope(logWarningHandler);
 
             try
             {
@@ -229,7 +263,7 @@ namespace TrishulSim.AAR
             }
             finally
             {
-                Debug.OnLogWarning -= logWarningHandler;
+                warningScope.Dispose();
             }
         }
 
@@ -367,7 +401,7 @@ namespace TrishulSim.AAR
                     warningsLogged.Add(msg);
                 }
             };
-            Debug.OnLogWarning += warningHandler;
+            var warningScope = new LogWarningScope(warningHandler);
 
             try
             {
@@ -386,7 +420,7 @@ namespace TrishulSim.AAR
             }
             finally
             {
-                Debug.OnLogWarning -= warningHandler;
+                warningScope.Dispose();
             }
         }
 
@@ -416,7 +450,7 @@ namespace TrishulSim.AAR
                     capturedWarning = msg;
                 }
             };
-            Debug.OnLogWarning += logWarningHandler;
+            var warningScope = new LogWarningScope(logWarningHandler);
 
             try
             {
@@ -471,7 +505,7 @@ namespace TrishulSim.AAR
             }
             finally
             {
-                Debug.OnLogWarning -= logWarningHandler;
+                warningScope.Dispose();
             }
         }
 
