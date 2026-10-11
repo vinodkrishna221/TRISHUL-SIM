@@ -66,7 +66,7 @@ namespace TrishulSim.Sensors
             rfWaterfallPeakGHz = 0f;
             rfWaterfallPeakDbm = -90f;
             dopplerPeakHz = 0f;
-            acousticSplDb = 32.5f;
+            acousticSplDb = 0f;
             radarDetectedCount = 0;
         }
 
@@ -81,17 +81,22 @@ namespace TrishulSim.Sensors
     }
 
     /// <summary>
-    /// Sensor suite computing engine for the simulation.
-    /// Runs on each 100 ms tick to update RF/Doppler/Acoustic readings
+    /// Sensor suite computing engine for the simulation (SA-P0-B Step 2).
+    /// Runs on each 100 ms tick to update Friis RF & radar readings
     /// and evaluate ROE friendly VHF blackout risk.
     /// </summary>
-    public class SensorSuiteComputer
+    public class SensorSuiteComputer : MonoBehaviour
     {
         // ── State ─────────────────────────────────────────────
         public bool friendlyVhfActive;
         public EWJammerState currentEwState;
         public SensorReadings currentReadings;
         public string activeScenarioId;
+
+        public SensorReadings CurrentSensorReadings
+        {
+            get { return currentReadings; }
+        }
 
         public SensorSuiteComputer()
         {
@@ -223,20 +228,23 @@ namespace TrishulSim.Sensors
         }
 
         /// <summary>
-        /// Computes or updates multi-spectral sensor readings from a swarm snapshot and trainee antenna position.
+        /// SA-P0-B Step 2: Computes multi-spectral sensor readings from a swarm snapshot and trainee antenna position.
+        /// - rfWaterfallPeakDbm: iterate emitting agents -> compute Friis -> return max power agent's dBm
+        /// - rfWaterfallPeakGHz: frequency of max-power agent
+        /// - radarDetectedCount: count agents where two-way radar return > -90 dBm
+        /// - dopplerPeakHz = 0.0f; acousticSplDb = 0.0f (P1 placeholders)
         /// </summary>
         public SensorReadings ComputeSensorReadings(SwarmAgentState[] snapshot, Vector3 antennaPos)
         {
             if (snapshot == null || snapshot.Length == 0)
             {
-                currentReadings = new SensorReadings(0f, -90f, 0f, 32.5f, 0);
+                currentReadings = new SensorReadings(0.0f, RfPhysics.NOISE_FLOOR_DBM, 0.0f, 0.0f, 0);
                 return currentReadings;
             }
 
-            float maxRfDbm = -120f;
-            float maxRfFreqGHz = 0f;
-            float maxDopplerHz = 0f;
-            float maxSplDb = 0f;
+            float maxRfDbm = float.NegativeInfinity;
+            float maxRfFreqGHz = 0.0f;
+            bool foundEmitting = false;
             int radarHits = 0;
 
             for (int i = 0; i < snapshot.Length; i++)
@@ -245,55 +253,47 @@ namespace TrishulSim.Sensors
                 if (agent == null || agent.isNeutralised)
                     continue;
 
-                // Simple range approximation for radar/sensor return
                 float dx = agent.positionWorld.x - antennaPos.x;
                 float dy = agent.positionWorld.y - antennaPos.y;
                 float dz = agent.positionWorld.z - antennaPos.z;
-                float distM = (float)Math.Sqrt(dx * dx + dy * dy + dz * dz);
-                if (distM < 1.0f) distM = 1.0f;
+                float distM = (float)Math.Sqrt((dx * dx) + (dy * dy) + (dz * dz));
+                if (distM < RfPhysics.MIN_DISTANCE_METRES)
+                    distM = RfPhysics.MIN_DISTANCE_METRES;
+
+                if (agent.rfEmitting)
+                {
+                    float receivedDbm = RfPhysics.ComputeFriisDbm(agent.rfPowerDbm, agent.rfFreqGHz, distM);
+                    if (!foundEmitting || receivedDbm > maxRfDbm)
+                    {
+                        maxRfDbm = receivedDbm;
+                        maxRfFreqGHz = agent.rfFreqGHz;
+                        foundEmitting = true;
+                    }
+                }
 
                 // SA-P2-B performance optimization: early-out when agent distance > 500m
-                // Beyond 500m, radar return is below -90 dBm threshold and acoustic signature is sub-audible.
+                // Beyond 500m, two-way radar return is well below -90 dBm threshold.
                 if (distM > 500.0f)
-                {
-                    if (agent.rfEmitting && agent.rfPowerDbm > maxRfDbm)
-                    {
-                        maxRfDbm = agent.rfPowerDbm;
-                        maxRfFreqGHz = agent.rfFreqGHz;
-                    }
                     continue;
-                }
 
-                if (agent.rfEmitting && agent.rfPowerDbm > maxRfDbm)
-                {
-                    maxRfDbm = agent.rfPowerDbm;
-                    maxRfFreqGHz = agent.rfFreqGHz;
-                }
-
-                if (distM <= 350.0f)
+                float radarReturnDbm = RfPhysics.ComputeRadarReturnDbm(agent.rfPowerDbm, agent.rfFreqGHz, distM, agent.rcs);
+                if (radarReturnDbm > RfPhysics.RADAR_DETECTION_THRESHOLD_DBM)
                 {
                     radarHits++;
                 }
+            }
 
-                // Blade-tip harmonic approx
-                float bladeTip = (agent.propellerRpm / 60f) * 4f * 0.289f; // ~220 Hz
-                if (bladeTip > maxDopplerHz)
-                {
-                    maxDopplerHz = bladeTip;
-                }
-
-                float spl = 85.0f - (20.0f * (float)Math.Log10(distM));
-                if (spl > maxSplDb)
-                {
-                    maxSplDb = spl;
-                }
+            if (!foundEmitting)
+            {
+                maxRfDbm = RfPhysics.NOISE_FLOOR_DBM;
+                maxRfFreqGHz = 0.0f;
             }
 
             currentReadings = new SensorReadings(
-                maxRfFreqGHz > 0 ? maxRfFreqGHz : 5.825f,
-                maxRfDbm > -120f ? maxRfDbm - 40f : -62.3f,
-                maxDopplerHz > 0 ? maxDopplerHz : 220.4f,
-                maxSplDb > 0 ? maxSplDb : 54.2f,
+                maxRfFreqGHz,
+                maxRfDbm,
+                0.0f,
+                0.0f,
                 radarHits
             );
 

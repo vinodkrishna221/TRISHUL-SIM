@@ -46,13 +46,46 @@ namespace TrishulSim.SwarmAI
         private SwarmProfile _currentProfile;
         private string _currentScenarioId;
         private int _currentSeed;
+        private SensorSuiteComputer _sensorSuiteComputer;
+        private Vector3 _antennaPosition = Vector3.zero;
+        private SensorReadings _lastSensorReadings;
 
         public GameObject swarmAgentPrefab;
         public event Action<SwarmAgentState[]> OnSwarmSnapshotInjected;
+        public event Action<SensorReadings> OnSensorReadingsInjected;
 
         public IReadOnlyList<BoidAgent> BoidAgents
         {
             get { return _boidAgents; }
+        }
+
+        public SensorSuiteComputer SensorSuiteComputer
+        {
+            get { return _sensorSuiteComputer; }
+        }
+
+        public Vector3 AntennaPosition
+        {
+            get { return _antennaPosition; }
+            set { _antennaPosition = value; }
+        }
+
+        public SensorReadings LastSensorReadings
+        {
+            get { return _lastSensorReadings; }
+        }
+
+        /// <summary>
+        /// SA-P0-B Step 3: Registers a SensorSuiteComputer instance with SwarmManager to compute
+        /// SensorReadings after each GetSwarmSnapshot() call.
+        /// </summary>
+        public void RegisterSensorSuiteComputer(SensorSuiteComputer computer)
+        {
+            _sensorSuiteComputer = computer ?? new SensorSuiteComputer();
+            if (!string.IsNullOrEmpty(_currentScenarioId))
+            {
+                _sensorSuiteComputer.ConfigureScenario(_currentScenarioId);
+            }
         }
 
         public int CurrentSeed
@@ -96,6 +129,9 @@ namespace TrishulSim.SwarmAI
             _agents = new List<SwarmAgentState>();
             _boidAgents = new List<BoidAgent>();
             _flockController = new BoidFlockController();
+            _sensorSuiteComputer = new SensorSuiteComputer();
+            _antennaPosition = Vector3.zero;
+            _lastSensorReadings = new SensorReadings();
             _allNeutralised = false;
             _allNeutralisedAtMs = null;
             _currentTactic = null;
@@ -186,6 +222,13 @@ namespace TrishulSim.SwarmAI
                 : "PINCER_LOW_FAST";
             _currentTactic = TacticTreeFactory.Create(tacticName);
             _currentTactic.Initialize(_currentProfile, seed, _agents, origin);
+
+            if (_sensorSuiteComputer == null)
+            {
+                _sensorSuiteComputer = new SensorSuiteComputer();
+            }
+            _sensorSuiteComputer.ConfigureScenario(_currentScenarioId);
+            _lastSensorReadings = _sensorSuiteComputer.ComputeSensorReadings(_agents.ToArray(), _antennaPosition);
         }
 
         /// <summary>
@@ -224,6 +267,7 @@ namespace TrishulSim.SwarmAI
             _currentTactic = null;
             _allNeutralised = false;
             _allNeutralisedAtMs = null;
+            _lastSensorReadings = new SensorReadings();
         }
 
         private BoidAgent CreateBoidAgentInstance(int index, bool isDecoy)
@@ -421,10 +465,13 @@ namespace TrishulSim.SwarmAI
         }
 
         /// <summary>
-        /// SA-P0-A Step 3 & 4: Called by ScenarioManager / TickLoop before each SCENARIO_TICK broadcast.
-        /// Returns current SwarmAgentState[] and invokes registered snapshot consumer callbacks.
+        /// SA-P0-A Step 3 & 4 / SA-P0-B Step 3: Called by ScenarioManager / TickLoop before each SCENARIO_TICK broadcast.
+        /// Returns current SwarmAgentState[], computes SensorReadings via registered SensorSuiteComputer,
+        /// and invokes registered snapshot and sensor consumer callbacks.
         /// </summary>
-        public SwarmAgentState[] InjectSwarmSnapshot(Action<SwarmAgentState[]> targetInjector = null)
+        public SwarmAgentState[] InjectSwarmSnapshot(
+            Action<SwarmAgentState[]> targetInjector = null,
+            Action<SensorReadings> sensorInjector = null)
         {
             SwarmAgentState[] snapshot = GetSwarmSnapshot();
             if (targetInjector != null)
@@ -435,7 +482,44 @@ namespace TrishulSim.SwarmAI
             {
                 OnSwarmSnapshotInjected(snapshot);
             }
+
+            if (_sensorSuiteComputer == null)
+            {
+                _sensorSuiteComputer = new SensorSuiteComputer();
+            }
+            _lastSensorReadings = _sensorSuiteComputer.ComputeSensorReadings(snapshot, _antennaPosition);
+            if (sensorInjector != null)
+            {
+                sensorInjector(_lastSensorReadings);
+            }
+            if (OnSensorReadingsInjected != null)
+            {
+                OnSensorReadingsInjected(_lastSensorReadings);
+            }
+
             return snapshot;
+        }
+
+        /// <summary>
+        /// SA-P0-B Step 3: Computes and injects SensorReadings for the current swarm snapshot into SCENARIO_TICK.
+        /// </summary>
+        public SensorReadings InjectSensorReadings(Action<SensorReadings> sensorInjector = null)
+        {
+            SwarmAgentState[] snapshot = GetSwarmSnapshot();
+            if (_sensorSuiteComputer == null)
+            {
+                _sensorSuiteComputer = new SensorSuiteComputer();
+            }
+            _lastSensorReadings = _sensorSuiteComputer.ComputeSensorReadings(snapshot, _antennaPosition);
+            if (sensorInjector != null)
+            {
+                sensorInjector(_lastSensorReadings);
+            }
+            if (OnSensorReadingsInjected != null)
+            {
+                OnSensorReadingsInjected(_lastSensorReadings);
+            }
+            return _lastSensorReadings;
         }
 
         /// <summary>

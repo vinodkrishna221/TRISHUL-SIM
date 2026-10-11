@@ -135,7 +135,7 @@ DELIVERABLE:
 TEST:
   SCENARIO_TICK Console: sensorReadings.rfWaterfallPeakDbm is a negative float that gets
   less negative as agents approach. At 50m: expected ≈ -36 dBm. radarDetectedCount increases.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
