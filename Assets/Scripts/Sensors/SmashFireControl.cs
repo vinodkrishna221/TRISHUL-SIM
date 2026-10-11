@@ -54,7 +54,7 @@ namespace TrishulSim.Sensors
         public float antennaBearingDeg;
         public float antennaElevationDeg;
         public bool ewEngaged;
-        public float? ewBandGHz;
+        [System.NonSerialized] public float? ewBandGHz;
         public KineticEvent kinetic;
         public bool kineticFireTriggered;
 
