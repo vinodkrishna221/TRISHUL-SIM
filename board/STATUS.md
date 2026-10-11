@@ -15,7 +15,7 @@
 |---|---|---|---|
 | unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B, US-P2-A, US-P2-B, US-P2-C | — | US-P2-D (Warden review coordination + smoke) |
 | swarm-ai | SA-P0-A, SA-P1-C, SA-P1-D, SA-P2-A, SA-P2-B (Burst pass) | — | SA-P0-B (Friis RF model) / SA-P3-A (Demo seed tuning) |
-| aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A, AA-P2-B | — | AA-P3-A (Partial-file guard) |
+| aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A, AA-P2-B, AA-P3-A | — | — (Track complete) |
 | ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B, UX-P1-D, UX-P2-A | — | UX-P1-C (Split-screen) / UX-P2-B (Bilingual pass) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
@@ -48,7 +48,8 @@
 ## Log (one line per session-end, newest first)
 
 - 2026-10-11T11:52 IST · Venu: SA-P0-A done — BoidAgent MonoBehaviour (all 13 Entity 2 fields, decoy RCS 0.08/9800 RPM blue sphere vs attacker RCS 0.012/11400 RPM red sphere), BoidFlockController Update() + 3 rules, SwarmManager OnScenarioStart(seed)/OnScenarioEnd()/InjectSwarmSnapshot() + WS lifecycle wiring, and SwarmAgentVisual.prefab; BoidsSpawnSelfTest PASSED
-- 2026-10-10T15:25 IST · Uday: SA-P2-B done — BoidFlockController classical 3 rules + double-buffering, Burst/Job System BoidStepJob, radar loop >500m early-out; 1000-frame 8-agent Punjab benchmark at 0.0021 ms/frame (>400,000 FPS, <16.7ms budget); BurstPerformanceSelfTest PASSED
+- 2026-10-10T18:55 IST · Sohail (aar-engine): [AA-P3-A] ✅ Partial-file guard + session manifest hardening live (TelemetryLogger IOException catch & partialFlag, ScorecardComputer 0-byte/read error SCORECARD_COMPUTE_FAILED WS ERROR broadcast, SessionManifest partial:true, startup orphaned session scan, idempotent dir creation) — self-test green on eat/aar-engine-partial-guard
+- 2026-10-10T15:25 IST Â· Uday: SA-P2-B done â€” BoidFlockController classical 3 rules + double-buffering, Burst/Job System BoidStepJob, radar loop >500m early-out; 1000-frame 8-agent Punjab benchmark at 0.0021 ms/frame (>400,000 FPS, <16.7ms budget); BurstPerformanceSelfTest PASSED
 - 2026-10-10T15:08 IST Â· Uday: SA-P2-A done â€” SATURATION_DIVE broad front + 100m simultaneous dive + 4s freq hop, MULTI-AXIS_SPLIT 4 cardinal vectors + 915 MHz, TacticTreeFactory dynamic binding; TacticTreesSelfTest PASSED
 - 2026-10-10T14:50 IST Â· Uday: SA-P1-D done â€” SMASH 2000 lead-angle reticle + KineticEvent hit resolution + SwarmManager neutralisation and ALL_NEUTRALISED terminal state; SmashFireControlSelfTest PASSED
 - 2026-10-10T15:52 IST Â· Vinod (unity-sim): [FIX] âœ… Resolved WebSocket HTTP 400 handshake rejection in WsServer (Mono header parsing), migrated SplitScreen & InstructorC2 EventSystem to InputSystemUIInputModule, and added solid clickable raycast hitboxes for Launch/Abort buttons
