@@ -171,8 +171,15 @@ namespace TrishulSim.SwarmAI
         /// (first decoyCount marked as decoys with blue sphere tint, remaining as attackers with red sphere tint)
         /// in coherent formation, and binds the scenario tactic tree.
         /// SA-P1-A Step 4: Passes WeatherPreset.temperature to SensorSuiteComputer for ISO 9613-1 correction.
+        /// SA-P1-B-i Step 4: Registers PincerLowFastTactic when tacticTree == "PINCER_LOW_FAST" with decoys at altitudeM + 5m.
         /// </summary>
-        public void OnScenarioStart(SwarmProfile profile, int seed, string scenarioId = "punjab-fog-pincer-01", Vector3? targetOrigin = null, float? temperatureCelsius = null)
+        public void OnScenarioStart(
+            SwarmProfile profile,
+            int seed,
+            string scenarioId = "punjab-fog-pincer-01",
+            Vector3? targetOrigin = null,
+            float? temperatureCelsius = null,
+            float? spawnDistanceM = null)
         {
             OnScenarioEnd();
 
@@ -189,8 +196,8 @@ namespace TrishulSim.SwarmAI
             float baseAlt = _currentProfile.altitudeM > 0f ? _currentProfile.altitudeM : 8.0f;
             float speedMs = _currentProfile.SpeedMs > 0f ? _currentProfile.SpeedMs : (120.0f / 3.6f);
 
-            // Spawn coherent formation around approach corridor (~260m out, within 20m neighbour radius so Boids cohere)
-            float baseRangeM = 260.0f;
+            // Spawn coherent formation around approach corridor (~300m out, within 20m neighbour radius so Boids cohere)
+            float baseRangeM = spawnDistanceM.HasValue && spawnDistanceM.Value > 0f ? spawnDistanceM.Value : 300.0f;
             float formationSpacingM = 3.2f;
             float halfWidth = ((totalAgents - 1) * formationSpacingM) * 0.5f;
 
@@ -199,10 +206,9 @@ namespace TrishulSim.SwarmAI
                 bool isDecoy = i < decoyCount;
                 float jitterX = UnityEngine.Random.Range(-0.8f, 0.8f);
                 float jitterZ = UnityEngine.Random.Range(-1.2f, 1.2f);
-                float jitterY = UnityEngine.Random.Range(-0.4f, 0.4f);
 
                 float spawnX = (i * formationSpacingM) - halfWidth + jitterX;
-                float spawnY = (isDecoy ? (baseAlt + 2.0f) : baseAlt) + jitterY;
+                float spawnY = isDecoy ? (baseAlt + PincerLowFastTactic.DecoyAltitudeOffsetM) : baseAlt;
                 float spawnZ = baseRangeM + (isDecoy ? -4.0f : 0.0f) + jitterZ;
 
                 Vector3 spawnPos = new Vector3(spawnX, spawnY, spawnZ);
@@ -218,11 +224,7 @@ namespace TrishulSim.SwarmAI
                 _boidAgents.Add(boid);
             }
 
-            string tacticName = !string.IsNullOrEmpty(_currentProfile.tacticTree)
-                ? _currentProfile.tacticTree
-                : "PINCER_LOW_FAST";
-            _currentTactic = TacticTreeFactory.Create(tacticName);
-            _currentTactic.Initialize(_currentProfile, seed, _agents, origin);
+            RegisterTacticTree(_currentProfile, seed, origin);
 
             if (_sensorSuiteComputer == null)
             {
@@ -230,6 +232,37 @@ namespace TrishulSim.SwarmAI
             }
             _sensorSuiteComputer.ConfigureScenario(_currentScenarioId, null, temperatureCelsius);
             _lastSensorReadings = _sensorSuiteComputer.ComputeSensorReadings(_agents.ToArray(), _antennaPosition);
+        }
+
+        /// <summary>
+        /// SA-P1-B-i Step 4: Registers PincerLowFastTactic when SwarmProfile.tacticTree == "PINCER_LOW_FAST"
+        /// (or delegates to TacticTreeFactory for additional tactics) and binds BoidFlockController weights.
+        /// </summary>
+        public TacticTree RegisterTacticTree(SwarmProfile profile, int seed, Vector3 targetOrigin)
+        {
+            string tacticName = (profile != null && !string.IsNullOrEmpty(profile.tacticTree))
+                ? profile.tacticTree.Trim()
+                : "PINCER_LOW_FAST";
+
+            if (string.Equals(tacticName, "PINCER_LOW_FAST", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(tacticName, "PINCER-LOW-FAST", StringComparison.OrdinalIgnoreCase))
+            {
+                PincerLowFastTactic pincerTactic = new PincerLowFastTactic();
+                pincerTactic.FlockController = _flockController;
+                _currentTactic = pincerTactic;
+            }
+            else
+            {
+                _currentTactic = TacticTreeFactory.Create(tacticName);
+                PincerLowFastTactic fallbackPincer = _currentTactic as PincerLowFastTactic;
+                if (fallbackPincer != null)
+                {
+                    fallbackPincer.FlockController = _flockController;
+                }
+            }
+
+            _currentTactic.Initialize(profile, seed, _agents, targetOrigin);
+            return _currentTactic;
         }
 
         /// <summary>
@@ -432,10 +465,8 @@ namespace TrishulSim.SwarmAI
             }
             _sensorSuiteComputer.ConfigureScenario(_currentScenarioId, null, parsedTempOverride);
 
-            // Bind HBT tactic tree via TacticTreeFactory (SA-P2-A core requirement)
-            string tacticName = profile != null ? profile.tacticTree : "PINCER_LOW_FAST";
-            _currentTactic = TacticTreeFactory.Create(tacticName);
-            _currentTactic.Initialize(_currentProfile, seed, _agents, origin);
+            // Bind HBT tactic tree via RegisterTacticTree / TacticTreeFactory (SA-P1-B-i / SA-P2-A)
+            RegisterTacticTree(_currentProfile, seed, origin);
         }
 
         /// <summary>
