@@ -108,6 +108,9 @@ namespace TrishulSim.VR
 
             TestZeroDroneVisibilityDoctrine();
             Console.WriteLine("[PASS] TestZeroDroneVisibilityDoctrine");
+
+            TestURPPipelineConfiguration();
+            Console.WriteLine("[PASS] TestURPPipelineConfiguration");
         }
 
         public static void TestSceneFileExistsAndValidYaml()
@@ -368,6 +371,26 @@ namespace TrishulSim.VR
             Assert(!yaml.ToLowerInvariant().Contains("drone"), "CRITICAL: Zero drone objects allowed in VRSentryPost scene (Beat 4 zero-visibility doctrine)");
             Assert(!yaml.Contains("BoidAgent"), "No BoidAgent components in VRSentryPost scene");
             Assert(!yaml.Contains("SwarmManager"), "No SwarmManager in VRSentryPost scene");
+        }
+
+        public static void TestURPPipelineConfiguration()
+        {
+            string rendererPath = Path.Combine("Assets", "Settings", "TrishulURPRenderer.asset");
+            string rendererMeta = rendererPath + ".meta";
+            Assert(File.Exists(rendererPath), "TrishulURPRenderer.asset must exist at " + rendererPath);
+            Assert(File.Exists(rendererMeta), "TrishulURPRenderer.asset.meta must exist at " + rendererMeta);
+
+            string pipelinePath = Path.Combine("Assets", "Settings", "TrishulURPPipeline.asset");
+            string pipelineMeta = pipelinePath + ".meta";
+            Assert(File.Exists(pipelinePath), "TrishulURPPipeline.asset must exist at " + pipelinePath);
+            Assert(File.Exists(pipelineMeta), "TrishulURPPipeline.asset.meta must exist at " + pipelineMeta);
+
+            string pipelineYaml = File.ReadAllText(pipelinePath, Encoding.UTF8);
+            Assert(pipelineYaml.Contains("guid: a1b2c3d4e5f647898a1b2c3d4e5f9201"), "TrishulURPPipeline must reference TrishulURPRenderer GUID");
+
+            string graphicsSettings = Path.Combine("ProjectSettings", "GraphicsSettings.asset");
+            string graphicsYaml = File.ReadAllText(graphicsSettings, Encoding.UTF8);
+            Assert(graphicsYaml.Contains("m_CustomRenderPipeline: {fileID: 11400000, guid: a1b2c3d4e5f647898a1b2c3d4e5f9202, type: 2}"), "GraphicsSettings m_CustomRenderPipeline must reference TrishulURPPipeline GUID");
         }
 
         private static void Assert(bool condition, string message)
