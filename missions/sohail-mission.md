@@ -341,7 +341,7 @@ DELIVERABLE: TelemetryLogger.cs + ScorecardComputer.cs hardened; partial flag in
 TEST:
   Write-protect sessions/ → run scenario → Console "IOException during telemetry write — continuing in partial mode"
   After END: SCORECARD_COMPUTE_FAILED broadcast. Remove protection → next run works normally.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -431,4 +431,4 @@ PERSONA: Sohail (aar-engine)   STATUS: [ ] todo
 
 > I, Sohail, have read this brief and will push `feat/aar-engine-telemetry-logger` the same day Vinod's WS IPC + Tick loop branches land.
 
-- [ ] **ACCEPTED**
+- [x] **ACCEPTED**
