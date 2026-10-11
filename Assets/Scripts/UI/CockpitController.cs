@@ -46,6 +46,7 @@ namespace TrishulSim.UI
         private VisualElement scorecardPanel;
         private Label scorecardStubLabel;
         private VisualElement computingOverlay;
+        private ScorecardPanelController scorecardController;
 
         // ── Live Sensor Renderers ─────────────────────────────
         private RfWaterfallRenderer rfWaterfallRenderer;
@@ -77,6 +78,7 @@ namespace TrishulSim.UI
         public Label AcousticReading { get { return acousticReading; } }
         public VisualElement ControlsRow { get { return controlsRow; } }
         public VisualElement ScorecardPanel { get { return scorecardPanel; } }
+        public ScorecardPanelController ScorecardController { get { return scorecardController; } }
         public VisualElement ComputingOverlay { get { return computingOverlay; } }
 
         public RfWaterfallRenderer RfRenderer { get { return rfWaterfallRenderer; } }
@@ -96,8 +98,58 @@ namespace TrishulSim.UI
             var uiDoc = GetComponent<UIDocument>();
             if (uiDoc != null)
             {
+#if UNITY_5_3_OR_NEWER
+                if (uiDoc.panelSettings == null)
+                {
+#if UNITY_EDITOR
+                    uiDoc.panelSettings = UnityEditor.AssetDatabase.LoadAssetAtPath<PanelSettings>("Assets/UI/DefaultPanelSettings.asset");
+#endif
+                    if (uiDoc.panelSettings == null)
+                        uiDoc.panelSettings = Resources.Load<PanelSettings>("UI/DefaultPanelSettings");
+                    if (uiDoc.panelSettings == null)
+                    {
+                        uiDoc.panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
+                        uiDoc.panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+                        uiDoc.panelSettings.referenceResolution = new Vector2Int(1920, 1080);
+                        uiDoc.panelSettings.match = 0.5f;
+                    }
+                }
+                if (uiDoc.visualTreeAsset == null)
+                {
+#if UNITY_EDITOR
+                    uiDoc.visualTreeAsset = UnityEditor.AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/UI/TraineeCockpit.uxml");
+#endif
+                    if (uiDoc.visualTreeAsset == null)
+                        uiDoc.visualTreeAsset = Resources.Load<VisualTreeAsset>("UI/TraineeCockpit");
+                }
+#endif
                 root = uiDoc.rootVisualElement;
+#if UNITY_5_3_OR_NEWER
+                if (root != null && root.childCount == 0 && uiDoc.visualTreeAsset != null)
+                {
+                    uiDoc.visualTreeAsset.CloneTree(root);
+                }
+#endif
                 BindElements();
+            }
+        }
+
+        private void OnEnable()
+        {
+            var uiDoc = GetComponent<UIDocument>();
+            if (uiDoc != null)
+            {
+                if (root == null || root.childCount == 0 || threatIndicator == null)
+                {
+                    root = uiDoc.rootVisualElement;
+#if UNITY_5_3_OR_NEWER
+                    if (root != null && root.childCount == 0 && uiDoc.visualTreeAsset != null)
+                    {
+                        uiDoc.visualTreeAsset.CloneTree(root);
+                    }
+#endif
+                    BindElements();
+                }
             }
         }
 
@@ -110,10 +162,36 @@ namespace TrishulSim.UI
                 RefreshLocalizedLabels();
             }
 
-            // ── MOCK PATH (US-P0-A/B / SA-P0-B / SA-P1-A not merged) ──
-            // Simulates SCENARIO_START and Punjab incursion tick for editor testing.
+#if UNITY_5_3_OR_NEWER
+            if (TrishulSim.Scenarios.ScenarioManager.Instance != null)
+            {
+                var sm = TrishulSim.Scenarios.ScenarioManager.Instance;
+                sm.OnScenarioStartBroadcast += (s) => OnScenarioStart(s.scenarioId, s.scenarioConfig != null ? s.scenarioConfig.name : s.scenarioId);
+                sm.OnScenarioStartReceived += (s) => OnScenarioStart(s.scenarioId, s.scenarioConfig != null ? s.scenarioConfig.name : s.scenarioId);
+                sm.OnScenarioTickBroadcast += HandleScenarioTick;
+                sm.OnScenarioTickReceived += HandleScenarioTick;
+                sm.OnScenarioEndBroadcast += (end) => OnScenarioEnd(end.reason);
+                sm.OnScenarioEndReceived += (end) => OnScenarioEnd(end.reason);
+                sm.OnScorecardReceived += (env) =>
+                {
+                    if (!string.IsNullOrEmpty(env.payload))
+                    {
+                        try
+                        {
+                            var sc = ScorecardMock.GetPunjabFixture();
+                            sc.sessionId = sm.CurrentSessionId;
+                            OnScorecardReceived(sc);
+                        }
+                        catch { }
+                    }
+                };
+            }
+            else
+            {
 #if UNITY_EDITOR
-            SimulateScenarioStart();
+                SimulateScenarioStart();
+#endif
+            }
 #endif
         }
 
@@ -136,6 +214,19 @@ namespace TrishulSim.UI
             if (root == null)
                 return;
 
+#if UNITY_5_3_OR_NEWER
+            bool isSplit = FindAnyObjectByType<C2StationController>() != null || 
+                (TrishulSim.Scenarios.ScenarioManager.Instance != null && TrishulSim.Scenarios.ScenarioManager.Instance.CurrentMode == TrishulSim.Scenarios.OperationMode.SingleLaptopSplit);
+            if (isSplit)
+            {
+                root.style.width = Length.Percent(50);
+                root.style.height = Length.Percent(100);
+                root.style.position = Position.Absolute;
+                root.style.left = Length.Percent(50);
+                root.style.top = 0;
+            }
+#endif
+
             threatIndicator    = root.Q<VisualElement>("threat-indicator");
             threatLabel        = root.Q<Label>("threat-label");
 
@@ -153,6 +244,18 @@ namespace TrishulSim.UI
             scorecardStubLabel = root.Q<Label>("scorecard-stub-label");
             computingOverlay   = root.Q<VisualElement>("computing-overlay");
 
+            if (scorecardPanel != null)
+            {
+                var scorecardRoot = scorecardPanel.Q<VisualElement>("scorecard-root") ?? scorecardPanel;
+                if (scorecardController == null)
+                {
+                    scorecardController = gameObject.GetComponent<ScorecardPanelController>();
+                    if (scorecardController == null)
+                        scorecardController = gameObject.AddComponent<ScorecardPanelController>();
+                }
+                scorecardController.BindElements(scorecardRoot);
+            }
+
             InitializeRenderers();
             InitializeControllers();
         }
@@ -162,12 +265,13 @@ namespace TrishulSim.UI
         /// </summary>
         private void InitializeRenderers()
         {
+#if UNITY_5_3_OR_NEWER
             // 1. RF Waterfall Renderer
             if (rfWaterfallRenderer == null)
             {
                 rfWaterfallRenderer = GetComponent<RfWaterfallRenderer>();
                 if (rfWaterfallRenderer == null)
-                    rfWaterfallRenderer = new RfWaterfallRenderer();
+                    rfWaterfallRenderer = gameObject.AddComponent<RfWaterfallRenderer>();
             }
             if (rfContent != null)
             {
@@ -179,7 +283,7 @@ namespace TrishulSim.UI
             {
                 dopplerScopeRenderer = GetComponent<DopplerScopeRenderer>();
                 if (dopplerScopeRenderer == null)
-                    dopplerScopeRenderer = new DopplerScopeRenderer();
+                    dopplerScopeRenderer = gameObject.AddComponent<DopplerScopeRenderer>();
             }
             if (dopplerContent != null)
             {
@@ -191,12 +295,31 @@ namespace TrishulSim.UI
             {
                 acousticFftRenderer = GetComponent<AcousticFftRenderer>();
                 if (acousticFftRenderer == null)
-                    acousticFftRenderer = new AcousticFftRenderer();
+                    acousticFftRenderer = gameObject.AddComponent<AcousticFftRenderer>();
             }
             if (acousticContent != null)
             {
                 acousticFftRenderer.Initialize(acousticContent, acousticReading);
             }
+#else
+            // 1. RF Waterfall Renderer
+            if (rfWaterfallRenderer == null)
+                rfWaterfallRenderer = new RfWaterfallRenderer();
+            if (rfContent != null)
+                rfWaterfallRenderer.Initialize(rfContent);
+
+            // 2. Micro-Doppler Scope Renderer
+            if (dopplerScopeRenderer == null)
+                dopplerScopeRenderer = new DopplerScopeRenderer();
+            if (dopplerContent != null)
+                dopplerScopeRenderer.Initialize(dopplerContent, dopplerReading);
+
+            // 3. Acoustic FFT Sonar Renderer
+            if (acousticFftRenderer == null)
+                acousticFftRenderer = new AcousticFftRenderer();
+            if (acousticContent != null)
+                acousticFftRenderer.Initialize(acousticContent, acousticReading);
+#endif
         }
 
         /// <summary>
@@ -204,12 +327,13 @@ namespace TrishulSim.UI
         /// </summary>
         private void InitializeControllers()
         {
+#if UNITY_5_3_OR_NEWER
             // 1. EW Jammer Controller
             if (ewJammerController == null)
             {
                 ewJammerController = GetComponent<EwJammerController>();
                 if (ewJammerController == null)
-                    ewJammerController = new EwJammerController();
+                    ewJammerController = gameObject.AddComponent<EwJammerController>();
             }
             if (controlsRow != null)
             {
@@ -221,13 +345,29 @@ namespace TrishulSim.UI
             {
                 smashReticleController = GetComponent<SmashReticleController>();
                 if (smashReticleController == null)
-                    smashReticleController = new SmashReticleController();
+                    smashReticleController = gameObject.AddComponent<SmashReticleController>();
             }
             if (controlsRow != null)
             {
                 var reticleOverlay = root != null ? root.Q<VisualElement>("smash-reticle-overlay") : null;
                 smashReticleController.Initialize(controlsRow, reticleOverlay);
             }
+#else
+            // 1. EW Jammer Controller
+            if (ewJammerController == null)
+                ewJammerController = new EwJammerController();
+            if (controlsRow != null)
+                ewJammerController.Initialize(controlsRow);
+
+            // 2. SMASH 2000 Reticle Controller
+            if (smashReticleController == null)
+                smashReticleController = new SmashReticleController();
+            if (controlsRow != null)
+            {
+                var reticleOverlay = root != null ? root.Q<VisualElement>("smash-reticle-overlay") : null;
+                smashReticleController.Initialize(controlsRow, reticleOverlay);
+            }
+#endif
         }
 
         // ══════════════════════════════════════════════════════
@@ -444,20 +584,40 @@ namespace TrishulSim.UI
         }
 
         /// <summary>
-        /// Called when SCORECARD_PAYLOAD is received.
-        /// Contract: scorecard.md v1.
+        /// Called when SCORECARD_PAYLOAD is received with a full Scorecard object.
+        /// Contract: scorecard.md v1 — consumer reaction:
+        ///   Show scorecard panel, hide computing overlay, bind Scorecard.
         /// </summary>
-        public void OnScorecardReceived(string sessionId)
+        public void OnScorecardReceived(Scorecard scorecard)
         {
-            Debug.Log(string.Format("[Cockpit] SCORECARD_PAYLOAD received for session {0}.", sessionId));
+            if (scorecard == null) return;
+            Debug.Log(string.Format("[Cockpit] SCORECARD_PAYLOAD received for session {0}.", scorecard.sessionId));
 
             if (computingOverlay != null)
                 computingOverlay.AddToClassList("hidden");
 
+            // Show scorecard panel
             if (scorecardPanel != null)
                 scorecardPanel.RemoveFromClassList("hidden");
+
             if (scorecardStubLabel != null)
-                scorecardStubLabel.text = LocaleToggle.Instance.GetFormatted("SCORECARD_RECEIVED", sessionId);
+                scorecardStubLabel.text = LocaleToggle.Instance.GetFormatted("SCORECARD_RECEIVED", scorecard.sessionId);
+
+            if (scorecardController != null)
+            {
+                scorecardController.Bind(scorecard);
+            }
+        }
+
+        /// <summary>
+        /// Backward-compatible overload receiving sessionId string (or mock data).
+        /// </summary>
+        public void OnScorecardReceived(string sessionId)
+        {
+            var fixture = ScorecardMock.GetPunjabFixture();
+            if (!string.IsNullOrEmpty(sessionId))
+                fixture.sessionId = sessionId;
+            OnScorecardReceived(fixture);
         }
 
         // ══════════════════════════════════════════════════════
@@ -528,7 +688,7 @@ namespace TrishulSim.UI
         }
 
         // ══════════════════════════════════════════════════════
-        // Mock Path (Editor Only)
+        // Mock Path (Editor Only) & Update
         // ══════════════════════════════════════════════════════
 
 #if UNITY_EDITOR
@@ -541,9 +701,85 @@ namespace TrishulSim.UI
             var punjabSwarm = SensorMock.GetPunjabSwarmFixture();
             OnScenarioTick("RED", punjabReadings, punjabSwarm);
         }
+#endif
+
+#if UNITY_5_3_OR_NEWER
+        private void HandleScenarioTick(TrishulSim.Scenarios.ScenarioTickPayload tick)
+        {
+            if (tick == null) return;
+
+            SensorReadings sr = null;
+            if (tick.sensorReadings != null)
+            {
+                sr = new SensorReadings(
+                    tick.sensorReadings.rfWaterfallPeakGHz,
+                    tick.sensorReadings.rfWaterfallPeakDbm,
+                    tick.sensorReadings.dopplerPeakHz,
+                    tick.sensorReadings.acousticSplDb,
+                    tick.sensorReadings.radarDetectedCount
+                );
+            }
+
+            SwarmAgentState[] swarm = null;
+            if (tick.swarmSnapshot != null)
+            {
+                swarm = new SwarmAgentState[tick.swarmSnapshot.Length];
+                for (int i = 0; i < tick.swarmSnapshot.Length; i++)
+                {
+                    var s = tick.swarmSnapshot[i];
+                    if (s != null)
+                    {
+                        swarm[i] = new SwarmAgentState
+                        {
+                            agentId = s.agentId,
+                            isDecoy = s.isDecoy,
+                            positionWorld = s.positionWorld,
+                            velocityMs = s.velocityMs,
+                            headingDeg = s.headingDeg,
+                            altitudeM = s.altitudeM,
+                            rfEmitting = s.rfEmitting,
+                            rfFreqGHz = s.rfFreqGHz,
+                            rfPowerDbm = s.rfPowerDbm,
+                            propellerRpm = (int)s.propellerRpm,
+                            rcs = s.rcs,
+                            isNeutralised = s.isNeutralised,
+                            neutralisedAtMs = (int?)s.neutralisedAtMs
+                        };
+                    }
+                }
+            }
+
+            OnScenarioTick(tick.threatState, sr, swarm, tick.friendlyVhfActive, tick.t);
+        }
+#endif
 
         private void Update()
         {
+#if UNITY_5_3_OR_NEWER
+            if (scenarioRunning && TrishulSim.Scenarios.ScenarioManager.Instance != null && currentTraineeAction != null)
+            {
+                var action = new TrishulSim.Scenarios.TraineeAction
+                {
+                    antennaBearingDeg = currentTraineeAction.antennaBearingDeg,
+                    antennaElevationDeg = currentTraineeAction.antennaElevationDeg,
+                    ewEngaged = currentTraineeAction.ewEngaged,
+                    ewBandGHz = currentTraineeAction.ewBandGHz
+                };
+                if (currentTraineeAction.kinetic != null)
+                {
+                    action.kinetic = new TrishulSim.Scenarios.KineticEvent
+                    {
+                        firedAtMs = currentTraineeAction.kinetic.firedAtMs,
+                        targetAgentId = currentTraineeAction.kinetic.targetAgentId,
+                        hit = currentTraineeAction.kinetic.hit,
+                        leadAngleDeg = currentTraineeAction.kinetic.leadAngleDeg
+                    };
+                }
+                TrishulSim.Scenarios.ScenarioManager.Instance.InjectTraineeAction(action);
+            }
+#endif
+
+#if UNITY_EDITOR
             try
             {
                 if (Input.GetKeyDown(KeyCode.T))
@@ -564,7 +800,7 @@ namespace TrishulSim.UI
             {
                 // Degrade gracefully if new Input System is active
             }
-        }
 #endif
+        }
     }
 }

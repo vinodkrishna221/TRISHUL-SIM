@@ -268,6 +268,7 @@ namespace TrishulSim.Network
 
             string readyJson = JsonEnvelope.CreateClientReady(clientRole, buildVersion, nowMs).ToJson();
             await SendJsonAsync(readyJson, ct).ConfigureAwait(false);
+            Debug.Log("[WsClient] Connected to " + uri + " and sent CLIENT_READY.");
             return true;
         }
 

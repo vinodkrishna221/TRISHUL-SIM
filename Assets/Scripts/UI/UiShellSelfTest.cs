@@ -269,6 +269,11 @@ namespace UnityEngine
             return Math.Min(a, b);
         }
 
+        public static int Max(int a, int b)
+        {
+            return Math.Max(a, b);
+        }
+
         public static float DeltaAngle(float current, float target)
         {
             float num = Mathf.Repeat(target - current, 360f);
@@ -303,16 +308,18 @@ namespace UnityEngine
     {
         public GameObject(string name) { }
         public T AddComponent<T>() where T : Component, new() { return new T(); }
+        public T GetComponent<T>() where T : Component { return null; }
     }
 
     public class Component : Object
     {
         public GameObject gameObject { get { return new GameObject("mock"); } }
+        public T GetComponent<T>() where T : Component { return null; }
+        public T AddComponent<T>() where T : Component, new() { return new T(); }
     }
 
     public class MonoBehaviour : Component
     {
-        public T GetComponent<T>() where T : class { return null; }
         public static void DontDestroyOnLoad(Object target) { }
         public static void Destroy(Object obj) { }
     }
@@ -336,6 +343,11 @@ namespace UnityEngine
         public static void LogError(string msg) { }
     }
 
+    public static class GUIUtility
+    {
+        public static string systemCopyBuffer { get; set; }
+    }
+
     public enum KeyCode { T }
 
     public static class Input
@@ -351,6 +363,7 @@ namespace UnityEngine.UIElements
         public VisualElement rootVisualElement { get; set; }
     }
 
+    public enum LengthUnit { Pixel, Percent }
     public enum FlexDirection { Column, ColumnReverse, Row, RowReverse }
     public enum Justify { FlexStart, Center, FlexEnd, SpaceBetween, SpaceAround }
     public enum Align { Auto, FlexStart, Center, FlexEnd, Stretch }
@@ -358,21 +371,29 @@ namespace UnityEngine.UIElements
     public struct Length
     {
         public float value;
+        public LengthUnit unit;
         public bool isPercent;
+
+        public Length(float value, LengthUnit unit = LengthUnit.Pixel)
+        {
+            this.value = value;
+            this.unit = unit;
+            this.isPercent = (unit == LengthUnit.Percent);
+        }
 
         public static Length Percent(float val)
         {
-            return new Length { value = val, isPercent = true };
+            return new Length(val, LengthUnit.Percent);
         }
 
         public static implicit operator Length(float val)
         {
-            return new Length { value = val, isPercent = false };
+            return new Length(val, LengthUnit.Pixel);
         }
 
         public static implicit operator Length(int val)
         {
-            return new Length { value = val, isPercent = false };
+            return new Length(val, LengthUnit.Pixel);
         }
     }
 
@@ -384,12 +405,14 @@ namespace UnityEngine.UIElements
 
     public class IStyle
     {
+        public Length left { get; set; }
+        public Length top { get; set; }
+        public Length width { get; set; }
+        public Length height { get; set; }
         public StyleBackground backgroundImage { get; set; }
         public FlexDirection flexDirection { get; set; }
         public Justify justifyContent { get; set; }
         public Align alignItems { get; set; }
-        public Length width { get; set; }
-        public Length height { get; set; }
         public Length flexBasis { get; set; }
         public float flexGrow { get; set; }
         public Length paddingLeft { get; set; }
@@ -408,17 +431,13 @@ namespace UnityEngine.UIElements
         private readonly List<string> classes = new List<string>();
         private readonly List<VisualElement> children = new List<VisualElement>();
         public IStyle style { get; set; }
-
-        public VisualElement()
-        {
-            style = new IStyle();
-        }
+        public VisualElement() { style = new IStyle(); }
 
         public int childCount { get { return children.Count; } }
 
-        public void Add(VisualElement child) { children.Add(child); }
+        public void Add(VisualElement child) { if (child != null) children.Add(child); }
         public void Clear() { children.Clear(); }
-
+        public List<VisualElement> Children() { return new List<VisualElement>(children); }
         public void AddToClassList(string className)
         {
             if (!classes.Contains(className)) classes.Add(className);
@@ -498,6 +517,30 @@ namespace UnityEngine.UIElements
         }
     }
 
+    public class Slider : VisualElement
+    {
+        public float lowValue { get; set; }
+        public float highValue { get; set; }
+        public float value { get; set; }
+        public event Action<ChangeEvent<float>> ValueChanged;
+
+        public void RegisterValueChangedCallback(Action<ChangeEvent<float>> callback)
+        {
+            ValueChanged += callback;
+        }
+        public void UnregisterValueChangedCallback(Action<ChangeEvent<float>> callback)
+        {
+            ValueChanged -= callback;
+        }
+        public void SimulateChange(float newVal)
+        {
+            float old = value;
+            value = newVal;
+            if (ValueChanged != null)
+                ValueChanged(new ChangeEvent<float> { previousValue = old, newValue = newVal });
+        }
+    }
+
     public class SliderInt : VisualElement
     {
         public int lowValue { get; set; }
@@ -558,6 +601,16 @@ namespace TrishulSim.UI
 {
     using UnityEngine;
     using UnityEngine.UIElements;
+
+#if UNITY_5_3_OR_NEWER
+    public static class UiTestExtensions
+    {
+        public static void SimulateChange(this DropdownField field, string newVal)
+        {
+            field.value = newVal;
+        }
+    }
+#endif
 
     public static class UiShellSelfTest
     {
@@ -954,22 +1007,32 @@ namespace TrishulSim.UI
             renderer.UpdateAcoustic(quietSr);
             Assert(label.text == "SPL: 32.0 dB", "Acoustic label must format SPL correctly");
             var bladeBar = renderer.BarElements[AcousticFftRenderer.BladeTipBandIndex];
-            Assert(bladeBar.style.height.value <= 15.0f, "Quiet blade bar height must be <= 15% (noise floor)");
+            Assert(GetBarHeight(bladeBar) <= 15.0f, "Quiet blade bar height must be <= 15% (noise floor)");
 
             // Test Amber threat level (40–55 dB)
             var amberSr = new SensorReadings(5.825f, -62.3f, 220.4f, 48.0f, 6);
             renderer.UpdateAcoustic(amberSr);
             Assert(label.text == "SPL: 48.0 dB", "Acoustic label must show 48.0 dB");
-            Assert(bladeBar.style.height.value >= 25.0f && bladeBar.style.height.value <= 65.0f, "Amber bar height must be between 25% and 65%");
-            Assert(bladeBar.style.backgroundColor.r == 1.0f && bladeBar.style.backgroundColor.g > 0.6f, "Amber bar must use #FFB300");
+            Assert(GetBarHeight(bladeBar) >= 25.0f && GetBarHeight(bladeBar) <= 65.0f, "Amber bar height must be between 25% and 65%");
+            Color amberColor = GetBarColor(bladeBar);
+            Assert(amberColor.r == 1.0f && amberColor.g > 0.6f, "Amber bar must use #FFB300");
 
             // Test Red alert (> 55 dB)
             var redSr = new SensorReadings(5.825f, -40.0f, 220.4f, 65.0f, 6);
             renderer.UpdateAcoustic(redSr);
             Assert(label.text == "SPL: 65.0 dB", "Acoustic label must show 65.0 dB");
-            Assert(bladeBar.style.height.value > 65.0f, "Red alert bar height must be > 65%");
-            Assert(bladeBar.style.backgroundColor.r >= 0.75f && bladeBar.style.backgroundColor.g < 0.1f, "Red alert bar must use #CC0000");
+            Assert(GetBarHeight(bladeBar) > 65.0f, "Red alert bar height must be > 65%");
+            Color redColor = GetBarColor(bladeBar);
+            Assert(redColor.r >= 0.75f && redColor.g < 0.1f, "Red alert bar must use #CC0000");
         }
+
+#if UNITY_5_3_OR_NEWER
+        private static float GetBarHeight(VisualElement el) { return el.style.height.value.value; }
+        private static Color GetBarColor(VisualElement el) { return el.style.backgroundColor.value; }
+#else
+        private static float GetBarHeight(VisualElement el) { return el.style.height.value; }
+        private static Color GetBarColor(VisualElement el) { return el.style.backgroundColor; }
+#endif
 
         public static void TestCockpitControllerSensorIntegration()
         {

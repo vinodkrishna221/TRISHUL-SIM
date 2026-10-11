@@ -35,6 +35,31 @@ namespace UnityEngine
         public static Color gray { get { return new Color(0.5f, 0.5f, 0.5f, 1f); } }
         public static Color grey { get { return new Color(0.5f, 0.5f, 0.5f, 1f); } }
         public static Color yellow { get { return new Color(1f, 0.702f, 0f, 1f); } }
+
+        public static bool operator ==(Color a, Color b)
+        {
+            return Math.Abs(a.r - b.r) < 0.001f && Math.Abs(a.g - b.g) < 0.001f && Math.Abs(a.b - b.b) < 0.001f && Math.Abs(a.a - b.a) < 0.001f;
+        }
+
+        public static bool operator !=(Color a, Color b)
+        {
+            return !(a == b);
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is Color)
+            {
+                Color other = (Color)obj;
+                return this == other;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return r.GetHashCode() ^ g.GetHashCode() ^ b.GetHashCode() ^ a.GetHashCode();
+        }
     }
 
     public static class Debug

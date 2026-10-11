@@ -37,9 +37,9 @@
 | SA-P1-B-i · HBT PINCER approach | Venu | [ ] |
 | SA-P1-B-ii · HBT PINCER execution + EW evasion | Venu | [ ] |
 | SA-P1-C · EW deconfliction / friendlyBlackoutRisk | Uday | [x] |
-| SA-P1-D · SMASH 2000 lead-angle + KineticEvent | Uday | [ ] |
-| SA-P2-A · SATURATION_DIVE + MULTI-AXIS_SPLIT tactics | Uday | [ ] |
-| SA-P2-B · Burst + 60 FPS validation | Uday | [ ] |
+| SA-P1-D · SMASH 2000 lead-angle + KineticEvent | Uday | [x] |
+| SA-P2-A · SATURATION_DIVE + MULTI-AXIS_SPLIT tactics | Uday | [x] |
+| SA-P2-B · Burst + 60 FPS validation | Uday | [x] |
 | SA-P3-A · Demo seed tuning | Uday | [ ] |
 | SA-P3-B · Mock fixtures | Uday | [ ] |
 | AA-P0-A · TelemetryLogger 10 Hz NDJSON | Sohail | [x] |
@@ -55,8 +55,8 @@
 | UX-P1-B · EW Jammer controls + SMASH reticle | Rani | [x] |
 | UX-P2-D · Full demo-path smoke (all 6 beats) | Rani | [ ] |
 | UX-P1-C · Split-screen layout compatibility | Rajeswari | [ ] |
-| UX-P1-D · Scorecard Renderer + Timeline Scrubber UI | Rajeswari | [ ] |
-| UX-P2-A · PDF Export button wiring | Rajeswari | [ ] |
+| UX-P1-D · Scorecard Renderer + Timeline Scrubber UI | Rajeswari | [x] |
+| UX-P2-A · PDF Export button wiring | Rajeswari | [x] |
 | UX-P2-B · Full bilingual pass | Rajeswari | [ ] |
 | UX-P2-C · Threat-state colour + night/fog ambience | Rajeswari | [ ] |
 | UX-P3-A · Demo-script alignment + UI freeze | Rajeswari | [ ] |

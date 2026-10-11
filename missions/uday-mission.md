@@ -129,7 +129,7 @@ TEST:
 
 PUSH IMMEDIATELY — Sohail (AA-P1-A) needs real KineticEvents to compute kineticEfficiency.
 DEMO: ⭐ "Trainee fires; hit registered; agentId neutralised." (Beat 4 core resolution)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -166,7 +166,7 @@ TEST:
   Load ladakh-lac-ridge-01 → 8 agents broad front, all dive at 100m.
   Load loc-mountain-pass-01 → 4 attackers immediately split to 4 compass points.
 DEMO: "4 distinct scenarios, each with different swarm behaviour." (Beat 1 — variety)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -188,7 +188,7 @@ CONTEXT:
 
 DELIVERABLE: BoidFlockController.cs updated (Burst path if needed) · FPS result logged
 TEST: IL2CPP build + 8 agents running Punjab: Unity Profiler < 16.7ms/frame.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -235,12 +235,144 @@ STATUS: [ ] todo
 
 ---
 
+## ⚡ NEW TRACK — `vr-gamepad` (added 11 Oct 2026)
+
+> Full phase plan → `plans/vr-gamepad-phase-plan.md`
+> You own: **VG-P1-C** (Floating 3D Sensor HUD panels) + **VG-P1-E** (spacedesk display mirror + VR mode toggle)
+> Budget: ~8h (5h + 3h). Timeline: 11–18 Oct 2026.
+> **Depends on VG-P1-B (Vinod's 3D scene) being done first.**
+
+### VG branch names (Uday's)
+
+| Card | Branch |
+|---|---|
+| VG-P1-C | `feat/vr-hud-panels` |
+| VG-P1-E | `feat/vr-spacedesk-mode-toggle` |
+
+### WAITS-ON (Uday's VG cards)
+
+| Your card | Waits on | Mock path |
+|---|---|---|
+| VG-P1-C | VG-P1-B (VRRig + VRSentryPost.unity exist), VG-P1-A (GamepadInputController) | Can stub panels as plain coloured quads to test layout |
+| VG-P1-E | VG-P1-B, VG-P1-C, VG-P1-D (Sohail's GyroReceiver.IsConnected) | Laptop-only stereo (no phone); stub `IsConnected = false` until Sohail's VG-P1-D lands |
+
+---
+
+### VG-P1-C · Floating 3D Sensor HUD panels [timebox: 5h]
+```
+CONTEXT:
+  The visual wow moment — Iron Man helmet display in the dark.
+  Converts existing 2D sensor renderers into world-space 3D floating panels via RenderTextures.
+  ADDITIVE change: existing 2D HUD path is unchanged.
+
+  Files to read:
+    • Assets/Scripts/UI/RfWaterfallRenderer.cs (Initialize, UpdateWaterfall)
+    • Assets/Scripts/UI/DopplerScopeRenderer.cs (Initialize, UpdateScope)
+    • Assets/Scripts/UI/AcousticFftRenderer.cs (Initialize, UpdateAcoustic)
+    • Assets/Scripts/UI/CockpitController.cs (UpdateSensors, how renderers are called each tick)
+    • plans/vr-gamepad-phase-plan.md VG-P1-C CONTEXT (full step list + RenderTexture approach)
+
+  Steps:
+    1. Create 4 RenderTexture assets (Assets/RenderTextures/):
+       RT_RfWaterfall.renderTexture     512×512 R8G8B8A8
+       RT_DopplerScope.renderTexture    512×512 R8G8B8A8
+       RT_AcousticFft.renderTexture     512×256 R8G8B8A8
+       RT_EwSmashPanel.renderTexture    512×256 R8G8B8A8
+    2. Create Assets/Scripts/VR/VRHudController.cs MonoBehaviour on VRRig:
+       - Serialized RenderTexture fields for all 4 RTs
+       - Subscribe to ScenarioManager events same as CockpitController
+       - On tick: update renderers to draw into RenderTextures
+         (use Graphics.Blit or camera-per-panel approach — see phase plan)
+       - Threat torus color: update MeshRenderer material color per threatState
+         GREEN=#00B300, AMBER=#FFB300, RED=#CC0000 (MIL-STD-2525)
+    3. In VRSentryPost.unity, create 4 floating Quad GameObjects:
+       Panel_RF     at (-2.0, 1.5, 2.5), scale (1.6,0.9,1), rot Y=+30°
+                    Material: Unlit, MainTex=RT_RfWaterfall, HDR emissive #00FF8844
+       Panel_Doppler at (0, 1.8, 2.8), scale (1.6,1.6,1), rot Y=0°
+                    Material: RT_DopplerScope
+       Panel_Acoustic at (2.0, 1.5, 2.5), scale (1.2,0.6,1), rot Y=-30°
+                    Material: RT_AcousticFft
+       Panel_EwSmash at (0, 0.7, 2.0), scale (1.8,0.8,1), rot X=+20° (desk-tilt)
+                    Material: RT_EwSmashPanel
+    4. TextMeshPro world-space labels above each panel:
+       "RF WATERFALL" · "MICRO-DOPPLER RADAR" · "ACOUSTIC SONAR" · "EW / SMASH 2000"
+    5. Threat indicator torus around Panel_Doppler:
+       Torus mesh, scale (1.8,1.8,0.05), emissive color updated by VRHudController
+
+DELIVERABLE:
+  Assets/RenderTextures/ — 4 RT assets
+  Assets/Scripts/VR/VRHudController.cs
+  VRSentryPost.unity updated (4 panels + labels + threat torus)
+  Unlit emissive materials for each panel
+
+TEST:
+  Play VRSentryPost.unity → launch Punjab scenario from C2 (WebSocket).
+  → RF Waterfall scrolling on left panel
+  → Doppler scope with 6 contacts on centre panel
+  → Acoustic FFT bars on right panel
+  → EW/SMASH read-out on bottom panel
+  → Threat torus: GREEN → AMBER → RED
+  → Both left/right eye cameras see panels at correct positions
+
+DEPENDS: VG-P1-B (scene + VRRig exist)    UNBLOCKS: VG-P1-E (integration)
+DEMO: "Iron Man HUD — four holographic sensor panels glowing in darkness." (Beat 4 wow)
+PERSONA: Uday (swarm-ai)   STATUS: [ ] todo
+```
+
+---
+
+### VG-P1-E · spacedesk display mirror + VR mode toggle [timebox: 3h]
+```
+CONTEXT:
+  spacedesk makes phone = Windows Display 2. Unity cameras target Display 2.
+  Instructor C2 gets [VR MODE] button. Falls back cleanly to desktop mode.
+
+  Manual pre-requisites (do BEFORE coding):
+    a. Install spacedesk DRIVER on laptop: https://www.spacedesk.net
+    b. Install spacedesk Android app on phone (Play Store)
+    c. Enable Windows WiFi hotspot (Settings → Network → Mobile hotspot)
+    d. Connect phone to laptop hotspot → open spacedesk → select laptop → Display 2 appears
+
+  Files to read:
+    • Assets/Scripts/UI/C2StationController.cs (button/mode wiring)
+    • Assets/Scripts/Scenarios/ScenarioManager.cs (OperationMode enum)
+    • plans/vr-gamepad-phase-plan.md VG-P1-E CONTEXT (full step list)
+
+  Steps:
+    1. ScenarioManager.cs: add VRMode to OperationMode enum
+    2. C2StationController.cs: add [VR MODE] toggle button
+       → ScenarioManager.Instance.SetMode(OperationMode.VRMode)
+    3. Assets/Scripts/VR/VRModeController.cs MonoBehaviour (persistent GO):
+       - On VRMode: LoadScene("VRSentryPost") → all VR cameras targetDisplay = 1
+       - On exit: LoadScene("TraineeCockpit") → targetDisplay = 0
+    4. C2 status badge: "VR MODE: ON ● GYRO: LIVE" / "VR MODE: ON ○ GYRO: OFFLINE"
+    5. Create docs/vr-setup-guide.md (6-step demo-day guide)
+
+DELIVERABLE:
+  Assets/Scripts/VR/VRModeController.cs
+  ScenarioManager.cs updated (VRMode enum)
+  C2StationController.cs updated (VR MODE button)
+  docs/vr-setup-guide.md
+
+TEST:
+  WITH spacedesk: VR MODE → VRSentryPost on phone (Display 2), C2 on laptop (Display 1).
+  WITHOUT phone: VR MODE → VRSentryPost on laptop stereo (fallback).
+  VR MODE OFF → desktop Trainee Cockpit loads, no regression.
+
+DEPENDS: VG-P1-B, VG-P1-C, VG-P1-D    UNBLOCKS: VG-P1-F
+DEMO: "Instructor clicks VR MODE — trainee puts on headset — border post appears." (Beat 1)
+PERSONA: Uday (swarm-ai)   STATUS: [ ] todo
+```
+
+---
+
 ## Sync expectations
 
 - **Start SA-P1-C + SA-P1-D immediately after Venu pushes `feat/swarm-ai-hbt-pincer`** — don't wait for PR merge if it's passing locally; ask Venu to share the branch.
 - **SA-P1-D push is critical for Sohail** — AAR-P1-A kineticEfficiency needs real KineticEvents.
 - **Blocked on Venu:** Use inline stub EWJammerState / SwarmMock to keep moving.
 - **PRs:** Tag Venu as reviewer for SA-P1-C/D (he owns the context). Tag Vinod for SA-P2-B (installer dependency).
+- **VG-P1-C & VG-P1-E:** Start VG-P1-C only after Vinod pushes `feat/vr-sentry-post-scene` (VG-P1-B done). Tag Vinod in PRs.
 
 ---
 

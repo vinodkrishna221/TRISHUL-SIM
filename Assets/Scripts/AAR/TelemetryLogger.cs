@@ -110,7 +110,7 @@ namespace TrishulSim.AAR
             if (inputStub == null)
             {
 #if UNITY_5_3_OR_NEWER
-                inputStub = FindObjectOfType<TraineeActionInputStub>();
+                inputStub = FindAnyObjectByType<TraineeActionInputStub>();
 #endif
             }
 

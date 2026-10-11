@@ -161,7 +161,11 @@ namespace TrishulSim.Scenarios
             Assert(eventFiredCount == 2, "Setting same mode should not fire redundant event");
 
             // Mode dropdown helper
+#if UNITY_5_3_OR_NEWER
+            var dropdown = new GameObject("ModeDropdown").AddComponent<Dropdown>();
+#else
             var dropdown = new Dropdown();
+#endif
             manager.ModeDropdown = dropdown;
             Assert(dropdown.options.Count == 2, "Mode dropdown must have 2 options");
             Assert(dropdown.options[0].text == ScenarioManager.ModeTwoLaptopText, "Option 0 must be Two-Laptop");

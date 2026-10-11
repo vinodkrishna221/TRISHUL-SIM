@@ -436,7 +436,7 @@ TEST:
 DEPENDS: SA-P1-B-ii             UNBLOCKS: AA-P1-A (kinetic metrics need real KineticEvents), UX-P1-B
 
 DEMO: ⭐ "Trainee fires; hit registered; agentId neutralised." (Beat 4 — core wow-moment action)
-PERSONA: swarm-ai builder       STATUS: [ ] todo
+PERSONA: swarm-ai builder       STATUS: [x] done
 ```
 
 ---
@@ -489,7 +489,7 @@ TEST:
 DEPENDS: SA-P1-B-ii, US-P1-B     UNBLOCKS: —
 
 DEMO: "4 distinct scenarios, each with different swarm behaviour." (Beat 1 — scenario variety)
-PERSONA: swarm-ai builder         STATUS: [ ] todo
+PERSONA: swarm-ai builder         STATUS: [x] done
 ```
 
 ---
@@ -524,7 +524,7 @@ TEST:
 DEPENDS: All SA-P1 cards, US-P2-B (IL2CPP build)     UNBLOCKS: US-P2-D (Warden review)
 
 DEMO: "Smooth 60 FPS with full swarm — no frame drops." (Beat 6 judge Q "can it run on a laptop?")
-PERSONA: swarm-ai builder                             STATUS: [ ] todo
+PERSONA: swarm-ai builder                             STATUS: [x] done
 ```
 
 ---

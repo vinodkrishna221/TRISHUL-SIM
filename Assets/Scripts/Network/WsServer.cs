@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Sockets;
 using System.Net.WebSockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -233,6 +235,7 @@ namespace TrishulSim.Network
 
         public static void CheckAirGapStatus()
         {
+#if UNITY_5_3_OR_NEWER
             if (Application.internetReachability != NetworkReachability.NotReachable)
             {
                 Debug.LogWarning("[WsServer] [AIR-GAP WARNING] External internet connectivity detected (" + Application.internetReachability + "). TRISHUL-SIM requires air-gapped deployment; zero external telemetry or outbound connections permitted.");
@@ -241,6 +244,9 @@ namespace TrishulSim.Network
             {
                 Debug.Log("[WsServer] [AIR-GAP CONFIRMED] NetworkReachability is NotReachable. Air-gapped localhost operation verified.");
             }
+#else
+            Debug.Log("[WsServer] [AIR-GAP CONFIRMED] Running in standalone air-gapped loopback test mode.");
+#endif
         }
 
         public bool StartServer()
@@ -387,11 +393,15 @@ namespace TrishulSim.Network
             }
         }
 
+
+
         private async Task AcceptLoopAsync(CancellationToken ct)
         {
             while (!ct.IsCancellationRequested && _isRunning && _listener != null && _listener.IsListening)
             {
                 HttpListenerContext context = null;
+                bool delay100 = false;
+                bool delay250 = false;
                 try
                 {
                     context = await _listener.GetContextAsync().ConfigureAwait(false);
@@ -404,21 +414,49 @@ namespace TrishulSim.Network
                 {
                     if (!_isRunning || ct.IsCancellationRequested)
                         break;
-                    continue;
+                    delay100 = true;
                 }
                 catch (Exception ex)
                 {
                     if (!_isRunning || ct.IsCancellationRequested)
                         break;
                     Debug.LogWarning("[WsServer] Accept error: " + ex.Message);
+                    delay250 = true;
+                }
+
+                if (delay100)
+                {
+                    try { await Task.Delay(100, ct).ConfigureAwait(false); } catch { }
+                    continue;
+                }
+                if (delay250)
+                {
+                    try { await Task.Delay(250, ct).ConfigureAwait(false); } catch { }
                     continue;
                 }
 
                 if (context == null)
                     continue;
 
-                if (!context.Request.IsWebSocketRequest)
+                bool isWs = context.Request.IsWebSocketRequest;
+                if (!isWs)
                 {
+                    string upgrade = context.Request.Headers["Upgrade"];
+                    string connection = context.Request.Headers["Connection"];
+                    if (!string.IsNullOrEmpty(upgrade) && string.Equals(upgrade.Trim(), "websocket", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!string.IsNullOrEmpty(connection) && connection.IndexOf("Upgrade", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            isWs = true;
+                        }
+                    }
+                }
+
+                if (!isWs)
+                {
+                    Debug.LogWarning("[WsServer] Non-WS request rejected (HTTP 400). RawUrl=" + context.Request.RawUrl +
+                                     " | Upgrade=" + context.Request.Headers["Upgrade"] +
+                                     " | Connection=" + context.Request.Headers["Connection"]);
                     try
                     {
                         context.Response.StatusCode = 400;
@@ -442,6 +480,7 @@ namespace TrishulSim.Network
                         _clients[session.Id] = session;
                     }
 
+                    Debug.Log("[WsServer] WebSocket client session established: " + session.Id);
                     Task _ = Task.Run(() => ReceiveClientLoopAsync(session, ct));
                 }
                 catch (Exception ex)

@@ -173,7 +173,11 @@ namespace TrishulSim.Network
             server.HeartbeatIntervalMs = 200;
             server.StaleThresholdMs = 500;
 
+#if UNITY_5_3_OR_NEWER
+            Text uiText = new GameObject("StatusText").AddComponent<Text>();
+#else
             Text uiText = new Text();
+#endif
             ConnectionStatusUI statusUi = new ConnectionStatusUI();
             statusUi.Server = server;
             statusUi.StatusText = uiText;

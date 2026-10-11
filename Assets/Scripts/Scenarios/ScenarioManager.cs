@@ -108,6 +108,9 @@ namespace TrishulSim.Scenarios
 
         private readonly List<ScenarioConfig> _scenarios = new List<ScenarioConfig>();
         private readonly object _tickStateLock = new object();
+        private readonly Queue<Action> _mainThreadQueue = new Queue<Action>();
+        private readonly object _mainThreadQueueLock = new object();
+        private int _mainThreadId;
         private WsServer _subscribedServer;
         private WsClient _subscribedClient;
         private Dropdown _subscribedModeDropdown;
@@ -400,16 +403,389 @@ namespace TrishulSim.Scenarios
             return "sess-" + timestamp.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
         }
 
+#if UNITY_5_3_OR_NEWER
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void EnforcePerformanceAndFramerateCaps()
+        {
+            QualitySettings.vSyncCount = 1;
+            Application.targetFrameRate = 60;
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void EnsureEventSystemAfterSceneLoad()
+        {
+            EnsureEventSystem();
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += (scene, mode) => EnsureEventSystem();
+        }
+
+        public static void EnsureEventSystem()
+        {
+            var existing = UnityEngine.Object.FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>();
+            if (existing == null)
+            {
+                GameObject esGo = new GameObject("EventSystem");
+                UnityEngine.Object.DontDestroyOnLoad(esGo);
+                existing = esGo.AddComponent<UnityEngine.EventSystems.EventSystem>();
+            }
+
+            var sim = existing.GetComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+            if (sim != null)
+            {
+                sim.enabled = false;
+                UnityEngine.Object.Destroy(sim);
+            }
+
+            var inputModule = existing.GetComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+            if (inputModule == null)
+            {
+                inputModule = existing.gameObject.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+                Debug.Log("[ScenarioManager] Attached InputSystemUIInputModule to EventSystem for Unity New Input System.");
+            }
+        }
+
+        public class SafeBaseInput : UnityEngine.EventSystems.BaseInput
+        {
+            public override bool GetButtonDown(string buttonName)
+            {
+                try { return UnityEngine.Input.GetButtonDown(buttonName); }
+                catch (System.InvalidOperationException) { return false; }
+            }
+
+            public override bool GetMouseButtonDown(int button)
+            {
+                try { return UnityEngine.Input.GetMouseButtonDown(button); }
+                catch (System.InvalidOperationException)
+                {
+                    var mouse = UnityEngine.InputSystem.Mouse.current;
+                    if (mouse != null)
+                    {
+                        if (button == 0) return mouse.leftButton.wasPressedThisFrame;
+                        if (button == 1) return mouse.rightButton.wasPressedThisFrame;
+                        if (button == 2) return mouse.middleButton.wasPressedThisFrame;
+                    }
+                    return false;
+                }
+            }
+
+            public override bool GetMouseButtonUp(int button)
+            {
+                try { return UnityEngine.Input.GetMouseButtonUp(button); }
+                catch (System.InvalidOperationException)
+                {
+                    var mouse = UnityEngine.InputSystem.Mouse.current;
+                    if (mouse != null)
+                    {
+                        if (button == 0) return mouse.leftButton.wasReleasedThisFrame;
+                        if (button == 1) return mouse.rightButton.wasReleasedThisFrame;
+                        if (button == 2) return mouse.middleButton.wasReleasedThisFrame;
+                    }
+                    return false;
+                }
+            }
+
+            public override bool GetMouseButton(int button)
+            {
+                try { return UnityEngine.Input.GetMouseButton(button); }
+                catch (System.InvalidOperationException)
+                {
+                    var mouse = UnityEngine.InputSystem.Mouse.current;
+                    if (mouse != null)
+                    {
+                        if (button == 0) return mouse.leftButton.isPressed;
+                        if (button == 1) return mouse.rightButton.isPressed;
+                        if (button == 2) return mouse.middleButton.isPressed;
+                    }
+                    return false;
+                }
+            }
+
+            public override Vector2 mousePosition
+            {
+                get
+                {
+                    try { return UnityEngine.Input.mousePosition; }
+                    catch (System.InvalidOperationException)
+                    {
+                        var mouse = UnityEngine.InputSystem.Mouse.current;
+                        if (mouse != null)
+                            return mouse.position.ReadValue();
+                        return Vector2.zero;
+                    }
+                }
+            }
+
+            public override Vector2 mouseScrollDelta
+            {
+                get
+                {
+                    try { return UnityEngine.Input.mouseScrollDelta; }
+                    catch (System.InvalidOperationException)
+                    {
+                        var mouse = UnityEngine.InputSystem.Mouse.current;
+                        if (mouse != null)
+                            return mouse.scroll.ReadValue();
+                        return Vector2.zero;
+                    }
+                }
+            }
+
+            public override float GetAxisRaw(string axisName)
+            {
+                try { return UnityEngine.Input.GetAxisRaw(axisName); }
+                catch (System.InvalidOperationException) { return 0f; }
+            }
+
+            public override bool touchSupported
+            {
+                get
+                {
+                    try { return UnityEngine.Input.touchSupported; }
+                    catch (System.InvalidOperationException) { return false; }
+                }
+            }
+
+            public override int touchCount
+            {
+                get
+                {
+                    try { return UnityEngine.Input.touchCount; }
+                    catch (System.InvalidOperationException) { return 0; }
+                }
+            }
+        }
+#endif
+
+        public void EnqueueMainThread(Action action)
+        {
+            if (action == null)
+                return;
+
+#if !UNITY_5_3_OR_NEWER
+            action();
+            return;
+#else
+            if (_mainThreadId != 0 && Thread.CurrentThread.ManagedThreadId == _mainThreadId)
+            {
+                action();
+                return;
+            }
+
+            lock (_mainThreadQueueLock)
+            {
+                _mainThreadQueue.Enqueue(action);
+            }
+#endif
+        }
+
+        public void Update()
+        {
+            DrainMainThreadQueue();
+        }
+
+        public int DrainMainThreadQueue()
+        {
+            int executed = 0;
+            while (true)
+            {
+                Action next = null;
+                lock (_mainThreadQueueLock)
+                {
+                    if (_mainThreadQueue.Count > 0)
+                        next = _mainThreadQueue.Dequeue();
+                }
+
+                if (next == null)
+                    break;
+
+                executed++;
+                try
+                {
+                    next();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError("[ScenarioManager] Main thread queue error: " + ex.Message);
+                }
+            }
+            return executed;
+        }
+
+        private Text _swarmTelemetryText;
+        private GameObject _scorecardPanel;
+        private Text _scorecardText;
+
+        private void LocateSplitScreenUI()
+        {
+#if UNITY_5_3_OR_NEWER
+            if (_swarmTelemetryText == null)
+            {
+                GameObject hudGo = GameObject.Find("SwarmTelemetryHUD");
+                if (hudGo != null)
+                    _swarmTelemetryText = hudGo.GetComponent<Text>();
+            }
+
+            if (_scorecardPanel == null)
+            {
+                GameObject scGo = GameObject.Find("CockpitScorecardPanel");
+                if (scGo != null)
+                {
+                    _scorecardPanel = scGo;
+                    _scorecardText = scGo.GetComponent<Text>() ?? scGo.GetComponentInChildren<Text>(true);
+                }
+            }
+
+            GameObject connGo = GameObject.Find("ConnectionStatusText");
+            if (connGo != null && connGo.GetComponent<ConnectionStatusUI>() == null)
+            {
+                ConnectionStatusUI csUI = connGo.AddComponent<ConnectionStatusUI>();
+                csUI.StatusText = connGo.GetComponent<Text>();
+                csUI.Server = Server;
+            }
+
+            EnsureButtonsInteractable();
+#endif
+        }
+
+        public void EnsureButtonsInteractable()
+        {
+#if UNITY_5_3_OR_NEWER
+            if (launchButton == null)
+            {
+                GameObject launchGo = GameObject.Find("LaunchButton");
+                if (launchGo != null)
+                    launchButton = launchGo.GetComponent<Button>();
+            }
+            if (abortButton == null)
+            {
+                GameObject abortGo = GameObject.Find("AbortButton");
+                if (abortGo != null)
+                    abortButton = abortGo.GetComponent<Button>();
+            }
+
+            if (launchButton != null)
+            {
+                var img = launchButton.GetComponent<Image>();
+                if (img == null)
+                {
+                    img = launchButton.gameObject.AddComponent<Image>();
+                    img.color = new Color(0.18f, 0.45f, 0.28f, 0.95f); // MIL-STD 2525 Dark Green
+                }
+                img.raycastTarget = true;
+                launchButton.targetGraphic = img;
+                launchButton.interactable = true;
+            }
+
+            if (abortButton != null)
+            {
+                var img = abortButton.GetComponent<Image>();
+                if (img == null)
+                {
+                    img = abortButton.gameObject.AddComponent<Image>();
+                    img.color = new Color(0.55f, 0.18f, 0.18f, 0.95f); // Crimson Red
+                }
+                img.raycastTarget = true;
+                abortButton.targetGraphic = img;
+                abortButton.interactable = true;
+            }
+
+            SubscribeButton();
+            SubscribeAbortButton();
+#endif
+        }
+
+        private void UpdateTelemetryHUD(ScenarioTickPayload tick)
+        {
+#if UNITY_5_3_OR_NEWER
+            EnqueueMainThread(() =>
+            {
+                if (_swarmTelemetryText == null)
+                    LocateSplitScreenUI();
+
+                if (_swarmTelemetryText != null && tick != null)
+                {
+                    int activeCount = 0;
+                    int neutralisedCount = 0;
+                    if (tick.swarmSnapshot != null)
+                    {
+                        for (int i = 0; i < tick.swarmSnapshot.Length; i++)
+                        {
+                            if (tick.swarmSnapshot[i].isNeutralised)
+                                neutralisedCount++;
+                            else
+                                activeCount++;
+                        }
+                    }
+
+                    string ewStatus = (tick.ewJammerState != null && tick.ewJammerState.engaged) ? "ENGAGED" : "STANDBY";
+                    _swarmTelemetryText.text = string.Format(
+                        "T: {0:F1}s | THREAT: {1} | SWARM: {2} ACTIVE ({3} NEUT)\nRF: {4:F3} GHz | DOPPLER: {5:F0} Hz | EW: {6}",
+                        tick.t / 1000f,
+                        tick.threatState,
+                        activeCount,
+                        neutralisedCount,
+                        tick.sensorReadings != null ? tick.sensorReadings.rfWaterfallPeakGHz : 5.8f,
+                        tick.sensorReadings != null ? tick.sensorReadings.dopplerPeakHz : 1140f,
+                        ewStatus
+                    );
+                }
+            });
+#endif
+        }
+
+        private void UpdateScorecardHUD(ScenarioEndPayload endPayload)
+        {
+#if UNITY_5_3_OR_NEWER
+            EnqueueMainThread(() =>
+            {
+                if (_scorecardPanel == null)
+                    LocateSplitScreenUI();
+
+                if (_scorecardPanel != null)
+                    _scorecardPanel.SetActive(true);
+
+                if (_scorecardText != null && endPayload != null)
+                {
+                    _scorecardText.text = string.Format(
+                        "=== AFTER ACTION REVIEW SCORECARD ===\n" +
+                        "Session: {0}\n" +
+                        "Reason: {1}\n" +
+                        "Duration: {2:F1}s\n" +
+                        "Status: MISSION CONCLUDED",
+                        endPayload.sessionId,
+                        endPayload.reason,
+                        endPayload.t / 1000f
+                    );
+                }
+            });
+#endif
+        }
+
         public void Awake()
         {
-            if (Instance == null)
+            _mainThreadId = Thread.CurrentThread.ManagedThreadId;
+            if (Instance == null || (Server != null && Instance.Server == null))
                 Instance = this;
+
+#if UNITY_5_3_OR_NEWER
+            QualitySettings.vSyncCount = 1;
+            Application.targetFrameRate = 60;
+            EnsureEventSystem();
+            LocateSplitScreenUI();
+#endif
         }
 
         public void Start()
         {
-            if (Instance == null)
+            _mainThreadId = Thread.CurrentThread.ManagedThreadId;
+            if (Instance == null || (Server != null && Instance.Server == null))
                 Instance = this;
+
+#if UNITY_5_3_OR_NEWER
+            QualitySettings.vSyncCount = 1;
+            Application.targetFrameRate = 60;
+            EnsureEventSystem();
+            LocateSplitScreenUI();
+#endif
 
             RefreshScenarioLibrary();
             UpdateSystemInfoText();
@@ -577,7 +953,7 @@ namespace TrishulSim.Scenarios
                 selected.seed = ScenarioLibrary.GenerateProceduralSeed();
             }
 
-            LaunchScenario(selected);
+            Task _ = LaunchScenarioAsync(selected);
         }
 
         public string LaunchScenario(ScenarioConfig config)
@@ -638,6 +1014,16 @@ namespace TrishulSim.Scenarios
                 InitSessionTelemetryFile(sessionId);
             }
 
+#if UNITY_5_3_OR_NEWER
+            EnqueueMainThread(() =>
+            {
+                if (_scorecardPanel != null)
+                    _scorecardPanel.SetActive(false);
+                if (_swarmTelemetryText != null)
+                    _swarmTelemetryText.text = "LAUNCHING: " + launchConfig.name + " (" + (launchConfig.swarmProfile != null ? launchConfig.swarmProfile.agentCount : 6) + " AGENTS)...";
+            });
+#endif
+
             WsServer activeServer = Server;
             string swarmSummary = launchConfig.swarmProfile != null
                 ? "tactic=" + launchConfig.swarmProfile.tacticTree + ", agents=" + launchConfig.swarmProfile.agentCount +
@@ -682,14 +1068,22 @@ namespace TrishulSim.Scenarios
 
         public void StartTickLoop()
         {
-            StopTickLoop();
-            if (!_isServerScenarioRunning)
-                return;
+            EnqueueMainThread(() =>
+            {
+                StopTickLoopInternal();
+                if (!_isServerScenarioRunning)
+                    return;
 
-            _tickCoroutine = StartCoroutine(TickLoop());
+                _tickCoroutine = StartCoroutine(TickLoop());
+            });
         }
 
         public void StopTickLoop()
+        {
+            EnqueueMainThread(StopTickLoopInternal);
+        }
+
+        private void StopTickLoopInternal()
         {
             Coroutine running = _tickCoroutine;
             _tickCoroutine = null;
@@ -713,7 +1107,11 @@ namespace TrishulSim.Scenarios
                 if (!_isServerScenarioRunning || _launchGeneration != generation)
                     yield break;
 
-                StepScenarioTickAsync().GetAwaiter().GetResult();
+                Task<ScenarioTickPayload> tickTask = StepScenarioTickAsync();
+                while (!tickTask.IsCompleted)
+                {
+                    yield return null;
+                }
             }
         }
 
@@ -773,6 +1171,10 @@ namespace TrishulSim.Scenarios
             if (tickHandler != null)
                 tickHandler(tickPayload);
 
+#if UNITY_5_3_OR_NEWER
+            UpdateTelemetryHUD(tickPayload);
+#endif
+
             string terminalReason;
             if (EvaluateTerminalCondition(elapsedMs, snapshotCopy, CurrentScenario, out terminalReason))
             {
@@ -784,7 +1186,7 @@ namespace TrishulSim.Scenarios
 
         public void AbortScenario()
         {
-            BroadcastScenarioEnd(ScenarioEndPayload.REASON_INSTRUCTOR_ABORT);
+            Task _ = BroadcastScenarioEndAsync(ScenarioEndPayload.REASON_INSTRUCTOR_ABORT);
         }
 
         public void BroadcastScenarioEnd(string reason)
@@ -843,6 +1245,10 @@ namespace TrishulSim.Scenarios
             Action<ScenarioEndPayload> endHandler = OnScenarioEndBroadcast;
             if (endHandler != null)
                 endHandler(endPayload);
+
+#if UNITY_5_3_OR_NEWER
+            UpdateScorecardHUD(endPayload);
+#endif
 
             return endPayload;
         }
@@ -1246,6 +1652,10 @@ namespace TrishulSim.Scenarios
             Action<ScenarioTickPayload> handler = OnScenarioTickReceived;
             if (handler != null)
                 handler(tickPayload);
+
+#if UNITY_5_3_OR_NEWER
+            UpdateTelemetryHUD(tickPayload);
+#endif
         }
 
         private void HandleClientScenarioEnd(JsonEnvelope envelope)
@@ -1279,6 +1689,10 @@ namespace TrishulSim.Scenarios
             Action<ScenarioEndPayload> handler = OnScenarioEndReceived;
             if (handler != null)
                 handler(endPayload);
+
+#if UNITY_5_3_OR_NEWER
+            UpdateScorecardHUD(endPayload);
+#endif
         }
 
         public void SetOperationMode(OperationMode mode, bool notifyListeners = true)
