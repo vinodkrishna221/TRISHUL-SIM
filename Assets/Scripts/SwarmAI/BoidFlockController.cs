@@ -320,6 +320,48 @@ namespace TrishulSim.SwarmAI
         }
 
         /// <summary>
+        /// Steps classical 3-rule Reynolds Boid flocking directly on BoidAgent MonoBehaviour instances (SA-P0-A Step 2).
+        /// Applies Separation (<5m), Alignment (20m), Cohesion (20m centroid), altitude spring (altitudeM ± 2m),
+        /// clamps speed to SwarmProfile.speedKmh / 3.6 m/s, and synchronizes backing SwarmAgentState + visual Transform.
+        /// </summary>
+        public void StepBoidAgents(
+            IList<BoidAgent> boidAgents,
+            SwarmProfile profile,
+            float deltaTime)
+        {
+            if (boidAgents == null || boidAgents.Count == 0 || deltaTime <= 0f)
+                return;
+
+            int count = boidAgents.Count;
+            SwarmAgentState[] states = new SwarmAgentState[count];
+            for (int i = 0; i < count; i++)
+            {
+                if (boidAgents[i] != null)
+                {
+                    states[i] = boidAgents[i].ToSwarmAgentState();
+                }
+            }
+
+            Step(states, profile, deltaTime);
+
+            for (int i = 0; i < count; i++)
+            {
+                if (boidAgents[i] != null && states[i] != null)
+                {
+                    boidAgents[i].SyncFromState(states[i]);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Frame Update entry-point for stepping BoidAgent flocking (SA-P0-A Step 2).
+        /// </summary>
+        public void Update(IList<BoidAgent> boidAgents, SwarmProfile profile, float deltaTime)
+        {
+            StepBoidAgents(boidAgents, profile, deltaTime);
+        }
+
+        /// <summary>
         /// Computes flocking forces on a standalone array of BoidAgentData structs.
         /// Useful for headless profiling, unit tests, and Burst-compatible NativeArray mirrors.
         /// </summary>

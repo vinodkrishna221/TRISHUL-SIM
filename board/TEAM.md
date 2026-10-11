@@ -31,7 +31,7 @@
 | US-P2-C · XR scaffold stub | Vinod | [x] |
 | US-P2-D · Warden smoke | Vinod | [ ] |
 | US-P3-A · Submission package coordination | Vinod | [ ] |
-| SA-P0-A · Boids 6-agent spawn | Venu | [ ] |
+| SA-P0-A · Boids 6-agent spawn | Venu | [x] |
 | SA-P0-B · Friis RF model | Venu | [ ] |
 | SA-P1-A · Doppler + Acoustic physics | Venu | [ ] |
 | SA-P1-B-i · HBT PINCER approach | Venu | [ ] |

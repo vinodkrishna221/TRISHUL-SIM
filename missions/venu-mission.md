@@ -97,7 +97,7 @@ DELIVERABLE:
 TEST:
   Play Punjab scenario. Trainee Cockpit: 6 coloured spheres move in coherent formation.
   SCENARIO_TICK Console log: swarmSnapshot contains 6 entries; positionWorld changes each tick.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -271,4 +271,4 @@ STATUS: [ ] todo
 
 > I, Venu, have read this brief and will push `feat/swarm-ai-boids-spawn` within 2h of Vinod's WS IPC branch landing.
 
-- [ ] **ACCEPTED**
+- [x] **ACCEPTED**
