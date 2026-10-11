@@ -388,7 +388,7 @@ TEST:
 
 DEPENDS: ui-ux-P1-B (done ✅)    UNBLOCKS: VG-P1-D (Sohail's Recalibrate event)
 DEMO: "Havildar Rajan engages jammer and fires SMASH 2000 with a gamepad." (Beat 4)
-STATUS: [ ] todo
+STATUS: [x] done — 2026-10-11 (verified with GamepadInputSelfTest PASS)
 ```
 
 ---

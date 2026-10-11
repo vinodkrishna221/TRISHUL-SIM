@@ -17,6 +17,7 @@
 | swarm-ai | SA-P1-C, SA-P1-D, SA-P2-A, SA-P2-B (Burst pass) | — | SA-P3-A (Demo seed tuning) |
 | aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A, AA-P2-B | — | AA-P3-A (Partial-file guard) |
 | ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B, UX-P1-D, UX-P2-A | — | UX-P1-C (Split-screen) / UX-P2-B (Bilingual pass) |
+| vr-gamepad | VG-P1-A | — | VG-P1-B (3D Sentry Post) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
 
@@ -46,6 +47,8 @@
 | Endgame tiering active | 19 Oct 2026 ~18:00 (T-6h) |
 
 ## Log (one line per session-end, newest first)
+
+- 2026-10-11T16:35 IST · Vinod: VG-P1-A done — TrishulInputActions.inputactions + GamepadInputController wired to TraineeCockpitRoot & SplitScreen; Left stick ±3°/frame azimuth wrap, D-pad ±2° elevation clamp [-90,90], Right trigger SMASH fire, A toggle jammer, Y/X band cycle (2.4/5.825/0.915 GHz), Select OnRecalibrate event, keyboard fallbacks confirmed; GamepadInputSelfTest (7/7 suites) PASSED
 
 - 2026-10-10T15:25 IST Â· Uday: SA-P2-B done â€” BoidFlockController classical 3 rules + double-buffering, Burst/Job System BoidStepJob, radar loop >500m early-out; 1000-frame 8-agent Punjab benchmark at 0.0021 ms/frame (>400,000 FPS, <16.7ms budget); BurstPerformanceSelfTest PASSED
 - 2026-10-10T15:08 IST Â· Uday: SA-P2-A done â€” SATURATION_DIVE broad front + 100m simultaneous dive + 4s freq hop, MULTI-AXIS_SPLIT 4 cardinal vectors + 915 MHz, TacticTreeFactory dynamic binding; TacticTreesSelfTest PASSED

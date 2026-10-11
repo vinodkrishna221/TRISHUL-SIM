@@ -109,7 +109,7 @@ TEST:
 DEPENDS: ui-ux-P1-B (EwJammerController + SmashReticleController live)   UNBLOCKS: VG-P1-D (Recalibrate binding needed)
 
 DEMO: "Havildar Rajan engages jammer and fires SMASH 2000 using only a gamepad." (Beat 4)
-PERSONA: Vinod (unity-sim)   STATUS: [ ] todo
+PERSONA: Vinod (unity-sim)   STATUS: [x] done — 2026-10-11 (verified with GamepadInputSelfTest PASS)
 ```
 
 ---
