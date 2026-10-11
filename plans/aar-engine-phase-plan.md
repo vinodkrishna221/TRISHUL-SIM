@@ -431,7 +431,7 @@ TEST:
 DEPENDS: AA-P2-B     UNBLOCKS: —
 
 DEMO: "Demo-day insurance — no crash on disk error during live judging." (internal)
-PERSONA: aar-engine builder     STATUS: [ ] todo
+PERSONA: aar-engine builder     STATUS: [x] done
 ```
 
 ---

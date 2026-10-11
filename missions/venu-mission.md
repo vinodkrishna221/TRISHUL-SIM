@@ -97,7 +97,7 @@ DELIVERABLE:
 TEST:
   Play Punjab scenario. Trainee Cockpit: 6 coloured spheres move in coherent formation.
   SCENARIO_TICK Console log: swarmSnapshot contains 6 entries; positionWorld changes each tick.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -135,7 +135,7 @@ DELIVERABLE:
 TEST:
   SCENARIO_TICK Console: sensorReadings.rfWaterfallPeakDbm is a negative float that gets
   less negative as agents approach. At 50m: expected ≈ -36 dBm. radarDetectedCount increases.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -176,7 +176,7 @@ TEST:
   Punjab (temp 4°C, 6 agents at 50m, rpm 11400):
   dopplerPeakHz in range 200–800 Hz, varying with approach velocity.
   acousticSplDb > 40 dB at 50m.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -213,7 +213,7 @@ DELIVERABLE:
 TEST:
   Punjab: 6 agents spawn ~300m out, flock toward origin. Decoys oscillate laterally at higher alt.
   Console: "PINCER SPLIT TRIGGERED" when lead attacker hits 150m mark.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -253,7 +253,7 @@ TEST:
 
 PUSH THIS BRANCH IMMEDIATELY WHEN DONE — Uday (SA-P1-C, SA-P1-D) is waiting.
 DEMO: ⭐ "4 FPV munitions executing low-level pincer in pitch-black fog." (Beat 4 wow moment)
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -271,4 +271,4 @@ STATUS: [ ] todo
 
 > I, Venu, have read this brief and will push `feat/swarm-ai-boids-spawn` within 2h of Vinod's WS IPC branch landing.
 
-- [ ] **ACCEPTED**
+- [x] **ACCEPTED**

@@ -1,6 +1,6 @@
 // ============================================================
 // TacticTree.cs — Hierarchical Behavior Tree Base for Swarm AI
-// TRISHUL-SIM · SA-P2-A / SA-P1-B · swarm-ai track (Uday)
+// TRISHUL-SIM · SA-P1-B-i / SA-P2-A · swarm-ai track (Venu / Uday)
 //
 // Base class for deterministic swarm tactics.
 // Contract: board/contracts/scenario-events.md, docs/SCHEMA.md Entity 1 & 2
@@ -14,16 +14,19 @@ using TrishulSim.Sensors;
 namespace TrishulSim.SwarmAI.HBT
 {
     /// <summary>
-    /// Tactical state of the swarm behavior tree.
+    /// Tactical state of the swarm behavior tree (SA-P1-B-i Step 2:
+    /// APPROACH -> SPLIT / SPLIT_TRIGGER -> PINCER -> DIVE / DIVE_ATTACK -> NEUTRALISED).
     /// </summary>
     public enum TacticState
     {
-        APPROACH,
-        SPLIT,
-        PINCER,
-        DIVE_ATTACK,
-        EXCLUSION_BREACH,
-        NEUTRALISED
+        APPROACH = 0,
+        SPLIT = 1,
+        SPLIT_TRIGGER = SPLIT,
+        PINCER = 2,
+        DIVE_ATTACK = 3,
+        DIVE = DIVE_ATTACK,
+        EXCLUSION_BREACH = 4,
+        NEUTRALISED = 5
     }
 
     /// <summary>
@@ -37,6 +40,15 @@ namespace TrishulSim.SwarmAI.HBT
         public TacticState CurrentState { get; protected set; }
 
         public Vector3 TargetOrigin { get; protected set; }
+
+        /// <summary>
+        /// SA-P1-B-i Step 3: Defended position target origin (defaults to Vector3.zero).
+        /// </summary>
+        public Vector3 TargetPosition
+        {
+            get { return TargetOrigin; }
+            protected set { TargetOrigin = value; }
+        }
 
         public int Seed { get; protected set; }
 

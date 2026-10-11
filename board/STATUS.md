@@ -14,8 +14,8 @@
 | Track | Done | In flight | Next |
 |---|---|---|---|
 | unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B, US-P2-A, US-P2-B, US-P2-C | — | US-P2-D (Warden review coordination + smoke) |
-| swarm-ai | SA-P1-C, SA-P1-D, SA-P2-A, SA-P2-B (Burst pass) | — | SA-P3-A (Demo seed tuning) |
-| aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A, AA-P2-B | — | AA-P3-A (Partial-file guard) |
+| swarm-ai | SA-P0-A, SA-P0-B, SA-P1-A, SA-P1-B-i, SA-P1-B-ii, SA-P1-C, SA-P1-D, SA-P2-A, SA-P2-B (Burst pass) | — | SA-P3-A (Demo seed tuning) |
+| aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A, AA-P2-B, AA-P3-A | — | — (Track complete) |
 | ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B, UX-P1-D, UX-P2-A | — | UX-P1-C (Split-screen) / UX-P2-B (Bilingual pass) |
 | vr-gamepad | VG-P1-A | — | VG-P1-B (3D Sentry Post) |
 
@@ -25,13 +25,13 @@
 
 ## Cut List (pre-ranked; T-3h = 19 Oct ~21:00 IST executes top-down)
 
-1. WebXR / VR sentry mode active playthrough â€” scaffold only, saves ~12h
-2. Scenario Editor UI â€” hard-coded JSON configs suffice for demo
-3. Campaign Mode / persistent ledger â€” session-scoped scoring is enough
-4. Hindi voice-over audio â€” text subtitles cover demo
-5. Live LAN sync beyond 2 stations â€” split-screen fallback already in MUST
+1. WebXR / VR sentry mode active playthrough — scaffold only, saves ~12h
+2. Scenario Editor UI — hard-coded JSON configs suffice for demo
+3. Campaign Mode / persistent ledger — session-scoped scoring is enough
+4. Hindi voice-over audio — text subtitles cover demo
+5. Live LAN sync beyond 2 stations — split-screen fallback already in MUST
 
-**v2 ideas parking lot:** Full multiplayer battalion drill mode Â· Real RF sensor hardware bridge Â· Mobile observer app (iOS/Android)
+**v2 ideas parking lot:** Full multiplayer battalion drill mode · Real RF sensor hardware bridge · Mobile observer app (iOS/Android)
 
 ## Freeze calendar (Patch enforces)
 
@@ -49,7 +49,12 @@
 ## Log (one line per session-end, newest first)
 
 - 2026-10-11T16:35 IST · Vinod: VG-P1-A done — TrishulInputActions.inputactions + GamepadInputController wired to TraineeCockpitRoot & SplitScreen; Left stick ±3°/frame azimuth wrap, D-pad ±2° elevation clamp [-90,90], Right trigger SMASH fire, A toggle jammer, Y/X band cycle (2.4/5.825/0.915 GHz), Select OnRecalibrate event, keyboard fallbacks confirmed; GamepadInputSelfTest (11/11 suites) PASSED
-
+- 2026-10-11T17:22 IST · Venu: SA-P1-B-ii done — PincerLowFastTactic SPLIT/PINCER/DIVE_ATTACK/NEUTRALISED/EXCLUSION_BREACH states (decoy ±45° peel + 20m climb, Pair A 0° / Pair B 180° pincer, 5s post-split RF silence, 2m skim at <=50m, 20m EXCLUSION_BREACH), BoidAgent.CheckEvasion(EWJammerState) (±30° seed-alternated steer + 3s RF silence + freq hop), SwarmManager BroadcastScenarioEnd("ALL_NEUTRALISED" / "EXCLUSION_BREACH"); PincerExecutionSelfTest PASSED
+- 2026-10-11T17:01 IST · Venu: SA-P1-B-i done — TacticTree base + TacticState enum, PincerLowFastTactic APPROACH + SPLIT_TRIGGER (~300m spawn, decoys at altitudeM+5m with seed-driven 15m/8s sinusoidal lateral oscillation, attackers at altitudeM with Boid weight modulation, "PINCER SPLIT TRIGGERED" console log at <=150m), SwarmManager RegisterTacticTree wiring; PincerApproachSelfTest PASSED
+- 2026-10-11T16:35 IST · Venu: SA-P1-A done — DopplerPhysics (ComputeBladeTipHz, 4-blade 343 m/s radial Doppler shift), AcousticPhysics (ComputeSplDb 85 dB SWL + ISO 9613-1 temperature correction, LogSumSpl dB energy addition), SensorSuiteComputer & SwarmManager WeatherPreset.temperature wiring; DopplerAcousticSelfTest PASSED
+- 2026-10-11T12:23 IST · Venu: SA-P0-B done — RfPhysics static class (ComputeFriisDbm, ComputeRadarReturnDbm), SensorSuiteComputer MonoBehaviour (rfWaterfallPeakDbm, rfWaterfallPeakGHz, radarDetectedCount > -90 dBm, P1 placeholders dopplerPeakHz=0.0f/acousticSplDb=0.0f), and SwarmManager registration + SCENARIO_TICK injection; RfPhysicsSelfTest PASSED
+- 2026-10-11T11:52 IST · Venu: SA-P0-A done — BoidAgent MonoBehaviour (all 13 Entity 2 fields, decoy RCS 0.08/9800 RPM blue sphere vs attacker RCS 0.012/11400 RPM red sphere), BoidFlockController Update() + 3 rules, SwarmManager OnScenarioStart(seed)/OnScenarioEnd()/InjectSwarmSnapshot() + WS lifecycle wiring, and SwarmAgentVisual.prefab; BoidsSpawnSelfTest PASSED
+- 2026-10-10T18:55 IST · Sohail (aar-engine): [AA-P3-A] ✅ Partial-file guard + session manifest hardening live (TelemetryLogger IOException catch & partialFlag, ScorecardComputer 0-byte/read error SCORECARD_COMPUTE_FAILED WS ERROR broadcast, SessionManifest partial:true, startup orphaned session scan, idempotent dir creation) — self-test green on feat/aar-engine-partial-guard
 - 2026-10-10T15:25 IST Â· Uday: SA-P2-B done â€” BoidFlockController classical 3 rules + double-buffering, Burst/Job System BoidStepJob, radar loop >500m early-out; 1000-frame 8-agent Punjab benchmark at 0.0021 ms/frame (>400,000 FPS, <16.7ms budget); BurstPerformanceSelfTest PASSED
 - 2026-10-10T15:08 IST Â· Uday: SA-P2-A done â€” SATURATION_DIVE broad front + 100m simultaneous dive + 4s freq hop, MULTI-AXIS_SPLIT 4 cardinal vectors + 915 MHz, TacticTreeFactory dynamic binding; TacticTreesSelfTest PASSED
 - 2026-10-10T14:50 IST Â· Uday: SA-P1-D done â€” SMASH 2000 lead-angle reticle + KineticEvent hit resolution + SwarmManager neutralisation and ALL_NEUTRALISED terminal state; SmashFireControlSelfTest PASSED
