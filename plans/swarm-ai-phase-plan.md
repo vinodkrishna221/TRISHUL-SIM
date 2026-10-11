@@ -163,7 +163,7 @@ TEST:
 DEPENDS: SA-P0-A               UNBLOCKS: UX-P1-A (RF Waterfall renderer needs live dBm values)
 
 DEMO: "RF Waterfall pane shows non-flat signal during approach." (Beat 2/3)
-PERSONA: swarm-ai builder     STATUS: [ ] todo
+PERSONA: swarm-ai builder     STATUS: [x] done
 ```
 
 ---

@@ -69,64 +69,6 @@ namespace UnityEngine
             }
         }
     }
-
-    public class Transform
-    {
-        public Vector3 position = Vector3.zero;
-        public Vector3 localScale = new Vector3(1f, 1f, 1f);
-    }
-
-    public class GameObject
-    {
-        public string name = string.Empty;
-        public bool activeSelf = true;
-        public Transform transform = new Transform();
-
-        public GameObject() { }
-        public GameObject(string name) { this.name = name ?? string.Empty; }
-
-        public void SetActive(bool active)
-        {
-            activeSelf = active;
-        }
-    }
-
-    public class MonoBehaviour
-    {
-        private GameObject _gameObject;
-        public GameObject gameObject
-        {
-            get
-            {
-                if (_gameObject == null)
-                    _gameObject = new GameObject(GetType().Name);
-                return _gameObject;
-            }
-            set { _gameObject = value; }
-        }
-
-        public Transform transform
-        {
-            get { return gameObject.transform; }
-        }
-
-        public bool enabled = true;
-
-        public static void Destroy(object obj)
-        {
-            GameObject go = obj as GameObject;
-            if (go != null)
-            {
-                go.activeSelf = false;
-                return;
-            }
-            MonoBehaviour mb = obj as MonoBehaviour;
-            if (mb != null && mb._gameObject != null)
-            {
-                mb._gameObject.activeSelf = false;
-            }
-        }
-    }
 }
 #endif
 
@@ -206,10 +148,7 @@ namespace TrishulSim.SwarmAI
 
             if (profile != null && profile.rfFreqGHz != null && profile.rfFreqGHz.Length > 0)
             {
-                if (decoy && profile.rfFreqGHz.Length > 1)
-                    rfFreqGHz = profile.rfFreqGHz[1];
-                else
-                    rfFreqGHz = profile.rfFreqGHz[0];
+                rfFreqGHz = profile.rfFreqGHz[0];
             }
             else
             {
