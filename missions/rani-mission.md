@@ -267,7 +267,7 @@ TEST:
   Acoustic FFT: bar at ~220 Hz lights amber/red as agents approach.
   All 3 update smoothly at ~10 Hz.
 DEMO: ⭐ "Beat 2 and Beat 3 fully visual — sensors alive." (Beat 2 + 3)
-STATUS: [ ] todo
+STATUS: [x] done — 2026-10-06 (verified with UiShellSelfTest PASS: 3 live renderers, spectrogram scroll, PPI scope blips, 8-band FFT)
 ```
 
 ---
@@ -319,7 +319,7 @@ TEST:
   EW azimuth=247°, band=5.825 GHz → ROE warning disappears.
   Click FIRE: "HIT: agent-3" or "MISS — adjust lead" flash.
 DEMO: ⭐ "Trainee operates EW and kinetic controls — Beat 4 interaction." (Beat 4)
-STATUS: [ ] todo
+STATUS: [x] done — 2026-10-06 (verified with UiShellSelfTest PASS: EW controls, ROE blackout warning, SMASH reticle lock, lead-angle, kinetic hit/miss)
 ```
 
 ---

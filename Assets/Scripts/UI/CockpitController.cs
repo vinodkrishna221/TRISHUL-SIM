@@ -49,6 +49,18 @@ namespace TrishulSim.UI
         private VisualElement computingOverlay;
         private ScorecardPanelController scorecardController;
 
+        // ── EW/SMASH Renderers & Controllers (UX-P1-A/B) ────────
+        private RfWaterfallRenderer rfWaterfallRenderer;
+        private DopplerScopeRenderer dopplerScopeRenderer;
+        private AcousticFftRenderer acousticFftRenderer;
+        private EwJammerController ewJammerController;
+        private SmashReticleController smashReticleController;
+        
+        private EWJammerState currentEwState = new EWJammerState();
+        private TraineeAction currentTraineeAction = new TraineeAction();
+        private SwarmAgentState[] lastSwarmSnapshot = null;
+        private long scenarioElapsedMs = 0;
+
         // ── State ─────────────────────────────────────────────
         private bool scenarioRunning = false;
         private string currentThreatState = "GREEN";
@@ -65,6 +77,13 @@ namespace TrishulSim.UI
         public VisualElement ComputingOverlay { get { return computingOverlay; } }
         public Label DopplerReading { get { return dopplerReading; } }
         public Label AcousticReading { get { return acousticReading; } }
+        public RfWaterfallRenderer RfRenderer { get { return rfWaterfallRenderer; } }
+        public DopplerScopeRenderer DopplerRenderer { get { return dopplerScopeRenderer; } }
+        public AcousticFftRenderer AcousticRenderer { get { return acousticFftRenderer; } }
+        public EwJammerController EwController { get { return ewJammerController; } }
+        public SmashReticleController SmashController { get { return smashReticleController; } }
+        public TraineeAction CurrentTraineeAction { get { return currentTraineeAction; } }
+        public EWJammerState CurrentEwState { get { return currentEwState; } }
 
         // ══════════════════════════════════════════════════════
         // Lifecycle
@@ -141,6 +160,54 @@ namespace TrishulSim.UI
                 }
                 scorecardController.BindElements(scorecardRoot);
             }
+
+            InitializeRenderers();
+            InitializeControllers();
+        }
+
+        private void InitializeRenderers()
+        {
+            if (rfWaterfallRenderer == null)
+            {
+                rfWaterfallRenderer = GetComponent<RfWaterfallRenderer>();
+                if (rfWaterfallRenderer == null) rfWaterfallRenderer = new RfWaterfallRenderer();
+            }
+            if (rfContent != null) rfWaterfallRenderer.Initialize(rfContent);
+
+            if (dopplerScopeRenderer == null)
+            {
+                dopplerScopeRenderer = GetComponent<DopplerScopeRenderer>();
+                if (dopplerScopeRenderer == null) dopplerScopeRenderer = new DopplerScopeRenderer();
+            }
+            if (dopplerContent != null) dopplerScopeRenderer.Initialize(dopplerContent, dopplerReading);
+
+            if (acousticFftRenderer == null)
+            {
+                acousticFftRenderer = GetComponent<AcousticFftRenderer>();
+                if (acousticFftRenderer == null) acousticFftRenderer = new AcousticFftRenderer();
+            }
+            if (acousticContent != null) acousticFftRenderer.Initialize(acousticContent, acousticReading);
+        }
+
+        private void InitializeControllers()
+        {
+            if (ewJammerController == null)
+            {
+                ewJammerController = GetComponent<EwJammerController>();
+                if (ewJammerController == null) ewJammerController = new EwJammerController();
+            }
+            if (controlsRow != null) ewJammerController.Initialize(controlsRow);
+
+            if (smashReticleController == null)
+            {
+                smashReticleController = GetComponent<SmashReticleController>();
+                if (smashReticleController == null) smashReticleController = new SmashReticleController();
+            }
+            if (controlsRow != null)
+            {
+                var reticleOverlay = root != null ? root.Q<VisualElement>("smash-reticle-overlay") : null;
+                smashReticleController.Initialize(controlsRow, reticleOverlay);
+            }
         }
 
         // ══════════════════════════════════════════════════════
@@ -157,57 +224,179 @@ namespace TrishulSim.UI
         public void OnScenarioStart(string scenarioId, string scenarioName)
         {
             scenarioRunning = true;
+            scenarioElapsedMs = 0;
             Debug.Log(string.Format("[Cockpit] SCENARIO_START: {0} — {1}", scenarioId, scenarioName));
 
-            // Show controls row (EW + SMASH controls added in UX-P1-B)
             if (controlsRow != null)
                 controlsRow.RemoveFromClassList("hidden");
 
-            // Set threat indicator to GREEN
+            if (ewJammerController != null) ewJammerController.ResetState();
+            if (smashReticleController != null) smashReticleController.ResetState();
+
+            currentTraineeAction = new TraineeAction();
+            currentEwState = new EWJammerState();
+
             SetThreatState("GREEN");
 
-            // Hide scorecard panel and computing overlay
             if (scorecardPanel != null)
                 scorecardPanel.AddToClassList("hidden");
             if (computingOverlay != null)
                 computingOverlay.AddToClassList("hidden");
+
+            var baseline = SensorMock.GetBaselineFixture();
+            UpdateSensors(baseline, null);
         }
 
         /// <summary>
-        /// Called on each SCENARIO_TICK (10 Hz).
-        /// Contract: scenario-events.md v1 — consumer reaction:
-        ///   "redraws RF Waterfall, Doppler scope, Acoustic FFT, threat-state indicator"
+        /// Primary tick entry point taking explicit sensor telemetry values.
+        /// Contract: scenario-events.md v1 (SCENARIO_TICK).
         /// </summary>
-        /// <param name="threatState">"GREEN" | "AMBER" | "RED"</param>
-        /// <param name="rfPeakGHz">RF waterfall peak frequency in GHz</param>
-        /// <param name="rfPeakDbm">RF waterfall peak power in dBm</param>
-        /// <param name="dopplerHz">Micro-Doppler peak frequency in Hz</param>
-        /// <param name="acousticDb">Acoustic SPL in dB</param>
-        /// <param name="radarCount">Number of radar returns above threshold</param>
         public void OnScenarioTick(
             string threatState,
             float rfPeakGHz, float rfPeakDbm,
             float dopplerHz, float acousticDb,
-            int radarCount)
+            int radarCount,
+            bool friendlyVhfActive = false,
+            long elapsedMs = 0)
         {
             if (!scenarioRunning) return;
 
-            // Update threat indicator
+            scenarioElapsedMs = elapsedMs > 0 ? elapsedMs : scenarioElapsedMs + 100;
             SetThreatState(threatState);
 
-            // Forward sensor data to renderers (stub: update reading labels)
-            // Replace with actual renderer calls in UX-P1-A:
-            //   RfWaterfallRenderer.UpdateWaterfall(sensorReadings)
-            //   DopplerScopeRenderer.UpdateScope(sensorReadings, swarm)
-            //   AcousticFftRenderer.UpdateAcoustic(sensorReadings)
-            if (dopplerReading != null)
-                dopplerReading.text = LocaleToggle.Instance.GetFormatted("DOPPLER_READING", dopplerHz);
-            if (acousticReading != null)
-                acousticReading.text = LocaleToggle.Instance.GetFormatted("ACOUSTIC_READING", acousticDb);
+            // 1. Process EW and SMASH controls
+            if (ewJammerController != null)
+            {
+                ewJammerController.OnScenarioTick(threatState, friendlyVhfActive);
+                currentEwState = ewJammerController.CurrentState;
+            }
 
-            // Log sensor values (stub — removed when renderers are wired)
-            Debug.Log(string.Format("[Cockpit][TICK] threat={0} RF={1}GHz/{2}dBm Doppler={3}Hz Acoustic={4}dB radar={5}",
-                threatState, rfPeakGHz, rfPeakDbm, dopplerHz, acousticDb, radarCount));
+            KineticEvent kineticEv = null;
+            if (smashReticleController != null)
+            {
+                kineticEv = smashReticleController.ConsumeKineticTrigger();
+            }
+
+            if (ewJammerController != null)
+            {
+                currentTraineeAction = ewJammerController.BuildTraineeAction(kineticEv);
+            }
+            else
+            {
+                currentTraineeAction = new TraineeAction(0f, 0f, false, null, kineticEv);
+            }
+
+            if (smashReticleController != null)
+            {
+                smashReticleController.UpdateReticle(lastSwarmSnapshot, currentTraineeAction);
+            }
+
+            // 2. Update sensor suite
+            var sr = new SensorReadings(rfPeakGHz, rfPeakDbm, dopplerHz, acousticDb, radarCount);
+            UpdateSensors(sr, lastSwarmSnapshot);
+
+            if (dopplerReading != null && LocaleToggle.Instance != null)
+                dopplerReading.text = LocaleToggle.Instance.GetFormatted("DOPPLER_READING", dopplerHz);
+            if (acousticReading != null && LocaleToggle.Instance != null)
+                acousticReading.text = LocaleToggle.Instance.GetFormatted("ACOUSTIC_READING", acousticDb);
+        }
+
+        /// <summary>
+        /// Overload taking full contract SensorReadings and SwarmAgentState snapshots.
+        /// </summary>
+        public void OnScenarioTick(string threatState, SensorReadings sr, SwarmAgentState[] swarm = null, bool friendlyVhfActive = false, long elapsedMs = 0)
+        {
+            if (!scenarioRunning) return;
+
+            scenarioElapsedMs = elapsedMs > 0 ? elapsedMs : scenarioElapsedMs + 100;
+            SetThreatState(threatState);
+            if (swarm != null)
+            {
+                lastSwarmSnapshot = swarm;
+            }
+
+            // 1. Process EW and SMASH controls
+            if (ewJammerController != null)
+            {
+                ewJammerController.OnScenarioTick(threatState, friendlyVhfActive);
+                currentEwState = ewJammerController.CurrentState;
+            }
+
+            KineticEvent kineticEv = null;
+            if (smashReticleController != null)
+            {
+                kineticEv = smashReticleController.ConsumeKineticTrigger();
+            }
+
+            if (ewJammerController != null)
+            {
+                currentTraineeAction = ewJammerController.BuildTraineeAction(kineticEv);
+            }
+            else
+            {
+                currentTraineeAction = new TraineeAction(0f, 0f, false, null, kineticEv);
+            }
+
+            if (smashReticleController != null)
+            {
+                smashReticleController.UpdateReticle(swarm ?? lastSwarmSnapshot, currentTraineeAction);
+            }
+
+            // 2. Update sensor suite
+            UpdateSensors(sr, swarm ?? lastSwarmSnapshot);
+        }
+
+        /// <summary>
+        /// Helper to trigger SMASH 2000 kinetic firing at current scenario timestamp.
+        /// </summary>
+        public KineticEvent TriggerFireKinetic()
+        {
+            if (smashReticleController != null)
+            {
+                return smashReticleController.TriggerFire(scenarioElapsedMs);
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Helper to configure EW Jammer controls.
+        /// </summary>
+        public void SetEwParameters(int azimuth, int elevation, float bandGHz, bool engaged)
+        {
+            if (ewJammerController != null)
+            {
+                ewJammerController.SetAzimuth(azimuth);
+                ewJammerController.SetElevation(elevation);
+                ewJammerController.SetBandGHz(bandGHz);
+                ewJammerController.SetEngaged(engaged);
+                currentEwState = ewJammerController.CurrentState;
+            }
+        }
+
+        /// <summary>
+        /// Dispatches sensor telemetry to all three live renderers.
+        /// </summary>
+        private void UpdateSensors(SensorReadings sr, SwarmAgentState[] swarm)
+        {
+            if (sr == null) return;
+
+            // 1. Update RF Waterfall
+            if (rfWaterfallRenderer != null && rfWaterfallRenderer.IsInitialized)
+            {
+                rfWaterfallRenderer.UpdateWaterfall(sr);
+            }
+
+            // 2. Update Doppler Scope
+            if (dopplerScopeRenderer != null && dopplerScopeRenderer.IsInitialized)
+            {
+                dopplerScopeRenderer.UpdateScope(sr, swarm);
+            }
+
+            // 3. Update Acoustic FFT
+            if (acousticFftRenderer != null && acousticFftRenderer.IsInitialized)
+            {
+                acousticFftRenderer.UpdateAcoustic(sr);
+            }
         }
 
         /// <summary>

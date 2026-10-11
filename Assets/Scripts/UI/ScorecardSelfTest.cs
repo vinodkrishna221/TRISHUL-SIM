@@ -19,7 +19,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
 
-#if !UNITY_5_3_OR_NEWER
+#if !UNITY_5_3_OR_NEWER && STANDALONE_SCORECARD_TEST
 namespace UnityEngine
 {
     public static class Resources

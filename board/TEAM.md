@@ -51,8 +51,8 @@
 | AA-P3-A · Partial-file guard + manifest clean-up | Sohail | [ ] |
 | UX-P0-A · UITK shell (C2 + Cockpit layout) | Rani | [ ] |
 | UX-P0-B · Unity Localization + Hindi/English toggle | Rani | [ ] |
-| UX-P1-A · Live sensor suite (RF Waterfall, Doppler, Acoustic) | Rani | [ ] |
-| UX-P1-B · EW Jammer controls + SMASH reticle | Rani | [ ] |
+| UX-P1-A · Live sensor suite (RF Waterfall, Doppler, Acoustic) | Rani | [x] |
+| UX-P1-B · EW Jammer controls + SMASH reticle | Rani | [x] |
 | UX-P2-D · Full demo-path smoke (all 6 beats) | Rani | [ ] |
 | UX-P1-C · Split-screen layout compatibility | Rajeswari | [ ] |
 | UX-P1-D · Scorecard Renderer + Timeline Scrubber UI | Rajeswari | [x] |
