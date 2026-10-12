@@ -305,7 +305,7 @@ TEST:
 DEPENDS: VG-P1-A (Recalibrate event), VG-P1-B (VRRig/StereoHead exist)   UNBLOCKS: VG-P1-E (GyroReceiver.IsConnected used for status badge)
 
 DEMO: "Trainee turns head — radar scope follows left. Acoustic sonar follows right." (Beat 3)
-PERSONA: Sohail (aar-engine)   STATUS: [ ] todo
+PERSONA: Sohail (aar-engine)   STATUS: [x] done — 2026-10-12 (GyroReceiver + vr-gyro-sender.html + serve-gyro.ps1)
 ```
 
 ---
