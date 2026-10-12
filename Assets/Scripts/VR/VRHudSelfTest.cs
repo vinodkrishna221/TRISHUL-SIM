@@ -8,9 +8,12 @@
 //   3. Panel reference assignment and initialization
 //   4. AssignReferences wiring path
 //   5. Threat state cycling
+//   6. Acoustic FFT procedural rendering (bar colors at 30/45/60 dB)
+//   7. EW/SMASH procedural rendering (jammer + blackout risk)
+//   8. Dual URP+legacy MaterialPropertyBlock properties
 //
 // Run: attach to any GameObject → Play → check Console for
-//      [VRHudSelfTest] 5/5 PASSED or FAILED details.
+//      [VRHudSelfTest] 8/8 PASSED or FAILED details.
 // ============================================================
 
 using System;
@@ -30,13 +33,16 @@ namespace TrishulSim.VR
 
         private void Start()
         {
-            Debug.Log("[VRHudSelfTest] ═══ Starting VG-P1-C Self-Test ═══");
+            Debug.Log("[VRHudSelfTest] ═══ Starting VG-P1-C Self-Test (8 suites) ═══");
 
             TestThreatColorMapping();
             TestRenderTextureClearMechanic();
             TestControllerInitWithNulls();
             TestAssignReferencesWiring();
             TestThreatStateCycling();
+            TestAcousticFftProceduralRendering();
+            TestEwSmashProceduralRendering();
+            TestDualMaterialPropertyBlock();
 
             Debug.Log(string.Format(
                 "[VRHudSelfTest] ═══ Results: {0}/{1} PASSED, {2} FAILED ═══",
@@ -60,16 +66,11 @@ namespace TrishulSim.VR
                 Color red   = VRHudController.GetThreatColor("RED");
                 Color unknown = VRHudController.GetThreatColor("UNKNOWN");
 
-                // GREEN = #00B300 → (0, 0.702, 0, 1)
                 AssertColorClose(green, new Color(0f, 0.702f, 0f, 1f), "GREEN");
-                // AMBER = #FFB300 → (1, 0.702, 0, 1)
                 AssertColorClose(amber, new Color(1f, 0.702f, 0f, 1f), "AMBER");
-                // RED = #CC0000 → (0.8, 0, 0, 1)
                 AssertColorClose(red, new Color(0.8f, 0f, 0f, 1f), "RED");
-                // Unknown falls back to GREEN
                 AssertColorClose(unknown, green, "UNKNOWN→GREEN");
 
-                // Verify they're all different
                 Assert(green != amber, "GREEN != AMBER");
                 Assert(amber != red, "AMBER != RED");
                 Assert(green != red, "GREEN != RED");
@@ -91,23 +92,19 @@ namespace TrishulSim.VR
             total++;
             try
             {
-                // Create a test RenderTexture
                 var rt = new RenderTexture(64, 64, 0, RenderTextureFormat.ARGB32);
                 rt.Create();
 
-                // Fill with white
                 RenderTexture prev = RenderTexture.active;
                 RenderTexture.active = rt;
                 GL.Clear(true, true, Color.white);
                 RenderTexture.active = prev;
 
-                // Clear to black (same mechanic as VRHudController.ClearRenderTexture)
                 prev = RenderTexture.active;
                 RenderTexture.active = rt;
                 GL.Clear(true, true, Color.black);
                 RenderTexture.active = prev;
 
-                // Read back a pixel to verify
                 var readTex = new Texture2D(1, 1, TextureFormat.RGBA32, false);
                 prev = RenderTexture.active;
                 RenderTexture.active = rt;
@@ -119,7 +116,6 @@ namespace TrishulSim.VR
                 Assert(pixel.r < 0.1f && pixel.g < 0.1f && pixel.b < 0.1f,
                     string.Format("Cleared pixel should be black, got ({0},{1},{2})", pixel.r, pixel.g, pixel.b));
 
-                // Cleanup
                 rt.Release();
                 DestroyImmediate(rt);
                 DestroyImmediate(readTex);
@@ -141,12 +137,9 @@ namespace TrishulSim.VR
             total++;
             try
             {
-                // Create a temporary GO with VRHudController
                 var tempGo = new GameObject("VRHudSelfTest_TempController");
                 var controller = tempGo.AddComponent<VRHudController>();
 
-                // Without any references assigned, should not be initialized
-                // (Start() would run on next frame, but we can check initial state)
                 Assert(!controller.IsInitialized, "Controller should NOT be initialized without references");
                 Assert(!controller.IsScenarioRunning, "Scenario should not be running initially");
                 Assert(controller.CurrentThreatState == "GREEN", "Default threat state should be GREEN");
@@ -173,13 +166,11 @@ namespace TrishulSim.VR
                 var tempGo = new GameObject("VRHudSelfTest_WiringTest");
                 var controller = tempGo.AddComponent<VRHudController>();
 
-                // Create mock RenderTextures
-                var rt1 = new RenderTexture(64, 64, 0);   rt1.Create();
-                var rt2 = new RenderTexture(64, 64, 0);   rt2.Create();
-                var rt3 = new RenderTexture(64, 32, 0);   rt3.Create();
-                var rt4 = new RenderTexture(64, 32, 0);   rt4.Create();
+                var rt1 = new RenderTexture(64, 64, 0); rt1.Create();
+                var rt2 = new RenderTexture(64, 64, 0); rt2.Create();
+                var rt3 = new RenderTexture(64, 32, 0); rt3.Create();
+                var rt4 = new RenderTexture(64, 32, 0); rt4.Create();
 
-                // Create mock panel quads
                 var q1 = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 var q2 = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 var q3 = GameObject.CreatePrimitive(PrimitiveType.Quad);
@@ -201,7 +192,6 @@ namespace TrishulSim.VR
                 Assert(controller.PanelRfRenderer == q1.GetComponent<Renderer>(), "RF panel renderer assigned");
                 Assert(controller.ThreatTorusRenderer == torus.GetComponent<Renderer>(), "Torus renderer assigned");
 
-                // Cleanup
                 rt1.Release(); rt2.Release(); rt3.Release(); rt4.Release();
                 DestroyImmediate(rt1); DestroyImmediate(rt2);
                 DestroyImmediate(rt3); DestroyImmediate(rt4);
@@ -227,52 +217,22 @@ namespace TrishulSim.VR
             total++;
             try
             {
-                var tempGo = new GameObject("VRHudSelfTest_ThreatCycle");
-                var controller = tempGo.AddComponent<VRHudController>();
+                ControllerTestRig rig = CreateTestRig("ThreatCycle");
 
-                // Create a minimal torus for color testing
-                var torus = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                var rt1 = new RenderTexture(4, 4, 0); rt1.Create();
-                var rt2 = new RenderTexture(4, 4, 0); rt2.Create();
-                var rt3 = new RenderTexture(4, 4, 0); rt3.Create();
-                var rt4 = new RenderTexture(4, 4, 0); rt4.Create();
-                var q1 = GameObject.CreatePrimitive(PrimitiveType.Quad);
-                var q2 = GameObject.CreatePrimitive(PrimitiveType.Quad);
-                var q3 = GameObject.CreatePrimitive(PrimitiveType.Quad);
-                var q4 = GameObject.CreatePrimitive(PrimitiveType.Quad);
-
-                controller.AssignReferences(
-                    rt1, rt2, rt3, rt4,
-                    q1.GetComponent<Renderer>(), q2.GetComponent<Renderer>(),
-                    q3.GetComponent<Renderer>(), q4.GetComponent<Renderer>(),
-                    torus.GetComponent<Renderer>()
-                );
-
-                // Cycle through all threat states
                 string[] states = new string[] { "GREEN", "AMBER", "RED", "GREEN" };
                 foreach (var state in states)
                 {
-                    controller.ManualSetThreat(state);
-                    Assert(controller.CurrentThreatState == state,
+                    rig.controller.ManualSetThreat(state);
+                    Assert(rig.controller.CurrentThreatState == state,
                         string.Format("After ManualSetThreat({0}), state should be {0}", state));
                 }
 
-                // Verify torus renderer has property block set
                 var mpb = new MaterialPropertyBlock();
-                torus.GetComponent<Renderer>().GetPropertyBlock(mpb);
-                // Property block should have _Color set (non-default)
+                rig.torus.GetComponent<Renderer>().GetPropertyBlock(mpb);
                 Color torusColor = mpb.GetColor("_Color");
-                AssertColorClose(torusColor, VRHudController.ThreatGreen, "Torus final color = GREEN");
+                AssertColorClose(torusColor, VRHudController.ThreatGreen, "Torus final _Color = GREEN");
 
-                // Cleanup
-                rt1.Release(); rt2.Release(); rt3.Release(); rt4.Release();
-                DestroyImmediate(rt1); DestroyImmediate(rt2);
-                DestroyImmediate(rt3); DestroyImmediate(rt4);
-                DestroyImmediate(q1); DestroyImmediate(q2);
-                DestroyImmediate(q3); DestroyImmediate(q4);
-                DestroyImmediate(torus);
-                DestroyImmediate(tempGo);
-
+                DestroyTestRig(rig);
                 Debug.Log("[VRHudSelfTest] ✓ Test 5: Threat state cycling correct");
                 passed++;
             }
@@ -281,6 +241,284 @@ namespace TrishulSim.VR
                 Debug.LogError(string.Format("[VRHudSelfTest] ✗ Test 5: Threat state cycling — {0}", e.Message));
                 failed++;
             }
+        }
+
+        // ── Test 6: Acoustic FFT Procedural Rendering ────────────
+
+        private void TestAcousticFftProceduralRendering()
+        {
+            total++;
+            try
+            {
+                ControllerTestRig rig = CreateTestRig("AcousticTest");
+
+                // ── 30 dB (ambient, below 40 dB threshold → green, low bars) ──
+                rig.controller.ManualRenderAcoustic(30f);
+                Assert(rig.controller.AcousticTex != null, "AcousticTex should be allocated");
+
+                Color[] pix30 = rig.controller.AcousticTex.GetPixels();
+                Assert(HasNonBlackPixels(pix30), "30 dB: should produce non-black pixels");
+                Assert(HasColor(pix30, IsGreenish), "30 dB: dominant color should be greenish (#00FF88)");
+                float greenHeight30 = MeasureBarHeight(pix30, VRHudController.AcousticTexWidth, VRHudController.AcousticTexHeight);
+
+                // ── 45 dB (mid, between 40-55 → amber, mid bars) ──
+                rig.controller.ManualRenderAcoustic(45f);
+                Color[] pix45 = rig.controller.AcousticTex.GetPixels();
+                Assert(HasNonBlackPixels(pix45), "45 dB: should produce non-black pixels");
+                Assert(HasColor(pix45, IsAmberish), "45 dB: should contain amber bars (#FFB300)");
+                float amberHeight45 = MeasureBarHeight(pix45, VRHudController.AcousticTexWidth, VRHudController.AcousticTexHeight);
+                Assert(amberHeight45 > greenHeight30, "45 dB bars should be taller than 30 dB bars");
+
+                // ── 60 dB (high, above 55 → red, tall bars) ──
+                rig.controller.ManualRenderAcoustic(60f);
+                Color[] pix60 = rig.controller.AcousticTex.GetPixels();
+                Assert(HasNonBlackPixels(pix60), "60 dB: should produce non-black pixels");
+                Assert(HasColor(pix60, IsReddish), "60 dB: should contain red bars (#CC0000)");
+                float redHeight60 = MeasureBarHeight(pix60, VRHudController.AcousticTexWidth, VRHudController.AcousticTexHeight);
+                Assert(redHeight60 > amberHeight45, "60 dB bars should be taller than 45 dB bars");
+
+                // ── Verify RT got the blit ──
+                var rtReadTex = new Texture2D(4, 4, TextureFormat.RGBA32, false);
+                RenderTexture prev = RenderTexture.active;
+                RenderTexture.active = rig.rts[2];
+                rtReadTex.ReadPixels(new Rect(0, 0, 4, 4), 0, 0);
+                rtReadTex.Apply();
+                RenderTexture.active = prev;
+                Color[] rtPixels = rtReadTex.GetPixels();
+                Assert(HasNonBlackPixels(rtPixels), "rtAcousticFft should have non-black pixels after blit");
+                DestroyImmediate(rtReadTex);
+
+                DestroyTestRig(rig);
+                Debug.Log("[VRHudSelfTest] ✓ Test 6: Acoustic FFT procedural rendering correct");
+                passed++;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError(string.Format("[VRHudSelfTest] ✗ Test 6: Acoustic FFT rendering — {0}", e.Message));
+                failed++;
+            }
+        }
+
+        // ── Test 7: EW/SMASH Procedural Rendering ────────────────
+
+        private void TestEwSmashProceduralRendering()
+        {
+            total++;
+            try
+            {
+                ControllerTestRig rig = CreateTestRig("EwSmashTest");
+
+                // Normal state — no blackout risk
+                rig.controller.ManualRenderEwSmash(
+                    engaged: true, bandGHz: 5.825f,
+                    azimuth: 45f, elevation: 10f,
+                    blackoutRisk: false, leadAngle: 5f, hit: false);
+
+                Assert(rig.controller.EwSmashTex != null, "EwSmashTex should be allocated");
+                Color[] pixNormal = rig.controller.EwSmashTex.GetPixels();
+                Assert(HasNonBlackPixels(pixNormal), "EW normal state: should produce non-black pixels");
+
+                // Blackout risk state — should produce red warning
+                rig.controller.ManualRenderEwSmash(
+                    engaged: true, bandGHz: 2.4f,
+                    azimuth: 180f, elevation: -5f,
+                    blackoutRisk: true, leadAngle: 12f, hit: true);
+
+                Color[] pixBlackout = rig.controller.EwSmashTex.GetPixels();
+                Assert(HasNonBlackPixels(pixBlackout), "EW blackout: should produce non-black pixels");
+                Assert(HasColor(pixBlackout, IsReddish), "EW blackout: should contain red ROE warning pixels");
+
+                // Pixel content should differ between normal and blackout
+                Assert(!PixelsIdentical(pixNormal, pixBlackout),
+                    "Normal vs blackout renders should differ");
+
+                // ── Verify RT got the blit ──
+                var rtReadTex = new Texture2D(4, 4, TextureFormat.RGBA32, false);
+                RenderTexture prev = RenderTexture.active;
+                RenderTexture.active = rig.rts[3];
+                rtReadTex.ReadPixels(new Rect(0, 0, 4, 4), 0, 0);
+                rtReadTex.Apply();
+                RenderTexture.active = prev;
+                Color[] rtPixels = rtReadTex.GetPixels();
+                Assert(HasNonBlackPixels(rtPixels), "rtEwSmashPanel should have non-black pixels after blit");
+                DestroyImmediate(rtReadTex);
+
+                DestroyTestRig(rig);
+                Debug.Log("[VRHudSelfTest] ✓ Test 7: EW/SMASH procedural rendering correct");
+                passed++;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError(string.Format("[VRHudSelfTest] ✗ Test 7: EW/SMASH rendering — {0}", e.Message));
+                failed++;
+            }
+        }
+
+        // ── Test 8: Dual URP+Legacy MaterialPropertyBlock ────────
+
+        private void TestDualMaterialPropertyBlock()
+        {
+            total++;
+            try
+            {
+                ControllerTestRig rig = CreateTestRig("DualMPB");
+
+                // After AssignReferences + ValidateAndInitialize, panels should have
+                // both _BaseMap and _MainTex set to the RenderTexture.
+                Assert(VRHudController.VerifyDualTextureProperties(
+                    rig.controller.PanelRfRenderer, "_BaseMap", "_MainTex"),
+                    "RF panel should have both _BaseMap and _MainTex set");
+
+                Assert(VRHudController.VerifyDualTextureProperties(
+                    rig.controller.PanelDopplerRenderer, "_BaseMap", "_MainTex"),
+                    "Doppler panel should have both _BaseMap and _MainTex set");
+
+                Assert(VRHudController.VerifyDualTextureProperties(
+                    rig.controller.PanelAcousticRenderer, "_BaseMap", "_MainTex"),
+                    "Acoustic panel should have both _BaseMap and _MainTex set");
+
+                Assert(VRHudController.VerifyDualTextureProperties(
+                    rig.controller.PanelEwSmashRenderer, "_BaseMap", "_MainTex"),
+                    "EW/SMASH panel should have both _BaseMap and _MainTex set");
+
+                // Torus should have both _BaseColor and _Color set after SetThreatTorusColor
+                rig.controller.ManualSetThreat("AMBER");
+                Assert(VRHudController.VerifyDualColorProperties(
+                    rig.controller.ThreatTorusRenderer),
+                    "Threat torus should have both _BaseColor and _Color set");
+
+                // Verify emission is also set
+                var mpb = new MaterialPropertyBlock();
+                rig.controller.ThreatTorusRenderer.GetPropertyBlock(mpb);
+                Color emission = mpb.GetColor("_EmissionColor");
+                Assert(emission.r > 0f || emission.g > 0f,
+                    string.Format("Emission should be non-zero, got ({0},{1},{2})", emission.r, emission.g, emission.b));
+
+                DestroyTestRig(rig);
+                Debug.Log("[VRHudSelfTest] ✓ Test 8: Dual URP+legacy MaterialPropertyBlock correct");
+                passed++;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError(string.Format("[VRHudSelfTest] ✗ Test 8: Dual MaterialPropertyBlock — {0}", e.Message));
+                failed++;
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════
+        // Test Rig Factory — shared setup/teardown
+        // ══════════════════════════════════════════════════════════
+
+        private struct ControllerTestRig
+        {
+            public GameObject root;
+            public VRHudController controller;
+            public RenderTexture[] rts;
+            public GameObject[] quads;
+            public GameObject torus;
+        }
+
+        private ControllerTestRig CreateTestRig(string testName)
+        {
+            var rig = new ControllerTestRig();
+            rig.root = new GameObject(string.Format("VRHudSelfTest_{0}", testName));
+            rig.controller = rig.root.AddComponent<VRHudController>();
+
+            rig.rts = new RenderTexture[4];
+            rig.rts[0] = new RenderTexture(64, 64, 0); rig.rts[0].Create();
+            rig.rts[1] = new RenderTexture(64, 64, 0); rig.rts[1].Create();
+            rig.rts[2] = new RenderTexture(64, 32, 0); rig.rts[2].Create();
+            rig.rts[3] = new RenderTexture(64, 32, 0); rig.rts[3].Create();
+
+            rig.quads = new GameObject[4];
+            for (int i = 0; i < 4; i++)
+                rig.quads[i] = GameObject.CreatePrimitive(PrimitiveType.Quad);
+
+            rig.torus = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+
+            rig.controller.AssignReferences(
+                rig.rts[0], rig.rts[1], rig.rts[2], rig.rts[3],
+                rig.quads[0].GetComponent<Renderer>(), rig.quads[1].GetComponent<Renderer>(),
+                rig.quads[2].GetComponent<Renderer>(), rig.quads[3].GetComponent<Renderer>(),
+                rig.torus.GetComponent<Renderer>()
+            );
+
+            return rig;
+        }
+
+        private void DestroyTestRig(ControllerTestRig rig)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                if (rig.rts[i] != null) { rig.rts[i].Release(); DestroyImmediate(rig.rts[i]); }
+                if (rig.quads[i] != null) DestroyImmediate(rig.quads[i]);
+            }
+            if (rig.torus != null) DestroyImmediate(rig.torus);
+            if (rig.root != null) DestroyImmediate(rig.root);
+        }
+
+        // ══════════════════════════════════════════════════════════
+        // Pixel Analysis Helpers
+        // ══════════════════════════════════════════════════════════
+
+        private delegate bool ColorPredicate(Color c);
+
+        private static bool HasNonBlackPixels(Color[] pixels)
+        {
+            for (int i = 0; i < pixels.Length; i++)
+                if (pixels[i].r > 0.05f || pixels[i].g > 0.05f || pixels[i].b > 0.05f)
+                    return true;
+            return false;
+        }
+
+        private static bool HasColor(Color[] pixels, ColorPredicate pred)
+        {
+            for (int i = 0; i < pixels.Length; i++)
+                if (pred(pixels[i]))
+                    return true;
+            return false;
+        }
+
+        private static bool IsGreenish(Color c) { return c.g > 0.4f && c.r < 0.2f && c.b < c.g; }
+        private static bool IsAmberish(Color c) { return c.r > 0.6f && c.g > 0.4f && c.b < 0.15f; }
+        private static bool IsReddish(Color c)  { return c.r > 0.5f && c.g < 0.25f && c.b < 0.25f; }
+
+        /// <summary>
+        /// Measures the fraction of the tallest bar in the texture by finding the
+        /// highest row that contains any non-background pixel.
+        /// </summary>
+        private static float MeasureBarHeight(Color[] pixels, int w, int h)
+        {
+            int topRow = 0;
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    Color c = pixels[y * w + x];
+                    if (c.r > 0.05f || c.g > 0.05f || c.b > 0.05f)
+                    {
+                        // Check it's not just the dark background
+                        if (c.r > 0.1f || c.g > 0.1f)
+                        {
+                            if (y > topRow) topRow = y;
+                        }
+                    }
+                }
+            }
+            return (float)topRow / h;
+        }
+
+        private static bool PixelsIdentical(Color[] a, Color[] b)
+        {
+            if (a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++)
+            {
+                if (Mathf.Abs(a[i].r - b[i].r) > 0.01f ||
+                    Mathf.Abs(a[i].g - b[i].g) > 0.01f ||
+                    Mathf.Abs(a[i].b - b[i].b) > 0.01f)
+                    return false;
+            }
+            return true;
         }
 
         // ── Assertion Helpers ────────────────────────────────────
