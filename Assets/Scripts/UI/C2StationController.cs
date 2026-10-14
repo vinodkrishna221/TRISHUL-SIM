@@ -373,13 +373,17 @@ namespace TrishulSim.UI
 
         /// <summary>
         /// Toggles VR Mode on/off. When active, loads VRSentryPost on secondary display (phone via spacedesk)
-        /// or laptop split-stereo fallback. When toggled off, returns to TwoLaptop mode.
+        /// or laptop split-stereo fallback. When toggled off, restores previous desktop mode without regression.
         /// </summary>
         public void OnVrModeClicked()
         {
             Debug.Log("[C2] VR MODE toggle clicked.");
 #if UNITY_5_3_OR_NEWER
-            if (TrishulSim.Scenarios.ScenarioManager.Instance != null)
+            if (TrishulSim.VR.VRModeController.Instance != null)
+            {
+                TrishulSim.VR.VRModeController.Instance.ToggleVRMode();
+            }
+            else if (TrishulSim.Scenarios.ScenarioManager.Instance != null)
             {
                 var sm = TrishulSim.Scenarios.ScenarioManager.Instance;
                 if (sm.CurrentMode == TrishulSim.Scenarios.OperationMode.VRMode)
@@ -475,6 +479,11 @@ namespace TrishulSim.UI
             }
         }
 
+        private static Type _cachedVrType;
+        private static System.Reflection.PropertyInfo _cachedInstanceProp;
+        private static System.Reflection.PropertyInfo _cachedGyroProp;
+        private static bool _reflectionInitialized = false;
+
         private bool CheckGyroStatus()
         {
             if (GyroStatusQuery != null)
@@ -484,17 +493,24 @@ namespace TrishulSim.UI
 
             try
             {
-                Type vrType = Type.GetType("TrishulSim.VR.VRModeController, Assembly-CSharp") ??
-                              Type.GetType("TrishulSim.VR.VRModeController");
-                if (vrType != null)
+                if (!_reflectionInitialized)
                 {
-                    var instanceProp = vrType.GetProperty("Instance", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-                    object instance = instanceProp != null ? instanceProp.GetValue(null, null) : null;
+                    _cachedVrType = Type.GetType("TrishulSim.VR.VRModeController, Assembly-CSharp") ??
+                                    Type.GetType("TrishulSim.VR.VRModeController");
+                    if (_cachedVrType != null)
+                    {
+                        _cachedInstanceProp = _cachedVrType.GetProperty("Instance", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                        _cachedGyroProp = _cachedVrType.GetProperty("IsGyroConnected", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    }
+                    _reflectionInitialized = true;
+                }
+
+                if (_cachedVrType != null && _cachedInstanceProp != null && _cachedGyroProp != null)
+                {
+                    object instance = _cachedInstanceProp.GetValue(null, null);
                     if (instance != null)
                     {
-                        var gyroProp = vrType.GetProperty("IsGyroConnected", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                        if (gyroProp != null)
-                            return (bool)gyroProp.GetValue(instance, null);
+                        return (bool)_cachedGyroProp.GetValue(instance, null);
                     }
                 }
             }

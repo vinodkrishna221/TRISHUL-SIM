@@ -31,7 +31,41 @@ namespace TrishulSim.VR
     /// </summary>
     public class VRModeController : MonoBehaviour
     {
-        public static VRModeController Instance { get; private set; }
+        private static VRModeController _instance;
+        public static VRModeController Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+#if UNITY_5_3_OR_NEWER
+                    _instance = FindAnyObjectByType<VRModeController>();
+                    if (_instance == null)
+                    {
+                        var go = new GameObject("VRModeController");
+                        _instance = go.AddComponent<VRModeController>();
+                        if (Application.isPlaying)
+                        {
+                            DontDestroyOnLoad(go);
+                        }
+                    }
+#endif
+                }
+                return _instance;
+            }
+            private set { _instance = value; }
+        }
+
+#if UNITY_5_3_OR_NEWER
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void AutoInitialize()
+        {
+            if (_instance == null)
+            {
+                var inst = Instance;
+            }
+        }
+#endif
 
         public const string DefaultVrSceneName = "VRSentryPost";
         public const string DefaultDesktopCockpitSceneName = "TraineeCockpit";
@@ -55,6 +89,7 @@ namespace TrishulSim.VR
         // ── State ────────────────────────────────────────────────
         private bool isVrActive = false;
         private OperationMode previousMode = OperationMode.TwoLaptop;
+        private bool _lastDisplay2State = false;
 
         // ── Testing / Simulation Overrides ───────────────────────
         public static bool? ForceDisplay2Available = null;
@@ -106,15 +141,18 @@ namespace TrishulSim.VR
 
         private void Awake()
         {
-            if (Instance == null)
+            if (_instance == null)
             {
-                Instance = this;
+                _instance = this;
 #if UNITY_5_3_OR_NEWER
-                DontDestroyOnLoad(gameObject);
+                if (transform.parent != null)
+                    transform.SetParent(null);
+                if (Application.isPlaying)
+                    DontDestroyOnLoad(gameObject);
                 SceneManager.sceneLoaded += OnSceneLoaded;
 #endif
             }
-            else if (Instance != this)
+            else if (_instance != this)
             {
 #if UNITY_5_3_OR_NEWER
                 Destroy(gameObject);
@@ -134,11 +172,34 @@ namespace TrishulSim.VR
             FindCameras();
         }
 
+        public void Update()
+        {
+            if (isVrActive)
+            {
+                bool currentDisplay2 = IsDisplay2Connected;
+                if (currentDisplay2 != _lastDisplay2State)
+                {
+                    Debug.Log(string.Format("[VRModeController] Secondary display connection state changed: {0} -> {1}. Re-routing cameras.", _lastDisplay2State, currentDisplay2));
+                    _lastDisplay2State = currentDisplay2;
+                    if (currentDisplay2 && autoActivateSecondaryDisplay && Display.displays != null && Display.displays.Length > 1)
+                    {
+                        try
+                        {
+                            if (!Display.displays[1].active)
+                                Display.displays[1].Activate();
+                        }
+                        catch { }
+                    }
+                    ConfigureCameras(currentDisplay2 ? vrTargetDisplay : desktopTargetDisplay);
+                }
+            }
+        }
+
         private void OnDestroy()
         {
-            if (Instance == this)
+            if (_instance == this)
             {
-                Instance = null;
+                _instance = null;
 #if UNITY_5_3_OR_NEWER
                 UI.C2StationController.GyroStatusQuery = null;
                 SceneManager.sceneLoaded -= OnSceneLoaded;
@@ -155,10 +216,15 @@ namespace TrishulSim.VR
         {
             if (ScenarioManager.Instance != null)
             {
+                ScenarioManager.Instance.OnOperationModeChanged -= HandleOperationModeChanged;
                 ScenarioManager.Instance.OnOperationModeChanged += HandleOperationModeChanged;
                 if (ScenarioManager.Instance.CurrentMode == OperationMode.VRMode)
                 {
                     EnterVRMode(transitionScene: false);
+                }
+                else
+                {
+                    previousMode = ScenarioManager.Instance.CurrentMode;
                 }
             }
         }
@@ -182,9 +248,13 @@ namespace TrishulSim.VR
             }
             else
             {
-                previousMode = mode;
-                if (isVrActive)
+                if (!isVrActive)
                 {
+                    previousMode = mode;
+                }
+                else
+                {
+                    previousMode = mode;
                     ExitVRMode(transitionScene: false);
                 }
             }
@@ -201,7 +271,12 @@ namespace TrishulSim.VR
         public void EnterVRMode(bool transitionScene = true)
         {
             Debug.Log("[VRModeController] Entering VR Mode...");
+            if (ScenarioManager.Instance != null && ScenarioManager.Instance.CurrentMode != OperationMode.VRMode)
+            {
+                previousMode = ScenarioManager.Instance.CurrentMode;
+            }
             isVrActive = true;
+            _lastDisplay2State = IsDisplay2Connected;
 
             // Step 1: Detect and activate secondary display (phone via spacedesk)
             bool hasDisplay2 = IsDisplay2Connected;
@@ -212,7 +287,8 @@ namespace TrishulSim.VR
                 {
                     try
                     {
-                        Display.displays[1].Activate();
+                        if (!Display.displays[1].active)
+                            Display.displays[1].Activate();
                     }
                     catch (Exception ex)
                     {
@@ -295,6 +371,7 @@ namespace TrishulSim.VR
         /// - Right Eye: Rect(0.5, 0.0, 0.5, 1.0)
         /// - TargetDisplay: displayIndex (1 for phone via spacedesk, 0 for laptop stereo fallback)
         /// - C2 Camera: TargetDisplay always stays 0 (laptop screen)
+        /// - When spacedesk phone (Display 2) is active, C2 Camera viewport fills Display 1: Rect(0, 0, 1, 1)
         /// </summary>
         public void ConfigureCameras(int targetDisplay)
         {
@@ -315,6 +392,11 @@ namespace TrishulSim.VR
             if (c2Camera != null)
             {
                 c2Camera.targetDisplay = desktopTargetDisplay; // C2 stays on laptop screen (Display 1)
+                if (targetDisplay != desktopTargetDisplay)
+                {
+                    // Phone displays VR on Display 2; Instructor C2 expands to full primary laptop screen
+                    c2Camera.rect = new Rect(0.0f, 0.0f, 1.0f, 1.0f);
+                }
             }
 
             Debug.Log(string.Format(
@@ -344,6 +426,14 @@ namespace TrishulSim.VR
             if (c2Camera != null)
             {
                 c2Camera.targetDisplay = desktopTargetDisplay;
+                if (previousMode == OperationMode.SingleLaptopSplit)
+                {
+                    c2Camera.rect = new Rect(0.0f, 0.0f, 0.5f, 1.0f);
+                }
+                else
+                {
+                    c2Camera.rect = new Rect(0.0f, 0.0f, 1.0f, 1.0f);
+                }
             }
         }
 
@@ -367,8 +457,12 @@ namespace TrishulSim.VR
 
             if (c2Camera == null)
             {
-                var go = GameObject.Find("CameraC2") ?? GameObject.Find("InstructorC2Camera");
+                var go = GameObject.Find("CameraC2") ?? GameObject.Find("InstructorC2Camera") ?? GameObject.Find("Main Camera");
                 if (go != null) c2Camera = go.GetComponent<Camera>();
+                if (c2Camera == null && Camera.main != null && Camera.main != leftEyeCamera && Camera.main != rightEyeCamera)
+                {
+                    c2Camera = Camera.main;
+                }
             }
 #endif
         }
@@ -418,16 +512,21 @@ namespace TrishulSim.VR
         // Scene Loaded Event Handler
         // ══════════════════════════════════════════════════════
 
-#if UNITY_5_3_OR_NEWER
+        #if UNITY_5_3_OR_NEWER
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             Debug.Log("[VRModeController] Scene loaded: " + scene.name);
+            SubscribeScenarioManager();
 
             if (string.Equals(scene.name, vrSceneName, StringComparison.OrdinalIgnoreCase) || isVrActive)
             {
                 bool hasDisplay2 = IsDisplay2Connected;
                 int targetDisplay = hasDisplay2 ? vrTargetDisplay : desktopTargetDisplay;
                 ConfigureCameras(targetDisplay);
+            }
+            else
+            {
+                ResetCameras();
             }
         }
 #endif

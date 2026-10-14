@@ -85,6 +85,8 @@ namespace TrishulSim.VR
             TestVRModeControllerCameraRoutingWithSpacedesk();
             TestVRModeControllerLaptopFallbackWithoutPhone();
             TestVRModeControllerExitRestoresDesktop();
+            TestDynamicSpacedeskHotplug();
+            TestCameraDiscoveryAndAutoInstance();
             TestGyroStatusQueryIntegration();
 #if UNITY_5_3_OR_NEWER
             TestC2StationControllerVrModeToggleAndBadges();
@@ -181,7 +183,7 @@ namespace TrishulSim.VR
                 var ctrl = new VRModeController();
                 var leftCam = new Camera();
                 var rightCam = new Camera();
-                var c2Cam = new Camera();
+                var c2Cam = new Camera { rect = new Rect(0.0f, 0.0f, 0.5f, 1.0f) }; // Simulating prior split-screen rect
 
                 ctrl.LeftEyeCamera = leftCam;
                 ctrl.RightEyeCamera = rightCam;
@@ -204,11 +206,13 @@ namespace TrishulSim.VR
                 Assert(Math.Abs(rightCam.rect.x - 0.5f) < 0.001f, "RightEyeCamera rect.x must be 0.5");
                 Assert(Math.Abs(rightCam.rect.width - 0.5f) < 0.001f, "RightEyeCamera rect.width must be 0.5");
 
-                // Verify C2 camera stays on Display 1 (targetDisplay = 0)
+                // Verify C2 camera stays on Display 1 (targetDisplay = 0) and expands to full screen (1.0 width)
                 Assert(c2Cam.targetDisplay == 0, "C2 Camera targetDisplay must remain 0 (laptop display)");
+                Assert(Math.Abs(c2Cam.rect.width - 1.0f) < 0.001f, "C2 Camera rect must expand to 1.0 full screen on Display 1");
+                Assert(Math.Abs(c2Cam.rect.x - 0.0f) < 0.001f, "C2 Camera rect.x must be 0.0");
 
                 VRModeController.ForceDisplay2Available = null;
-                Console.WriteLine("[PASS] Test 2: Camera routing with spacedesk (Display 2)");
+                Console.WriteLine("[PASS] Test 2: Camera routing with spacedesk (Display 2 & C2 fullscreen Display 1)");
                 passed++;
             }
             catch (Exception ex)
@@ -265,25 +269,52 @@ namespace TrishulSim.VR
             }
         }
 
-        // ── Test 4: VRModeController Exit Restores Desktop ──
+        // ── Test 4: VRModeController Exit Restores Desktop & Respects Previous Mode ──
 
         public static void TestVRModeControllerExitRestoresDesktop()
         {
             total++;
             try
             {
-                var ctrl = new VRModeController();
-                var leftCam = new Camera { targetDisplay = 1 };
-                var rightCam = new Camera { targetDisplay = 1 };
-                ctrl.LeftEyeCamera = leftCam;
-                ctrl.RightEyeCamera = rightCam;
+                // Case A: Entered from TwoLaptop -> exit VR restores TwoLaptop (1.0 width rect)
+                var ctrlA = new VRModeController();
+                var leftCamA = new Camera { targetDisplay = 1 };
+                var rightCamA = new Camera { targetDisplay = 1 };
+                var c2CamA = new Camera { targetDisplay = 0, rect = new Rect(0, 0, 1, 1) };
+                ctrlA.LeftEyeCamera = leftCamA;
+                ctrlA.RightEyeCamera = rightCamA;
+                ctrlA.C2Camera = c2CamA;
+                ctrlA.PreviousMode = OperationMode.TwoLaptop;
 
-                ctrl.ExitVRMode(transitionScene: false);
-                Assert(!ctrl.IsVRActive, "IsVRActive must be false after ExitVRMode");
-                Assert(leftCam.targetDisplay == 0, "LeftEyeCamera must reset to display 0");
-                Assert(rightCam.targetDisplay == 0, "RightEyeCamera must reset to display 0");
+                ctrlA.ExitVRMode(transitionScene: false);
+                Assert(!ctrlA.IsVRActive, "IsVRActive must be false after ExitVRMode");
+                Assert(leftCamA.targetDisplay == 0, "LeftEyeCamera must reset to display 0");
+                Assert(rightCamA.targetDisplay == 0, "RightEyeCamera must reset to display 0");
+                Assert(Math.Abs(c2CamA.rect.width - 1.0f) < 0.001f, "C2Camera rect.width must be 1.0 on TwoLaptop restore");
 
-                Console.WriteLine("[PASS] Test 4: Exit VR mode restores desktop configuration");
+                // Case B: Entered from SingleLaptopSplit -> exit VR restores SingleLaptopSplit (0.5 width rect)
+                var ctrlB = new VRModeController();
+                var leftCamB = new Camera { targetDisplay = 1 };
+                var rightCamB = new Camera { targetDisplay = 1 };
+                var c2CamB = new Camera { targetDisplay = 0, rect = new Rect(0, 0, 1, 1) };
+                ctrlB.LeftEyeCamera = leftCamB;
+                ctrlB.RightEyeCamera = rightCamB;
+                ctrlB.C2Camera = c2CamB;
+                ctrlB.PreviousMode = OperationMode.SingleLaptopSplit;
+
+                // Also test scene transition request
+                var sm = new ScenarioManager();
+                sm.SetOperationMode(OperationMode.SingleLaptopSplit, notifyListeners: false);
+                ctrlB.ExitVRMode(transitionScene: true);
+
+                Assert(!ctrlB.IsVRActive, "IsVRActive must be false after ExitVRMode");
+                Assert(leftCamB.targetDisplay == 0, "LeftEyeCamera must reset to display 0");
+                Assert(Math.Abs(c2CamB.rect.width - 0.5f) < 0.001f, "C2Camera rect.width must be 0.5 on SingleLaptopSplit restore");
+                Assert(Math.Abs(c2CamB.rect.x - 0.0f) < 0.001f, "C2Camera rect.x must be 0.0 on SingleLaptopSplit restore");
+                Assert(sm.CurrentMode == OperationMode.SingleLaptopSplit, "ScenarioManager mode must be restored to SingleLaptopSplit");
+                Assert(SceneLoader.LastRequestedScene == "SplitScreen", "SplitScreen scene must be loaded when restoring split mode");
+
+                Console.WriteLine("[PASS] Test 4: Exit VR mode restores desktop configuration and respects SingleLaptopSplit vs TwoLaptop");
                 passed++;
             }
             catch (Exception ex)
@@ -294,7 +325,105 @@ namespace TrishulSim.VR
             }
         }
 
-        // ── Test 5: Gyro Status Query Integration ──
+        // ── Test 5: Dynamic Spacedesk Hotplug & Hot-unplug during VR Mode ──
+
+        public static void TestDynamicSpacedeskHotplug()
+        {
+            total++;
+            try
+            {
+                var ctrl = new VRModeController();
+                var leftCam = new Camera();
+                var rightCam = new Camera();
+                var c2Cam = new Camera();
+                ctrl.LeftEyeCamera = leftCam;
+                ctrl.RightEyeCamera = rightCam;
+                ctrl.C2Camera = c2Cam;
+
+                // Start VR with phone connected
+                VRModeController.ForceDisplay2Available = true;
+                ctrl.EnterVRMode(transitionScene: false);
+                Assert(leftCam.targetDisplay == 1, "Initial VR routing must target Display 2");
+                Assert(Math.Abs(c2Cam.rect.width - 1.0f) < 0.001f, "C2 Camera rect must be 1.0 with phone active");
+
+                // Phone unexpectedly disconnects mid-session
+                VRModeController.ForceDisplay2Available = false;
+                ctrl.Update(); // Trigger frame update check
+                Assert(leftCam.targetDisplay == 0, "After phone disconnect, eye cameras must hot-fallback to Display 1 stereo");
+                Assert(rightCam.targetDisplay == 0, "Right eye camera must fallback to Display 1");
+
+                // Phone reconnects
+                VRModeController.ForceDisplay2Available = true;
+                ctrl.Update(); // Trigger frame update check
+                Assert(leftCam.targetDisplay == 1, "After phone reconnect, eye cameras must dynamically re-route to Display 2");
+                Assert(rightCam.targetDisplay == 1, "Right eye camera must re-route to Display 2");
+                Assert(Math.Abs(c2Cam.rect.width - 1.0f) < 0.001f, "C2 Camera rect must expand to 1.0");
+
+                VRModeController.ForceDisplay2Available = null;
+                Console.WriteLine("[PASS] Test 5: Dynamic Spacedesk hotplug & hot-unplug handling during active VR session");
+                passed++;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("[FAIL] Test 5: " + ex.Message);
+                failed++;
+                throw;
+            }
+        }
+
+        // ── Test 6: Camera Discovery and C2 Camera Name Matching ──
+
+#if UNITY_5_3_OR_NEWER
+        public static void TestCameraDiscoveryAndAutoInstance()
+        {
+            total++;
+            try
+            {
+                var ctrl = new VRModeController();
+                var c2Go = new GameObject("Main Camera");
+                var camComp = c2Go.AddComponent<Camera>();
+
+                ctrl.FindCameras();
+                Assert(ctrl.C2Camera != null, "FindCameras must discover C2 camera named 'Main Camera'");
+
+                Console.WriteLine("[PASS] Test 6: Camera discovery supports 'Main Camera', 'CameraC2', and 'InstructorC2Camera'");
+                passed++;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("[FAIL] Test 6: " + ex.Message);
+                failed++;
+                throw;
+            }
+        }
+#else
+        public static void TestCameraDiscoveryAndAutoInstance()
+        {
+            total++;
+            try
+            {
+                string root = FindRepoRoot();
+                string path = Path.Combine(root, "Assets", "Scripts", "VR", "VRModeController.cs");
+                Assert(File.Exists(path), "VRModeController.cs must exist");
+                string content = File.ReadAllText(path);
+                Assert(content.Contains("Main Camera"), "VRModeController must search for 'Main Camera'");
+                Assert(content.Contains("CameraC2"), "VRModeController must search for 'CameraC2'");
+                Assert(content.Contains("InstructorC2Camera"), "VRModeController must search for 'InstructorC2Camera'");
+                Assert(content.Contains("LeftEyeCamera"), "VRModeController must search for 'LeftEyeCamera'");
+                Assert(content.Contains("RightEyeCamera"), "VRModeController must search for 'RightEyeCamera'");
+
+                Console.WriteLine("[PASS] Test 6: Camera discovery contract supports 'Main Camera', 'CameraC2', and 'InstructorC2Camera'");
+                passed++;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("[FAIL] Test 6: " + ex.Message);
+                failed++;
+                throw;
+            }
+        }
+#endif
+        // ── Test 7: Gyro Status Query Integration ──
 
         public static void TestGyroStatusQueryIntegration()
         {
@@ -315,18 +444,18 @@ namespace TrishulSim.VR
                 Assert(!ctrl.IsGyroConnected, "IsGyroConnected must report false when offline");
 
                 VRModeController.ForceGyroConnected = null;
-                Console.WriteLine("[PASS] Test 5: Gyro status query integration and mock path");
+                Console.WriteLine("[PASS] Test 7: Gyro status query integration and mock path");
                 passed++;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine("[FAIL] Test 5: " + ex.Message);
+                Console.Error.WriteLine("[FAIL] Test 7: " + ex.Message);
                 failed++;
                 throw;
             }
         }
 
-        // ── Test 6: C2StationController VR Mode Toggle & Status Badges ──
+        // ── Test 8: C2StationController VR Mode Toggle & Status Badges ──
 
 #if UNITY_5_3_OR_NEWER
         public static void TestC2StationControllerVrModeToggleAndBadges()
@@ -402,7 +531,7 @@ namespace TrishulSim.VR
             }
         }
 
-        // ── Test 7: C2StationController Null Safety (Legacy Mock Root) ──
+        // ── Test 9: C2StationController Null Safety (Legacy Mock Root) ──
 
         public static void TestC2StationControllerNullSafety()
         {
@@ -423,18 +552,18 @@ namespace TrishulSim.VR
                 Assert(controller.VrModeBtn == null, "VrModeBtn should be null in empty root");
                 Assert(controller.VrStatusBadge == null, "VrStatusBadge should be null in empty root");
 
-                Console.WriteLine("[PASS] Test 7: C2StationController null-safety for omitted VR elements");
+                Console.WriteLine("[PASS] Test 9: C2StationController null-safety for omitted VR elements");
                 passed++;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine("[FAIL] Test 7: " + ex.Message);
+                Console.Error.WriteLine("[FAIL] Test 9: " + ex.Message);
                 failed++;
                 throw;
             }
         }
 #else
-        // ── Test 6: C2StationController VR Integration Contract (Non-Unity) ──
+        // ── Test 8: C2StationController VR Integration Contract (Non-Unity) ──
 
         public static void TestC2StationControllerIntegrationContract()
         {
@@ -456,19 +585,19 @@ namespace TrishulSim.VR
                 Assert(content.Contains("OnVrModeClicked"), "C2StationController must declare OnVrModeClicked");
                 Assert(content.Contains("OperationMode.VRMode"), "C2StationController must reference OperationMode.VRMode");
 
-                Console.WriteLine("[PASS] Test 6: C2StationController VR Mode integration contract verified");
+                Console.WriteLine("[PASS] Test 8: C2StationController VR Mode integration contract verified");
                 passed++;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine("[FAIL] Test 6: " + ex.Message);
+                Console.Error.WriteLine("[FAIL] Test 8: " + ex.Message);
                 failed++;
                 throw;
             }
         }
 #endif
 
-        // ── Test 8: UXML and USS Integrity ──
+        // ── Test 9: UXML and USS Integrity ──
 
         public static void TestUxmlAndUssIntegrity()
         {
@@ -511,18 +640,18 @@ namespace TrishulSim.VR
                     Assert(content.Contains(".vr-status-badge"), path + " must contain .vr-status-badge");
                 }
 
-                Console.WriteLine("[PASS] Test 8: UXML and USS file integrity across UI and Resources/UI");
+                Console.WriteLine("[PASS] Test 9: UXML and USS file integrity across UI and Resources/UI");
                 passed++;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine("[FAIL] Test 8: " + ex.Message);
+                Console.Error.WriteLine("[FAIL] Test 9: " + ex.Message);
                 failed++;
                 throw;
             }
         }
 
-        // ── Test 9: vr-setup-guide.md Documentation Completeness ──
+        // ── Test 10: vr-setup-guide.md Documentation Completeness ──
 
         public static void TestVrSetupGuideDocumentation()
         {
@@ -544,12 +673,12 @@ namespace TrishulSim.VR
                 Assert(content.Contains("VR MODE: ON ● GYRO: LIVE"), "Setup guide must document live status badge");
                 Assert(content.Contains("Fail-Safe Fallbacks") || content.Contains("fallback"), "Setup guide must document fallbacks");
 
-                Console.WriteLine("[PASS] Test 9: docs/vr-setup-guide.md documentation completeness");
+                Console.WriteLine("[PASS] Test 10: docs/vr-setup-guide.md documentation completeness");
                 passed++;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine("[FAIL] Test 9: " + ex.Message);
+                Console.Error.WriteLine("[FAIL] Test 10: " + ex.Message);
                 failed++;
                 throw;
             }
