@@ -160,6 +160,26 @@ namespace UnityEngine
     public class Camera : MonoBehaviour
     {
         public Rect rect = new Rect(0f, 0f, 1f, 1f);
+        public int targetDisplay = 0;
+    }
+
+    public class Display
+    {
+        private static Display[] _displays = new Display[] { new Display() };
+        public static Display[] displays
+        {
+            get { return _displays; }
+            set { _displays = value; }
+        }
+        private bool _active = true;
+        public bool active { get { return _active; } private set { _active = value; } }
+        public void Activate() { _active = true; }
+        public static void SetDisplayCount(int count)
+        {
+            _displays = new Display[count];
+            for (int i = 0; i < count; i++)
+                _displays[i] = new Display();
+        }
     }
 
     public class AudioListener : MonoBehaviour
@@ -256,6 +276,11 @@ namespace UnityEngine
                 if (handler != null)
                     handler(sceneName);
                 return new AsyncOperation { isDone = true, progress = 1f };
+            }
+
+            public static void LoadScene(string sceneName)
+            {
+                LoadSceneAsync(sceneName);
             }
         }
     }

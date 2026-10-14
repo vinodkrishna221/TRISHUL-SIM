@@ -47,6 +47,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-14T21:15 IST · Uday: VG-P1-E done — VRModeController dual-display spacedesk mirror (Display 2) + laptop stereo fallback (Display 1), ScenarioManager.OperationMode.VRMode transitions, C2StationController [VR MODE] toggle + live/offline gyro badge, docs/vr-setup-guide.md; VRModeSelfTest (8/8) + UiShellSelfTest + SplitScreenSelfTest PASSED on feat/vr-spacedesk-mode-toggle
 - 2026-10-12T19:47 IST · Uday: VG-P1-C Warden BLOCK fix — procedural Acoustic FFT (8-band bar chart, green/amber/red by dB), procedural EW/SMASH (jammer status + ROE blackout + crosshair), standalone RF+Doppler fallback when UITK absent, dual URP+legacy _BaseMap/_MainTex + _BaseColor/_Color, exported & committed VRHudPanels.prefab + 4 RenderTextures + 5 Materials + .metas, self-test expanded 5→8 suites (all pass) on `feat/vr-hud-panels`
 - 2026-10-11T18:42 IST · Uday: VG-P1-C code-complete — VRHudController (4-panel RenderTexture blit + MIL-STD-2525 threat torus), VRHudSetup editor menu (one-click scene assembly), VRHudSelfTest (5/5 structural); awaiting VG-P1-B (Vinod: 3D scene) for visual integration test on `feat/vr-hud-panels`
 - 2026-10-10T15:25 IST Â· Uday: SA-P2-B done â€” BoidFlockController classical 3 rules + double-buffering, Burst/Job System BoidStepJob, radar loop >500m early-out; 1000-frame 8-agent Punjab benchmark at 0.0021 ms/frame (>400,000 FPS, <16.7ms budget); BurstPerformanceSelfTest PASSED

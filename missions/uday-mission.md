@@ -361,7 +361,7 @@ TEST:
 
 DEPENDS: VG-P1-B, VG-P1-C, VG-P1-D    UNBLOCKS: VG-P1-F
 DEMO: "Instructor clicks VR MODE — trainee puts on headset — border post appears." (Beat 1)
-PERSONA: Uday (swarm-ai)   STATUS: [ ] todo
+PERSONA: Uday (swarm-ai)   STATUS: [x] done
 ```
 
 ---

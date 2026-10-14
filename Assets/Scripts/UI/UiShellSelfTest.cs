@@ -647,6 +647,7 @@ namespace TrishulSim.UI
             TestEwJammerController();
             TestSmashReticleController();
             TestCockpitControllerEwAndSmashIntegration();
+            TestC2StationControllerVrModeToggleAndBadges();
         }
 
         private static string FindRepoRoot()
@@ -820,6 +821,67 @@ namespace TrishulSim.UI
             controller.OnScorecardReceived("sess-test-20261005");
             Assert(!scorecardMirror.ClassListContains("hidden"), "Scorecard mirror must unhide on SCORECARD_PAYLOAD");
             Assert(scorecardStub.text.Contains("sess-test-20261005"), "Scorecard stub must display sessionId");
+
+            controller.UnregisterCallbacks();
+        }
+
+        public static void TestC2StationControllerVrModeToggleAndBadges()
+        {
+            var controller = new C2StationController();
+
+            var mockRoot = new VisualElement { name = "c2-root" };
+            var vrModeBtn = new Button { name = "vr-mode-btn", text = "VR MODE" };
+            var vrStatusBadge = new VisualElement { name = "vr-status-badge" };
+            var vrStatusIcon = new VisualElement { name = "vr-status-icon" };
+            var vrStatusLabel = new Label { name = "vr-status-label", text = "VR MODE: OFF" };
+
+            mockRoot.Add(vrModeBtn);
+            mockRoot.Add(vrStatusBadge);
+            mockRoot.Add(vrStatusIcon);
+            mockRoot.Add(vrStatusLabel);
+
+            controller.BindElements(mockRoot);
+            controller.RegisterCallbacks();
+
+            Assert(controller.VrModeBtn != null, "VrModeBtn must be bound");
+            Assert(controller.VrStatusBadge != null, "VrStatusBadge must be bound");
+            Assert(controller.VrStatusIcon != null, "VrStatusIcon must be bound");
+            Assert(controller.VrStatusLabel != null, "VrStatusLabel must be bound");
+
+            // Initial state: VR mode OFF
+            controller.UpdateVrStatusBadge(vrActive: false, gyroLive: false);
+            Assert(!controller.IsVrModeActive, "IsVrModeActive must be false initially");
+            Assert(vrStatusLabel.text == "VR MODE: OFF", "Label must be 'VR MODE: OFF'");
+            Assert(vrStatusIcon.ClassListContains("status-waiting"), "Icon must have status-waiting");
+            Assert(vrModeBtn.text == "VR MODE", "Button text must be 'VR MODE'");
+            Assert(!vrModeBtn.ClassListContains("btn-vr-active"), "Button must not have btn-vr-active");
+
+            // State 2: VR Mode ON, Gyro OFFLINE
+            controller.UpdateVrStatusBadge(vrActive: true, gyroLive: false);
+            Assert(controller.IsVrModeActive, "IsVrModeActive must be true");
+            Assert(!controller.IsGyroLive, "IsGyroLive must be false");
+            Assert(vrStatusLabel.text.Contains("VR MODE: ON") && vrStatusLabel.text.Contains("OFFLINE"),
+                "Label must contain 'VR MODE: ON' and 'OFFLINE', found: " + vrStatusLabel.text);
+            Assert(vrStatusIcon.ClassListContains("status-waiting"), "Offline gyro must show status-waiting");
+            Assert(vrModeBtn.text == "VR ACTIVE", "Button text must be 'VR ACTIVE'");
+            Assert(vrModeBtn.ClassListContains("btn-vr-active"), "Button must have btn-vr-active");
+
+            // State 3: VR Mode ON, Gyro LIVE
+            controller.UpdateVrStatusBadge(vrActive: true, gyroLive: true);
+            Assert(controller.IsVrModeActive, "IsVrModeActive must be true");
+            Assert(controller.IsGyroLive, "IsGyroLive must be true");
+            Assert(vrStatusLabel.text.Contains("VR MODE: ON") && vrStatusLabel.text.Contains("LIVE"),
+                "Label must contain 'VR MODE: ON' and 'LIVE', found: " + vrStatusLabel.text);
+            Assert(vrStatusIcon.ClassListContains("status-connected"), "Live gyro must show status-connected");
+            Assert(vrModeBtn.text == "VR ACTIVE", "Button text must be 'VR ACTIVE'");
+
+            // Toggle click simulation
+            vrModeBtn.SimulateClick();
+            Assert(!controller.IsVrModeActive, "SimulateClick on VR ACTIVE should toggle to OFF");
+            Assert(vrStatusLabel.text == "VR MODE: OFF", "Status label must return to OFF");
+
+            vrModeBtn.SimulateClick();
+            Assert(controller.IsVrModeActive, "SimulateClick on VR MODE should toggle to ON");
 
             controller.UnregisterCallbacks();
         }

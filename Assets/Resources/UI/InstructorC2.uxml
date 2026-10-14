@@ -9,6 +9,10 @@
                 <ui:VisualElement name="link-status-icon" class="status-icon status-waiting" />
                 <ui:Label name="link-status-label" text="○ Waiting for Trainee..." class="status-label" />
             </ui:VisualElement>
+            <ui:VisualElement name="vr-status-badge" class="status-group vr-status-badge">
+                <ui:VisualElement name="vr-status-icon" class="status-icon status-waiting" />
+                <ui:Label name="vr-status-label" text="VR MODE: OFF" class="status-label" />
+            </ui:VisualElement>
         </ui:VisualElement>
 
         <!-- Controls Panel -->
@@ -18,6 +22,7 @@
             <ui:VisualElement class="button-row">
                 <ui:Button name="launch-btn" text="LAUNCH SCENARIO" class="btn btn-launch" />
                 <ui:Button name="abort-btn" text="ABORT" class="btn btn-abort" />
+                <ui:Button name="vr-mode-btn" text="VR MODE" class="btn btn-vr-mode" />
                 <ui:Button name="lang-toggle" text="हिंदी" class="btn btn-lang" />
             </ui:VisualElement>
         </ui:VisualElement>
