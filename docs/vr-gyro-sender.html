@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>TRISHUL-SIM · Gyro Sender</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0a1a;
+    color: #e0e0e0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+}
+h1 { font-size: 1.2rem; color: #00ff88; margin-bottom: 0.5rem; }
+.subtitle { font-size: 0.8rem; color: #888; margin-bottom: 2rem; }
+#status {
+    font-size: 2rem;
+    font-weight: bold;
+    padding: 1.5rem 3rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    transition: all 0.3s;
+}
+.status-disconnected { background: #cc0000; color: #fff; }
+.status-connecting   { background: #ffb300; color: #000; }
+.status-tracking     { background: #00b300; color: #fff; }
+#btn-start {
+    font-size: 1.5rem;
+    padding: 1rem 3rem;
+    border: none;
+    border-radius: 8px;
+    background: #00ff88;
+    color: #000;
+    font-weight: bold;
+    cursor: pointer;
+    display: none;
+}
+#btn-start:active { background: #00cc6a; }
+#angles {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    color: #00ff88;
+    margin-top: 1.5rem;
+    text-align: left;
+}
+.info { font-size: 0.7rem; color: #666; margin-top: 2rem; text-align: center; max-width: 80%; }
+</style>
+</head>
+<body>
+<h1>TRISHUL-SIM</h1>
+<p class="subtitle">Phone Gyroscope Head Tracking</p>
+<div id="status" class="status-disconnected">DISCONNECTED</div>
+<button id="btn-start" onclick="requestPermissionAndStart()">TAP TO START TRACKING</button>
+<div id="angles"></div>
+<p class="info">Point phone forward, then press SELECT on gamepad to recalibrate zero.</p>
+
+<script>
+// ── Configuration ──────────────────────────────────────────
+// LAPTOP_IP is replaced by serve-gyro.ps1 at serve-time
+const WS_URL = 'ws://LAPTOP_IP:9800';
+const SEND_INTERVAL_MS = 16; // ~60 Hz
+
+// ── State ──────────────────────────────────────────────────
+let ws = null;
+let tracking = false;
+let lastAlpha = 0, lastBeta = 0, lastGamma = 0;
+let sendTimer = null;
+let reconnectTimer = null;
+
+const statusEl  = document.getElementById('status');
+const anglesEl  = document.getElementById('angles');
+const btnStart  = document.getElementById('btn-start');
+
+// ── Permission (iOS 13+ requires explicit request) ─────────
+function requestPermissionAndStart() {
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+            .then(function(state) {
+                if (state === 'granted') {
+                    startTracking();
+                } else {
+                    setStatus('PERMISSION DENIED', 'status-disconnected');
+                }
+            })
+            .catch(function(err) {
+                console.error('Permission error:', err);
+                // Fallback: try anyway (some Android browsers)
+                startTracking();
+            });
+    } else {
+        startTracking();
+    }
+}
+
+// ── Check if deviceorientation is available ────────────────
+function checkGyroSupport() {
+    if (typeof DeviceOrientationEvent === 'undefined') {
+        setStatus('NO GYROSCOPE', 'status-disconnected');
+        return;
+    }
+    // iOS needs user gesture; show button
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        btnStart.style.display = 'block';
+    } else {
+        // Android / desktop: start immediately
+        startTracking();
+    }
+}
+
+// ── Tracking ───────────────────────────────────────────────
+function startTracking() {
+    btnStart.style.display = 'none';
+    tracking = true;
+    window.addEventListener('deviceorientation', onOrientation, true);
+    connectWs();
+}
+
+function onOrientation(e) {
+    if (e.alpha !== null) lastAlpha = e.alpha;
+    if (e.beta  !== null) lastBeta  = e.beta;
+    if (e.gamma !== null) lastGamma = e.gamma;
+
+    anglesEl.textContent =
+        'α (yaw):   ' + lastAlpha.toFixed(1) + '°\n' +
+        'β (pitch): ' + lastBeta.toFixed(1)  + '°\n' +
+        'γ (roll):  ' + lastGamma.toFixed(1) + '°';
+}
+
+// ── WebSocket ──────────────────────────────────────────────
+function connectWs() {
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        return;
+    }
+    setStatus('CONNECTING…', 'status-connecting');
+
+    try {
+        ws = new WebSocket(WS_URL);
+    } catch (err) {
+        scheduleReconnect();
+        return;
+    }
+
+    ws.onopen = function() {
+        setStatus('TRACKING', 'status-tracking');
+        clearReconnectTimer();
+        startSending();
+    };
+
+    ws.onclose = function() {
+        stopSending();
+        setStatus('DISCONNECTED', 'status-disconnected');
+        scheduleReconnect();
+    };
+
+    ws.onerror = function() {
+        // onclose will fire after this
+    };
+}
+
+function startSending() {
+    stopSending();
+    sendTimer = setInterval(function() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                a: Math.round(lastAlpha * 100) / 100,
+                b: Math.round(lastBeta  * 100) / 100,
+                g: Math.round(lastGamma * 100) / 100
+            }));
+        }
+    }, SEND_INTERVAL_MS);
+}
+
+function stopSending() {
+    if (sendTimer) {
+        clearInterval(sendTimer);
+        sendTimer = null;
+    }
+}
+
+function scheduleReconnect() {
+    clearReconnectTimer();
+    reconnectTimer = setTimeout(function() {
+        if (tracking) connectWs();
+    }, 2000);
+}
+
+function clearReconnectTimer() {
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+    }
+}
+
+// ── UI helpers ─────────────────────────────────────────────
+function setStatus(text, cls) {
+    statusEl.textContent = text;
+    statusEl.className = cls;
+}
+
+// ── Boot ───────────────────────────────────────────────────
+checkGyroSupport();
+</script>
+</body>
+</html>

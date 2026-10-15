@@ -514,6 +514,7 @@ namespace TrishulSim.Input
         // Canonical JSON definition for fallback / tests
         // ══════════════════════════════════════════════════════
         public const string CanonicalInputActionsJson = @"{
+    ""version"": 1,
     ""name"": ""TrishulInputActions"",
     ""maps"": [
         {
