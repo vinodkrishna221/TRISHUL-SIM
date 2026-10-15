@@ -388,7 +388,7 @@ TEST:
 
 DEPENDS: ui-ux-P1-B (done ✅)    UNBLOCKS: VG-P1-D (Sohail's Recalibrate event)
 DEMO: "Havildar Rajan engages jammer and fires SMASH 2000 with a gamepad." (Beat 4)
-STATUS: [ ] todo
+STATUS: [x] done — 2026-10-11 (verified with GamepadInputSelfTest PASS)
 ```
 
 ---
@@ -427,7 +427,7 @@ TEST:
 
 DEPENDS: VG-P1-A    UNBLOCKS: VG-P1-C (Uday's panels), VG-P1-D (Sohail's GyroReceiver needs VRRig)
 DEMO: "In the dark. No flashlight. Only sensor glow." (Beat 4)
-STATUS: [ ] todo
+STATUS: [x] done — 2026-10-11 (verified with VRSentryPostSelfTest PASS)
 ```
 
 ---

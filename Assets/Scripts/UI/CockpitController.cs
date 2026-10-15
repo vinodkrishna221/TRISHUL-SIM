@@ -782,7 +782,7 @@ namespace TrishulSim.UI
 #if UNITY_EDITOR
             try
             {
-                if (Input.GetKeyDown(KeyCode.T))
+                if (UnityEngine.Input.GetKeyDown(KeyCode.T))
                 {
                     string next;
                     switch (currentThreatState)
