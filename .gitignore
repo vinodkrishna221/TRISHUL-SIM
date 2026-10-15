@@ -27,3 +27,6 @@ powershell.cmd
 [Uu]ser[Ss]ettings/
 [Mm]emoryCaptures/
 [Rr]ecordings/
+
+# Media & 3D exports
+exports/

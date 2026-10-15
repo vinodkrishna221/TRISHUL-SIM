@@ -107,7 +107,7 @@ TEST:
 DEPENDS: unity-sim P0-A, P0-C     UNBLOCKS: AA-P0-A, UX-P0-A (shape frozen), SA-P0-B
 
 DEMO: "6 moving dots visible on Trainee Cockpit." (Beat 2 first hint)
-PERSONA: swarm-ai builder          STATUS: [ ] todo
+PERSONA: swarm-ai builder          STATUS: [x] done
 ```
 
 ---
@@ -163,7 +163,7 @@ TEST:
 DEPENDS: SA-P0-A               UNBLOCKS: UX-P1-A (RF Waterfall renderer needs live dBm values)
 
 DEMO: "RF Waterfall pane shows non-flat signal during approach." (Beat 2/3)
-PERSONA: swarm-ai builder     STATUS: [ ] todo
+PERSONA: swarm-ai builder     STATUS: [x] done
 ```
 
 ---
@@ -227,7 +227,7 @@ TEST:
 DEPENDS: SA-P0-B               UNBLOCKS: UX-P1-A (Doppler scope, Acoustic FFT driven by these values)
 
 DEMO: "Doppler scope shows 220 Hz spike on approach." (Beat 3)
-PERSONA: swarm-ai builder     STATUS: [ ] todo
+PERSONA: swarm-ai builder     STATUS: [x] done
 ```
 
 ---
@@ -279,7 +279,7 @@ TEST:
 DEPENDS: SA-P0-A               UNBLOCKS: SA-P1-B-ii
 
 DEMO: "Plumbing for pincer split — all agents approaching in formation." (Beat 3 setup)
-PERSONA: swarm-ai builder     STATUS: [ ] todo
+PERSONA: swarm-ai builder     STATUS: [x] done
 ```
 
 ---
@@ -335,7 +335,7 @@ TEST:
 DEPENDS: SA-P1-B-i             UNBLOCKS: UX-P1-B (EW + SMASH controls become meaningful), SA-P1-C
 
 DEMO: ⭐ "4 FPV munitions executing low-level pincer in pitch-black fog — the wow moment." (Beat 4)
-PERSONA: swarm-ai builder     STATUS: [ ] todo
+PERSONA: swarm-ai builder     STATUS: [x] done
 ```
 
 ---

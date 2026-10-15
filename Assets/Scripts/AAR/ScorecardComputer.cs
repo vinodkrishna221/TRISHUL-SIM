@@ -495,6 +495,7 @@ namespace TrishulSim.AAR
         [SerializeField] private TelemetryLogger telemetryLogger;
         [SerializeField] private string sessionsDirectoryOverride;
         [SerializeField] private bool autoSubscribeToClient = true;
+        [SerializeField] private bool autoScanOrphanedSessionsOnStart = true;
 
         private WsClient _subscribedClient;
         private ScenarioStartPayload _lastStartPayload;
@@ -502,6 +503,13 @@ namespace TrishulSim.AAR
 
         public event Action<Scorecard> OnScorecardComputed;
         public event Action<Scorecard> OnScorecardBroadcast;
+        public event Action<JsonEnvelope> OnErrorBroadcast;
+
+        public bool AutoScanOrphanedSessionsOnStart
+        {
+            get { return autoScanOrphanedSessionsOnStart; }
+            set { autoScanOrphanedSessionsOnStart = value; }
+        }
 
         public string SessionsDirectoryOverride
         {
@@ -553,6 +561,11 @@ namespace TrishulSim.AAR
             if (autoSubscribeToClient)
             {
                 SubscribeToClient();
+            }
+
+            if (autoScanOrphanedSessionsOnStart)
+            {
+                ScanAndLogOrphanedSessions();
             }
         }
 
@@ -638,22 +651,106 @@ namespace TrishulSim.AAR
         }
 
         /// <summary>
+        /// Ensures the sessions directory exists in an idempotent, race-condition-safe manner (AA-P3-A).
+        /// Directory.CreateDirectory in .NET is idempotent; this helper wraps and validates existence.
+        /// </summary>
+        public static bool EnsureSessionsDirectoryExists(string dirPath)
+        {
+            if (string.IsNullOrWhiteSpace(dirPath))
+                return false;
+
+            try
+            {
+                if (!Directory.Exists(dirPath))
+                {
+                    Directory.CreateDirectory(dirPath);
+                }
+                return Directory.Exists(dirPath);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[ScorecardComputer] Directory creation notice for '" + dirPath + "': " + ex.Message);
+                return Directory.Exists(dirPath);
+            }
+        }
+
+        /// <summary>
+        /// Scans sessions/manifest.json on startup for any sessions missing their .scorecard.json file.
+        /// Logs orphaned sessions to Console without recomputing (PRD / AA-P3-A hardening).
+        /// </summary>
+        public int ScanAndLogOrphanedSessions(string sessionsDirOverride = null)
+        {
+            string dir = !string.IsNullOrWhiteSpace(sessionsDirOverride) ? sessionsDirOverride : GetSessionsDirectory();
+            string manifestPath = Path.Combine(dir, "manifest.json");
+
+            if (!File.Exists(manifestPath))
+            {
+                Debug.Log("[ScorecardComputer] Startup check: No manifest.json found at " + manifestPath + " — skipping orphan scan.");
+                return 0;
+            }
+
+            try
+            {
+                SessionManifest manifest = SessionManifest.LoadOrCreate(manifestPath);
+                if (manifest == null || manifest.sessions == null || manifest.sessions.Count == 0)
+                {
+                    Debug.Log("[ScorecardComputer] Startup check: Manifest is empty (0 sessions recorded).");
+                    return 0;
+                }
+
+                int orphanedCount = 0;
+                foreach (SessionSummary s in manifest.sessions)
+                {
+                    if (s == null || string.IsNullOrWhiteSpace(s.sessionId))
+                        continue;
+
+                    string scPath = !string.IsNullOrWhiteSpace(s.scoreFilePath)
+                        ? s.scoreFilePath
+                        : Path.Combine(dir, s.sessionId + ".scorecard.json");
+
+                    if (!File.Exists(scPath))
+                    {
+                        orphanedCount++;
+                        Debug.LogWarning("[ScorecardComputer] Orphaned session detected in manifest (missing scorecard.json): " + s.sessionId + " (" + scPath + ") — skipping re-compute.");
+                    }
+                }
+
+                Debug.Log("[ScorecardComputer] Startup orphan scan completed: " + orphanedCount + " orphaned session(s) detected across " + manifest.sessions.Count + " total sessions.");
+                return orphanedCount;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("[ScorecardComputer] Failed to scan manifest for orphaned sessions: " + ex.Message);
+                return 0;
+            }
+        }
+
+        /// <summary>
         /// Resolves the absolute directory path where session files (.ndjson, .scorecard.json, manifest.json) are stored.
         /// Defaults to %AppData%\TRISHUL-SIM\sessions\.
         /// </summary>
         public string GetSessionsDirectory()
         {
+            string targetDir;
             if (!string.IsNullOrWhiteSpace(sessionsDirectoryOverride))
-                return sessionsDirectoryOverride;
+            {
+                targetDir = sessionsDirectoryOverride;
+            }
+            else if (Logger != null && !string.IsNullOrWhiteSpace(Logger.SessionsDirectoryOverride))
+            {
+                targetDir = Logger.SessionsDirectoryOverride;
+            }
+            else
+            {
+                string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                if (string.IsNullOrWhiteSpace(appData))
+                    appData = Directory.GetCurrentDirectory();
 
-            if (Logger != null && !string.IsNullOrWhiteSpace(Logger.SessionsDirectoryOverride))
-                return Logger.SessionsDirectoryOverride;
+                targetDir = Path.Combine(appData, "TRISHUL-SIM", "sessions");
+            }
 
-            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            if (string.IsNullOrWhiteSpace(appData))
-                appData = Directory.GetCurrentDirectory();
-
-            return Path.Combine(appData, "TRISHUL-SIM", "sessions");
+            EnsureSessionsDirectoryExists(targetDir);
+            return targetDir;
         }
 
         /// <summary>
@@ -710,26 +807,37 @@ namespace TrishulSim.AAR
             List<TelemetryRecord> records = new List<TelemetryRecord>();
             bool fileReadAttempted = false;
             bool fileReadError = false;
+            bool isZeroBytes = false;
 
             if (File.Exists(expectedNdjsonPath))
             {
                 fileReadAttempted = true;
                 try
                 {
-                    using (FileStream fs = new FileStream(expectedNdjsonPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                    using (StreamReader reader = new StreamReader(fs, Encoding.UTF8))
+                    FileInfo fi = new FileInfo(expectedNdjsonPath);
+                    if (fi.Length == 0)
                     {
-                        string line;
-                        while ((line = reader.ReadLine()) != null)
+                        isZeroBytes = true;
+                        fileReadError = true;
+                        Debug.LogWarning("[ScorecardComputer] Session NDJSON file is 0 bytes: " + expectedNdjsonPath);
+                    }
+                    else
+                    {
+                        using (FileStream fs = new FileStream(expectedNdjsonPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        using (StreamReader reader = new StreamReader(fs, Encoding.UTF8))
                         {
-                            if (string.IsNullOrWhiteSpace(line))
-                                continue;
-
-                            TelemetryRecord rec;
-                            string err;
-                            if (TelemetryRecord.TryParse(line, out rec, out err))
+                            string line;
+                            while ((line = reader.ReadLine()) != null)
                             {
-                                records.Add(rec);
+                                if (string.IsNullOrWhiteSpace(line))
+                                    continue;
+
+                                TelemetryRecord rec;
+                                string err;
+                                if (TelemetryRecord.TryParse(line, out rec, out err))
+                                {
+                                    records.Add(rec);
+                                }
                             }
                         }
                     }
@@ -739,6 +847,18 @@ namespace TrishulSim.AAR
                     Debug.LogWarning("[ScorecardComputer] Error reading NDJSON file: " + ex.Message);
                     fileReadError = true;
                 }
+            }
+            else
+            {
+                fileReadError = true;
+                Debug.LogWarning("[ScorecardComputer] Session NDJSON file does not exist: " + expectedNdjsonPath);
+            }
+
+            bool computeFailed = !File.Exists(expectedNdjsonPath) || isZeroBytes || fileReadError;
+            if (computeFailed)
+            {
+                // AA-P3-A Step 2: Broadcast WS ERROR {code:"SCORECARD_COMPUTE_FAILED", message:"Session file corrupt or missing.", fatal:false}
+                BroadcastError("SCORECARD_COMPUTE_FAILED", "Session file corrupt or missing.", false);
             }
 
             // Resolve scenario configuration for attackerCount benchmarks
@@ -771,11 +891,15 @@ namespace TrishulSim.AAR
                 actualDurationMs = records[records.Count - 1].t;
             }
 
-            bool isPartial = fileReadError || (!fileReadAttempted && (Logger != null && Logger.TotalTicksWritten > 0));
+            bool isPartial = computeFailed ||
+                             fileReadError ||
+                             isZeroBytes ||
+                             (Logger != null && Logger.IsPartial) ||
+                             (!fileReadAttempted && (Logger != null && Logger.TotalTicksWritten > 0));
 
             // Compute timelineIndex for Timeline Scrubber data engine (AA-P1-B)
             int[] timelineIdx = null;
-            if (File.Exists(expectedNdjsonPath))
+            if (File.Exists(expectedNdjsonPath) && !isZeroBytes)
             {
                 try
                 {
@@ -806,7 +930,7 @@ namespace TrishulSim.AAR
                 traineeId = Scorecard.DefaultTraineeId,
                 completedAtIso = completedIso,
                 durationMs = Math.Max(0L, actualDurationMs),
-                doctrinePassed = doctrinePassed,
+                doctrinePassed = !isPartial && doctrinePassed,
                 metrics = metrics,
                 doctrineBenchmarks = benchmarks,
                 timelineIndex = timelineIdx,
@@ -825,9 +949,11 @@ namespace TrishulSim.AAR
             catch (Exception ex)
             {
                 Debug.LogError("[ScorecardComputer] Failed writing scorecard file: " + ex.Message);
+                isPartial = true;
+                scorecard.partial = true;
             }
 
-            // 2. Update sessions/manifest.json
+            // 2. Update sessions/manifest.json (AA-P3-A Step 3: set partial:true for failed sessions)
             string manifestPath = Path.Combine(dir, "manifest.json");
             try
             {
@@ -838,10 +964,10 @@ namespace TrishulSim.AAR
                     scorecard.completedAtIso,
                     scorecard.doctrinePassed,
                     scorecardPath,
-                    scorecard.partial);
+                    partial: isPartial);
                 manifest.AddOrUpdate(summary);
                 manifest.Save(manifestPath);
-                Debug.Log("[ScorecardComputer] Updated manifest at: " + manifestPath);
+                Debug.Log("[ScorecardComputer] Updated manifest at: " + manifestPath + " (partial: " + isPartial + ")");
             }
             catch (Exception ex)
             {
@@ -950,6 +1076,47 @@ namespace TrishulSim.AAR
             Action<Scorecard> broadHandler = OnScorecardBroadcast;
             if (broadHandler != null)
                 broadHandler(scorecard);
+        }
+
+        private JsonEnvelope? _lastBroadcastError;
+        public JsonEnvelope? LastBroadcastError
+        {
+            get { return _lastBroadcastError; }
+        }
+
+        /// <summary>
+        /// Broadcasts WS ERROR envelope to the server / connected clients matching websocket-ipc.md §2 and scorecard.md §Error shape.
+        /// (AA-P3-A: SCORECARD_COMPUTE_FAILED error envelope).
+        /// </summary>
+        public void BroadcastError(string code, string message, bool fatal = false)
+        {
+            JsonEnvelope envelope = JsonEnvelope.CreateError(code, message, fatal);
+            _lastBroadcastError = envelope;
+
+            WsClient client = Client;
+            if (client != null && client.IsConnected)
+            {
+                Task.Run(async () =>
+                {
+                    try
+                    {
+                        await client.SendAsync(envelope.ToJson()).ConfigureAwait(false);
+                        Debug.LogWarning("[ScorecardComputer] WS ERROR broadcast sent — code: " + code + ", message: " + message);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning("[ScorecardComputer] Broadcast transport error on WS ERROR: " + ex.Message);
+                    }
+                });
+            }
+            else
+            {
+                Debug.LogWarning("[ScorecardComputer] WS ERROR broadcast sent (offline/test mode) — code: " + code + ", message: " + message);
+            }
+
+            Action<JsonEnvelope> errHandler = OnErrorBroadcast;
+            if (errHandler != null)
+                errHandler(envelope);
         }
     }
 }

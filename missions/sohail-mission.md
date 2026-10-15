@@ -341,7 +341,7 @@ DELIVERABLE: TelemetryLogger.cs + ScorecardComputer.cs hardened; partial flag in
 TEST:
   Write-protect sessions/ → run scenario → Console "IOException during telemetry write — continuing in partial mode"
   After END: SCORECARD_COMPUTE_FAILED broadcast. Remove protection → next run works normally.
-STATUS: [ ] todo
+STATUS: [x] done
 ```
 
 ---
@@ -411,7 +411,7 @@ TEST:
 DEPENDS: VG-P1-A (OnRecalibrate event), VG-P1-B (VRRig/StereoHead exist)
 UNBLOCKS: VG-P1-E (IsConnected used for status badge)
 DEMO: "Trainee turns head — radar scope follows left. Acoustic sonar follows right." (Beat 3)
-PERSONA: Sohail (aar-engine)   STATUS: [ ] todo
+PERSONA: Sohail (aar-engine)   STATUS: [x] done — 2026-10-12 (GyroReceiver + vr-gyro-sender.html + serve-gyro.ps1; scene wiring via Unity Editor pending)
 ```
 
 ---
@@ -431,4 +431,4 @@ PERSONA: Sohail (aar-engine)   STATUS: [ ] todo
 
 > I, Sohail, have read this brief and will push `feat/aar-engine-telemetry-logger` the same day Vinod's WS IPC + Tick loop branches land.
 
-- [ ] **ACCEPTED**
+- [x] **ACCEPTED**
