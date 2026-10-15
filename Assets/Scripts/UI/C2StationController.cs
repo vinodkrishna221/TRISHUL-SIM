@@ -40,6 +40,15 @@ namespace TrishulSim.UI
         private Label scorecardStubLabel;
         private ScorecardPanelController scorecardController;
 
+        // ── VG-P1-E: VR Mode & Gyro Status ─────────────────────
+        private Button vrModeBtn;
+        private VisualElement vrStatusBadge;
+        private VisualElement vrStatusIcon;
+        private Label vrStatusLabel;
+        private bool isVrModeActive = false;
+        private bool isGyroLive = false;
+        public static Func<bool> GyroStatusQuery = null;
+
         // ── State ─────────────────────────────────────────────
         private bool isConnected = false;
         private string selectedScenarioId = "";
@@ -56,6 +65,12 @@ namespace TrishulSim.UI
         public VisualElement ScorecardMirror { get { return scorecardMirror; } }
         public ScorecardPanelController ScorecardController { get { return scorecardController; } }
         public Label ScorecardStubLabel { get { return scorecardStubLabel; } }
+        public Button VrModeBtn { get { return vrModeBtn; } }
+        public VisualElement VrStatusBadge { get { return vrStatusBadge; } }
+        public VisualElement VrStatusIcon { get { return vrStatusIcon; } }
+        public Label VrStatusLabel { get { return vrStatusLabel; } }
+        public bool IsVrModeActive { get { return isVrModeActive; } }
+        public bool IsGyroLive { get { return isGyroLive; } }
 
         // ══════════════════════════════════════════════════════
         // Lifecycle
@@ -139,6 +154,10 @@ namespace TrishulSim.UI
             if (TrishulSim.Scenarios.ScenarioManager.Instance != null)
             {
                 var sm = TrishulSim.Scenarios.ScenarioManager.Instance;
+                sm.OnOperationModeChanged += OnOperationModeChanged;
+                isVrModeActive = (sm.CurrentMode == TrishulSim.Scenarios.OperationMode.VRMode);
+                UpdateVrStatusBadge();
+
                 if (sm.CurrentMode == TrishulSim.Scenarios.OperationMode.SingleLaptopSplit || (sm.Server != null && sm.Server.ConnectedCount > 0))
                 {
                     OnClientConnected();
@@ -177,6 +196,18 @@ namespace TrishulSim.UI
 #endif
         }
 
+        private void Update()
+        {
+            if (isVrModeActive)
+            {
+                bool gyro = CheckGyroStatus();
+                if (gyro != isGyroLive)
+                {
+                    UpdateVrStatusBadge(isVrModeActive, gyro);
+                }
+            }
+        }
+
         private void OnDestroy()
         {
             UnregisterCallbacks();
@@ -184,6 +215,11 @@ namespace TrishulSim.UI
             // ── UX-P0-B: Unsubscribe locale listener ─────────
             if (LocaleToggle.Instance != null)
                 LocaleToggle.Instance.OnLocaleChanged -= OnLocaleChanged;
+
+#if UNITY_5_3_OR_NEWER
+            if (TrishulSim.Scenarios.ScenarioManager.Instance != null)
+                TrishulSim.Scenarios.ScenarioManager.Instance.OnOperationModeChanged -= OnOperationModeChanged;
+#endif
         }
 
         // ══════════════════════════════════════════════════════
@@ -226,8 +262,14 @@ namespace TrishulSim.UI
             launchBtn          = root.Q<Button>("launch-btn");
             abortBtn           = root.Q<Button>("abort-btn");
             langToggle         = root.Q<Button>("lang-toggle");
+            vrModeBtn          = root.Q<Button>("vr-mode-btn");
+            vrStatusBadge      = root.Q<VisualElement>("vr-status-badge");
+            vrStatusIcon       = root.Q<VisualElement>("vr-status-icon");
+            vrStatusLabel      = root.Q<Label>("vr-status-label");
             scorecardMirror    = root.Q<VisualElement>("scorecard-mirror");
             scorecardStubLabel = root.Q<Label>("scorecard-stub-label");
+
+            UpdateVrStatusBadge();
 
             if (scorecardMirror != null)
             {
@@ -304,6 +346,7 @@ namespace TrishulSim.UI
             if (launchBtn != null) launchBtn.clicked += OnLaunchClicked;
             if (abortBtn != null) abortBtn.clicked += OnAbortClicked;
             if (langToggle != null) langToggle.clicked += OnLangToggleClicked;
+            if (vrModeBtn != null) vrModeBtn.clicked += OnVrModeClicked;
 
             if (scenarioDropdown != null)
                 scenarioDropdown.RegisterValueChangedCallback(OnScenarioChanged);
@@ -314,9 +357,165 @@ namespace TrishulSim.UI
             if (launchBtn != null) launchBtn.clicked -= OnLaunchClicked;
             if (abortBtn != null) abortBtn.clicked -= OnAbortClicked;
             if (langToggle != null) langToggle.clicked -= OnLangToggleClicked;
+            if (vrModeBtn != null) vrModeBtn.clicked -= OnVrModeClicked;
 
             if (scenarioDropdown != null)
                 scenarioDropdown.UnregisterValueChangedCallback(OnScenarioChanged);
+        }
+
+#if UNITY_5_3_OR_NEWER
+        private void OnOperationModeChanged(TrishulSim.Scenarios.OperationMode mode)
+        {
+            isVrModeActive = (mode == TrishulSim.Scenarios.OperationMode.VRMode);
+            UpdateVrStatusBadge();
+        }
+#endif
+
+        /// <summary>
+        /// Toggles VR Mode on/off. When active, loads VRSentryPost on secondary display (phone via spacedesk)
+        /// or laptop split-stereo fallback. When toggled off, restores previous desktop mode without regression.
+        /// </summary>
+        public void OnVrModeClicked()
+        {
+            Debug.Log("[C2] VR MODE toggle clicked.");
+#if UNITY_5_3_OR_NEWER
+            if (TrishulSim.VR.VRModeController.Instance != null)
+            {
+                TrishulSim.VR.VRModeController.Instance.ToggleVRMode();
+            }
+            else if (TrishulSim.Scenarios.ScenarioManager.Instance != null)
+            {
+                var sm = TrishulSim.Scenarios.ScenarioManager.Instance;
+                if (sm.CurrentMode == TrishulSim.Scenarios.OperationMode.VRMode)
+                {
+                    sm.SetOperationMode(TrishulSim.Scenarios.OperationMode.TwoLaptop);
+                }
+                else
+                {
+                    sm.SetOperationMode(TrishulSim.Scenarios.OperationMode.VRMode);
+                }
+            }
+            else
+            {
+                isVrModeActive = !isVrModeActive;
+                UpdateVrStatusBadge();
+            }
+#else
+            isVrModeActive = !isVrModeActive;
+            UpdateVrStatusBadge();
+#endif
+        }
+
+        /// <summary>
+        /// Updates the C2 status badge for VR and Gyro tracking:
+        /// "VR MODE: ON ● GYRO: LIVE" when connected
+        /// "VR MODE: ON ○ GYRO: OFFLINE" when not
+        /// "VR MODE: OFF" when VR mode is inactive
+        /// </summary>
+        public void UpdateVrStatusBadge()
+        {
+            bool gyro = CheckGyroStatus();
+            UpdateVrStatusBadge(isVrModeActive, gyro);
+        }
+
+        public void UpdateVrStatusBadge(bool vrActive, bool gyroLive)
+        {
+            isVrModeActive = vrActive;
+            isGyroLive = gyroLive;
+
+            if (vrStatusBadge != null)
+            {
+                vrStatusBadge.RemoveFromClassList("hidden");
+            }
+
+            if (vrModeBtn != null)
+            {
+                if (vrActive)
+                {
+                    vrModeBtn.AddToClassList("btn-vr-active");
+                    vrModeBtn.text = "VR ACTIVE";
+                }
+                else
+                {
+                    vrModeBtn.RemoveFromClassList("btn-vr-active");
+                    vrModeBtn.text = "VR MODE";
+                }
+            }
+
+            if (vrStatusLabel != null)
+            {
+                if (!vrActive)
+                {
+                    vrStatusLabel.text = "VR MODE: OFF";
+                }
+                else if (gyroLive)
+                {
+                    vrStatusLabel.text = "VR MODE: ON \u25cf GYRO: LIVE";
+                }
+                else
+                {
+                    vrStatusLabel.text = "VR MODE: ON \u25cb GYRO: OFFLINE";
+                }
+            }
+
+            if (vrStatusIcon != null)
+            {
+                vrStatusIcon.RemoveFromClassList("status-connected");
+                vrStatusIcon.RemoveFromClassList("status-waiting");
+                vrStatusIcon.RemoveFromClassList("status-lost");
+
+                if (!vrActive)
+                {
+                    vrStatusIcon.AddToClassList("status-waiting");
+                }
+                else if (gyroLive)
+                {
+                    vrStatusIcon.AddToClassList("status-connected");
+                }
+                else
+                {
+                    vrStatusIcon.AddToClassList("status-waiting");
+                }
+            }
+        }
+
+        private static Type _cachedVrType;
+        private static System.Reflection.PropertyInfo _cachedInstanceProp;
+        private static System.Reflection.PropertyInfo _cachedGyroProp;
+        private static bool _reflectionInitialized = false;
+
+        private bool CheckGyroStatus()
+        {
+            if (GyroStatusQuery != null)
+            {
+                try { return GyroStatusQuery(); } catch { }
+            }
+
+            try
+            {
+                if (!_reflectionInitialized)
+                {
+                    _cachedVrType = Type.GetType("TrishulSim.VR.VRModeController, Assembly-CSharp") ??
+                                    Type.GetType("TrishulSim.VR.VRModeController");
+                    if (_cachedVrType != null)
+                    {
+                        _cachedInstanceProp = _cachedVrType.GetProperty("Instance", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                        _cachedGyroProp = _cachedVrType.GetProperty("IsGyroConnected", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    }
+                    _reflectionInitialized = true;
+                }
+
+                if (_cachedVrType != null && _cachedInstanceProp != null && _cachedGyroProp != null)
+                {
+                    object instance = _cachedInstanceProp.GetValue(null, null);
+                    if (instance != null)
+                    {
+                        return (bool)_cachedGyroProp.GetValue(instance, null);
+                    }
+                }
+            }
+            catch { }
+            return false;
         }
 
         public void OnScenarioChanged(ChangeEvent<string> evt)

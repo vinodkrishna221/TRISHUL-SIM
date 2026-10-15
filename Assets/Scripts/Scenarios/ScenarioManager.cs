@@ -58,7 +58,8 @@ namespace TrishulSim.Scenarios
     public enum OperationMode
     {
         TwoLaptop = 0,
-        SingleLaptopSplit = 1
+        SingleLaptopSplit = 1,
+        VRMode = 2
     }
 
     /// <summary>
@@ -74,8 +75,10 @@ namespace TrishulSim.Scenarios
         public const string DefaultTraineeSceneName = "TraineeCockpit";
         public const string DefaultTwoLaptopSceneName = "InstructorC2";
         public const string DefaultSplitScreenSceneName = "SplitScreen";
+        public const string DefaultVrSentrySceneName = "VRSentryPost";
         public const string ModeTwoLaptopText = "Two-Laptop";
         public const string ModeSplitScreenText = "Single-Laptop (Split)";
+        public const string ModeVrText = "VR Mode (spacedesk)";
         public const int DefaultAckTimeoutMs = 1000;
         public const float DefaultTickIntervalSeconds = 0.1f;
         public const int DefaultTickStepMs = 100;
@@ -95,6 +98,7 @@ namespace TrishulSim.Scenarios
         [SerializeField] private string traineeCockpitSceneName = DefaultTraineeSceneName;
         [SerializeField] private string twoLaptopSceneName = DefaultTwoLaptopSceneName;
         [SerializeField] private string splitScreenSceneName = DefaultSplitScreenSceneName;
+        [SerializeField] private string vrSentrySceneName = DefaultVrSentrySceneName;
         [SerializeField] private OperationMode currentMode = OperationMode.TwoLaptop;
         [SerializeField] private bool loadSceneOnScenarioStart = true;
         [SerializeField] private int ackTimeoutMs = DefaultAckTimeoutMs;
@@ -140,6 +144,11 @@ namespace TrishulSim.Scenarios
         public event Action<ScenarioEndPayload> OnScenarioEndBroadcast;
         public event Action<ScenarioEndPayload> OnScenarioEndReceived;
         public event Action<OperationMode> OnOperationModeChanged;
+        public event Action<OperationMode> OnModeChanged
+        {
+            add { OnOperationModeChanged += value; }
+            remove { OnOperationModeChanged -= value; }
+        }
         public event Action<JsonEnvelope> OnScorecardReceived;
 
         public JsonEnvelope LastScorecardEnvelope { get; private set; }
@@ -257,6 +266,12 @@ namespace TrishulSim.Scenarios
         {
             get { return splitScreenSceneName; }
             set { splitScreenSceneName = string.IsNullOrWhiteSpace(value) ? DefaultSplitScreenSceneName : value; }
+        }
+
+        public string VrSentrySceneName
+        {
+            get { return vrSentrySceneName; }
+            set { vrSentrySceneName = string.IsNullOrWhiteSpace(value) ? DefaultVrSentrySceneName : value; }
         }
 
         public bool AutoLogTelemetryToDisk
@@ -1713,15 +1728,21 @@ namespace TrishulSim.Scenarios
 
             if (notifyListeners)
             {
-                string targetScene = mode == OperationMode.SingleLaptopSplit
-                    ? splitScreenSceneName
-                    : twoLaptopSceneName;
+                string targetScene = null;
+                if (mode == OperationMode.SingleLaptopSplit)
+                    targetScene = splitScreenSceneName;
+                else if (mode == OperationMode.VRMode)
+                    targetScene = vrSentrySceneName;
+                else
+                    targetScene = twoLaptopSceneName;
 
                 if (!string.IsNullOrWhiteSpace(targetScene))
                 {
+                    string modeName = mode == OperationMode.SingleLaptopSplit ? ModeSplitScreenText :
+                                      (mode == OperationMode.VRMode ? ModeVrText : ModeTwoLaptopText);
                     Debug.Log("[ScenarioManager] Switching operation mode to " +
-                              (mode == OperationMode.SingleLaptopSplit ? ModeSplitScreenText : ModeTwoLaptopText) +
-                              " \u2014 loading scene: " + targetScene);
+                              modeName +
+                              " — loading scene: " + targetScene);
                     SceneLoader.LoadAsync(targetScene);
                 }
             }
@@ -1735,6 +1756,16 @@ namespace TrishulSim.Scenarios
         public void SwitchToTwoLaptop()
         {
             SetOperationMode(OperationMode.TwoLaptop, notifyListeners: true);
+        }
+
+        public void SwitchToVRMode()
+        {
+            SetOperationMode(OperationMode.VRMode, notifyListeners: true);
+        }
+
+        public void SetMode(OperationMode mode)
+        {
+            SetOperationMode(mode, notifyListeners: true);
         }
 
         private void SubscribeModeDropdown()

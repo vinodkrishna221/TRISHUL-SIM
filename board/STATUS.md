@@ -17,7 +17,7 @@
 | swarm-ai | SA-P0-A, SA-P0-B, SA-P1-A, SA-P1-B-i, SA-P1-B-ii, SA-P1-C, SA-P1-D, SA-P2-A, SA-P2-B (Burst pass) | — | SA-P3-A (Demo seed tuning) |
 | aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A, AA-P2-B, AA-P3-A | — | — (Track complete) |
 | ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B, UX-P1-D, UX-P2-A | — | UX-P1-C (Split-screen) / UX-P2-B (Bilingual pass) |
-| vr-gamepad | VG-P1-A, VG-P1-B, VG-P1-C, VG-P1-D | — | VG-P1-E (Spacedesk mode toggle) |
+| vr-gamepad | VG-P1-A, VG-P1-B, VG-P1-C, VG-P1-D, VG-P1-E | — | VG-P1-F (Submission) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
 
@@ -48,6 +48,7 @@
 
 ## Log (one line per session-end, newest first)
 
+- 2026-10-14T21:55 IST · Uday: VG-P1-E review & harden complete — VRModeController auto-instantiation, previousMode state restoration (SingleLaptopSplit vs TwoLaptop), dynamic Spacedesk hotplug/hot-unplug camera re-routing, primary C2 camera full-rect expansion on Display 1, reflection caching in C2StationController; VRModeSelfTest (10/10 suites) + UiShellSelfTest + SplitScreenSelfTest all PASSED on feat/vr-spacedesk-mode-toggle
 - 2026-10-12T19:47 IST · Uday: VG-P1-C Warden BLOCK fix — procedural Acoustic FFT (8-band bar chart, green/amber/red by dB), procedural EW/SMASH (jammer status + ROE blackout + crosshair), standalone RF+Doppler fallback when UITK absent, dual URP+legacy _BaseMap/_MainTex + _BaseColor/_Color, exported & committed VRHudPanels.prefab + 4 RenderTextures + 5 Materials + .metas, self-test expanded 5→8 suites (all pass) on feat/vr-hud-panels
 - 2026-10-12T12:12 IST · Sohail (vr-gamepad): [VG-P1-D] ✅ Phone gyroscope head tracking — GyroReceiver.cs (WebSocket server port 9800, HttpListener pattern, Quaternion.Euler(-b+pitchOffset, a-yawOffset, -g), Slerp 15f*dt smoothing, 2s disconnect timeout, IsConnected property for VG-P1-E), vr-gyro-sender.html (~60Hz {a,b,g} sender with iOS permission gate + reconnect), serve-gyro.ps1 (auto-IP replacement); GamepadInputController.OnRecalibrate already wired (VG-P1-A line 62); scene wiring (add component to VRRig) requires Unity Editor — self-test 7/7 suites on feat/vr-gyro-head-tracking
 - 2026-10-11T19:35 IST · Vinod: VG-P1-B done — 3D Nighttime Sentry Post scene (Assets/Scenes/VRSentryPost.unity) registered in EditorBuildSettings at index 3; Full-moon lighting (Directional Light Moonlight #C8D8E8, 0.3 intensity, soft shadows, SkyboxNight.mat high-quality moon disk), Trilight ambient (#080A17/#05060E/#020203), DarkConcrete.mat watchtower platform (20x20m ground quad + 4 cylindrical posts + 4 rails) backed by URP pipeline configuration (Assets/Settings/TrishulURPRenderer.asset + TrishulURPPipeline.asset wired to GraphicsSettings.asset m_CustomRenderPipeline); VRRig stereo rig with LeftEye/RightEye camera viewport halves (0,0,0.5,1 and 0.5,0,0.5,1, IPD 0.064m), AudioListener & GamepadInputController wired; RenderSettings ExponentialSquared fog (#12122A, density 0.03); VRSentryPostSelfTest (15/15 suites) PASSED with Unity Editor MenuItem runner
