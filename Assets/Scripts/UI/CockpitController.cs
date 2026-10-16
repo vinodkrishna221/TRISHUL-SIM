@@ -1,6 +1,6 @@
 // ============================================================
 // CockpitController.cs — Trainee Cockpit UIDocument Controller
-// TRISHUL-SIM · UX-P0-A + UX-P0-B + UX-P1-A · ui-ux track (Rani)
+// TRISHUL-SIM · UX-P0-A + UX-P0-B + UX-P1-A + UX-P2-C · ui-ux track
 //
 // Binds TraineeCockpit.uxml elements and connects the live sensor suite:
 // 1. RF Waterfall Spectrogram (RfWaterfallRenderer)
@@ -14,6 +14,7 @@
 // ============================================================
 
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -64,6 +65,11 @@ namespace TrishulSim.UI
         private string currentThreatState = "GREEN";
         private SwarmAgentState[] lastSwarmSnapshot = null;
         private long scenarioElapsedMs = 0;
+
+        // ── UX-P2-C: Night mode + fog + pulse state ──────────
+        private bool isNightMode = false;
+        private VisualElement fogOverlay = null;
+        private Coroutine threatPulseCoroutine = null;
 
         // ── Public Accessors for Tests / UI Validation ────────
         public bool ScenarioRunning { get { return scenarioRunning; } }
@@ -380,9 +386,17 @@ namespace TrishulSim.UI
         /// </summary>
         public void OnScenarioStart(string scenarioId, string scenarioName)
         {
+            OnScenarioStart(scenarioId, scenarioName, false);
+        }
+
+        /// <summary>
+        /// Overload with isNight flag for UX-P2-C night/fog ambience.
+        /// </summary>
+        public void OnScenarioStart(string scenarioId, string scenarioName, bool isNight)
+        {
             scenarioRunning = true;
             scenarioElapsedMs = 0;
-            Debug.Log(string.Format("[Cockpit] SCENARIO_START: {0} — {1}", scenarioId, scenarioName));
+            Debug.Log(string.Format("[Cockpit] SCENARIO_START: {0} — {1} (night={2})", scenarioId, scenarioName, isNight));
 
             // Show controls row (EW + SMASH controls)
             if (controlsRow != null)
@@ -396,6 +410,9 @@ namespace TrishulSim.UI
 
             currentTraineeAction = new TraineeAction();
             currentEwState = new EWJammerState();
+
+            // ── UX-P2-C: Apply night mode if scenario isNight ──
+            ApplyNightMode(isNight);
 
             // Set initial threat indicator to GREEN (peace/quiet)
             SetThreatState("GREEN");
@@ -662,6 +679,7 @@ namespace TrishulSim.UI
             threatIndicator.RemoveFromClassList("threat-green");
             threatIndicator.RemoveFromClassList("threat-amber");
             threatIndicator.RemoveFromClassList("threat-red");
+            threatIndicator.RemoveFromClassList("threat-red-pulse");
 
             var loc = LocaleToggle.Instance;
 
@@ -670,22 +688,142 @@ namespace TrishulSim.UI
                 case "GREEN":
                     threatIndicator.AddToClassList("threat-green");
                     if (threatLabel != null) threatLabel.text = loc != null ? loc.GetString("THREAT_GREEN") : "GREEN";
+                    StopThreatPulse();
                     break;
                 case "AMBER":
                     threatIndicator.AddToClassList("threat-amber");
                     if (threatLabel != null) threatLabel.text = loc != null ? loc.GetString("THREAT_AMBER") : "AMBER";
+                    StopThreatPulse();
                     break;
                 case "RED":
                     threatIndicator.AddToClassList("threat-red");
+                    threatIndicator.AddToClassList("threat-red-pulse");
                     if (threatLabel != null) threatLabel.text = loc != null ? loc.GetString("THREAT_RED") : "RED";
+                    StartThreatPulse();
                     break;
                 default:
                     threatIndicator.AddToClassList("threat-green");
                     if (threatLabel != null) threatLabel.text = loc != null ? loc.GetString("THREAT_GREEN") : "GREEN";
+                    StopThreatPulse();
                     Debug.LogWarning(string.Format("[Cockpit] Unknown threat state: {0}", state));
                     break;
             }
+
+            // ── UX-P2-C: Update sensor pane borders to match threat state ──
+            UpdateSensorPaneBorders(state);
         }
+
+        // ══════════════════════════════════════════════════════
+        // UX-P2-C: Night Mode, Fog Overlay, Sensor Borders, Pulse
+        // ══════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Applies or removes pitch-black night-mode aesthetic + fog overlay.
+        /// Contract: PRD §3 Beat 4 — "pitch-black screen, two sensor panes".
+        /// </summary>
+        private void ApplyNightMode(bool isNight)
+        {
+            isNightMode = isNight;
+            if (root == null) return;
+
+            // Find the cockpit root (might be the root itself or a child)
+            var cockpitRoot = root.Q<VisualElement>(className: "cockpit-root") ?? root;
+
+            if (isNight)
+            {
+                cockpitRoot.AddToClassList("night-mode");
+                Debug.Log("[Cockpit][UX-P2-C] Night mode ENABLED — pitch-black background + glowing sensors");
+
+                // Add fog overlay if not already present
+                if (fogOverlay == null)
+                {
+                    fogOverlay = new VisualElement();
+                    fogOverlay.name = "fog-overlay";
+                    fogOverlay.AddToClassList("fog-overlay");
+                    // Insert behind sensor panes (at index 0 or after threat indicator)
+                    cockpitRoot.Insert(0, fogOverlay);
+                }
+                fogOverlay.RemoveFromClassList("hidden");
+            }
+            else
+            {
+                cockpitRoot.RemoveFromClassList("night-mode");
+                Debug.Log("[Cockpit][UX-P2-C] Night mode DISABLED — standard background");
+
+                if (fogOverlay != null)
+                    fogOverlay.AddToClassList("hidden");
+            }
+        }
+
+        /// <summary>
+        /// Updates sensor pane border colours to follow the current threat state.
+        /// MIL-STD-2525: GREEN #00B300, AMBER #FFB300, RED #CC0000.
+        /// </summary>
+        private void UpdateSensorPaneBorders(string state)
+        {
+            VisualElement[] panes = { rfWaterfallPane, dopplerPane, acousticPane };
+            foreach (var pane in panes)
+            {
+                if (pane == null) continue;
+                pane.RemoveFromClassList("sensor-pane-green");
+                pane.RemoveFromClassList("sensor-pane-amber");
+                pane.RemoveFromClassList("sensor-pane-red");
+
+                switch (state)
+                {
+                    case "GREEN":
+                        pane.AddToClassList("sensor-pane-green");
+                        break;
+                    case "AMBER":
+                        pane.AddToClassList("sensor-pane-amber");
+                        break;
+                    case "RED":
+                        pane.AddToClassList("sensor-pane-red");
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Starts the RED threat indicator pulse (opacity 1.0 ↔ 0.4, 1s cycle).
+        /// USS does not support @keyframes; we drive it via a coroutine.
+        /// </summary>
+        private void StartThreatPulse()
+        {
+            if (threatPulseCoroutine != null) return; // already pulsing
+            threatPulseCoroutine = StartCoroutine(ThreatPulseLoop());
+        }
+
+        private void StopThreatPulse()
+        {
+            if (threatPulseCoroutine != null)
+            {
+                StopCoroutine(threatPulseCoroutine);
+                threatPulseCoroutine = null;
+            }
+            // Restore full opacity
+            if (threatIndicator != null)
+            {
+                threatIndicator.RemoveFromClassList("pulse-dim");
+                threatIndicator.RemoveFromClassList("pulse-bright");
+                threatIndicator.style.opacity = 1f;
+            }
+        }
+
+        private IEnumerator ThreatPulseLoop()
+        {
+            bool dim = false;
+            while (true)
+            {
+                if (threatIndicator == null) yield break;
+                dim = !dim;
+                threatIndicator.style.opacity = dim ? 0.4f : 1.0f;
+                yield return new WaitForSeconds(0.5f);
+            }
+        }
+
+        /// <summary>Public accessor for night mode state (UX-P2-C).</summary>
+        public bool IsNightMode { get { return isNightMode; } }
 
         // ══════════════════════════════════════════════════════
         // Mock Path (Editor Only) & Update
@@ -694,8 +832,9 @@ namespace TrishulSim.UI
 #if UNITY_EDITOR
         private void SimulateScenarioStart()
         {
-            Debug.Log("[Cockpit][MOCK] Simulating SCENARIO_START with Punjab Incursion sensors.");
-            OnScenarioStart("punjab-fog-pincer-01", "Punjab Border — Zero Visibility Pincer");
+            Debug.Log("[Cockpit][MOCK] Simulating SCENARIO_START with Punjab Incursion sensors (night=true).");
+            // UX-P2-C: Punjab is a night scenario
+            OnScenarioStart("punjab-fog-pincer-01", "Punjab Border — Zero Visibility Pincer", true);
 
             var punjabReadings = SensorMock.GetPunjabFixture();
             var punjabSwarm = SensorMock.GetPunjabSwarmFixture();

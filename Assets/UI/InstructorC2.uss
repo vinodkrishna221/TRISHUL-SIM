@@ -1,12 +1,26 @@
 /* ============================================================
    InstructorC2.uss — C2 Station Stylesheet
-   TRISHUL-SIM · UX-P0-A · MIL-STD-2525 colour palette
+   TRISHUL-SIM · UX-P0-A / UX-P2-C · MIL-STD-2525 palette
+   via CSS custom properties
    ============================================================ */
+
+/* --- CSS Custom Properties (MIL-STD-2525) --- */
+:root {
+    --mil-green: #00B300;
+    --mil-amber: #FFB300;
+    --mil-red: #CC0000;
+    --bg: #0D0D0D;
+    --bg-panel: #141414;
+    --border-default: #333333;
+    --border-subtle: #2A2A2A;
+    --text-primary: #E0E0E0;
+    --text-muted: #AAAAAA;
+}
 
 /* --- Root --- */
 .c2-root {
-    background-color: #0D0D0D;
-    color: #E0E0E0;
+    background-color: var(--bg);
+    color: var(--text-primary);
     font-size: 14px;
     flex-grow: 1;
     padding: 16px;
@@ -23,7 +37,7 @@
     background-color: #1A1A1A;
     border-radius: 4px;
     border-bottom-width: 1px;
-    border-bottom-color: #333333;
+    border-bottom-color: var(--border-default);
 }
 
 .app-title {
@@ -51,26 +65,26 @@
 }
 
 .status-connected {
-    background-color: #00B300; /* MIL-STD-2525 GREEN */
+    background-color: var(--mil-green);
 }
 
 .status-lost {
-    background-color: #CC0000; /* MIL-STD-2525 RED */
+    background-color: var(--mil-red);
 }
 
 .status-label {
     font-size: 13px;
-    color: #AAAAAA;
+    color: var(--text-muted);
 }
 
 /* --- Controls Panel --- */
 .controls-panel {
     padding: 16px;
     margin-bottom: 16px;
-    background-color: #141414;
+    background-color: var(--bg-panel);
     border-radius: 4px;
     border-width: 1px;
-    border-color: #2A2A2A;
+    border-color: var(--border-subtle);
 }
 
 .control-field {
@@ -78,7 +92,7 @@
 }
 
 .control-field > Label {
-    color: #AAAAAA;
+    color: var(--text-muted);
     font-size: 12px;
     min-width: 140px;
 }
@@ -101,7 +115,7 @@
 }
 
 .btn-launch {
-    background-color: #00B300;
+    background-color: var(--mil-green);
     color: #FFFFFF;
     border-color: #009900;
 }
@@ -111,7 +125,7 @@
 }
 
 .btn-abort {
-    background-color: #CC0000;
+    background-color: var(--mil-red);
     color: #FFFFFF;
     border-color: #990000;
 }
@@ -122,7 +136,7 @@
 
 .btn-lang {
     background-color: #333333;
-    color: #E0E0E0;
+    color: var(--text-primary);
     border-color: #555555;
 }
 
@@ -133,10 +147,10 @@
 /* --- Scorecard Panel (stub) --- */
 .scorecard-panel {
     padding: 16px;
-    background-color: #141414;
+    background-color: var(--bg-panel);
     border-radius: 4px;
     border-width: 1px;
-    border-color: #2A2A2A;
+    border-color: var(--border-subtle);
 }
 
 .scorecard-stub {
@@ -152,34 +166,13 @@
 
 /* --- MIL-STD-2525 Threat State Colours (shared) --- */
 .threat-green {
-    background-color: #00B300;
+    background-color: var(--mil-green);
 }
 
 .threat-amber {
-    background-color: #FFB300;
+    background-color: var(--mil-amber);
 }
 
 .threat-red {
-    background-color: #CC0000;
-}
-
-/* --- VR Mode & Gyro Status (VG-P1-E) --- */
-.btn-vr-mode {
-    background-color: #0077BE;
-    color: #FFFFFF;
-    border-color: #005588;
-}
-
-.btn-vr-mode:hover {
-    background-color: #0099EE;
-}
-
-.btn-vr-active {
-    background-color: #00B300;
-    color: #FFFFFF;
-    border-color: #008800;
-}
-
-.vr-status-badge {
-    margin-left: 12px;
+    background-color: var(--mil-red);
 }
