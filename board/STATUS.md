@@ -16,7 +16,7 @@
 | unity-sim | US-P0-A, US-P0-B, US-P0-C, US-P1-A, US-P1-B, US-P2-A, US-P2-B, US-P2-C | — | US-P2-D (Warden review coordination + smoke) |
 | swarm-ai | SA-P0-A, SA-P0-B, SA-P1-A, SA-P1-B-i, SA-P1-B-ii, SA-P1-C, SA-P1-D, SA-P2-A, SA-P2-B (Burst pass) | — | SA-P3-A (Demo seed tuning) |
 | aar-engine | AA-P0-A, AA-P0-B, AA-P1-A, AA-P1-B, AA-P2-A, AA-P2-B, AA-P3-A | — | — (Track complete) |
-| ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B, UX-P1-D, UX-P2-A | — | UX-P1-C (Split-screen) / UX-P2-B (Bilingual pass) |
+| ui-ux | UX-P0-A, UX-P0-B, UX-P1-A, UX-P1-B, UX-P1-D, UX-P2-A, UX-P2-C | — | UX-P1-C (Split-screen) / UX-P2-B (Bilingual pass) / UX-P2-D (Demo smoke) |
 | vr-gamepad | VG-P1-A, VG-P1-B, VG-P1-C, VG-P1-D, VG-P1-E | — | VG-P1-F (Submission) |
 
 ## Blockers (>45m old = escalated, advisor protocol)
@@ -86,3 +86,5 @@
 - 2026-10-05T18:58 IST Â· Vinod (unity-sim): [US-P0-A] âœ… WS IPC bootstrap live (`WsServer`, `WsClient`, `JsonEnvelope`, `ConnectionStatusUI`, `InstructorC2.unity`, `TraineeCockpit.unity`) â€” self-test green on `feat/unity-sim-ws-ipc`
 - 2026-10-04T11:03 IST Â· Orion: /blueprint complete â€” ARCHITECTURE.md Â· SCHEMA.md Â· 4Ã— contracts Â· FIT-AUDIT (clean) Â· BUILD-PLAN.md written; 4 tracks confirmed; ready for /phase-plan
 - 2026-10-04T10:52 IST Â· Orion: /kickoff complete â€” PRD drafted, board seeded, vocabulary frozen, ready for /blueprint
+
+- 2026-10-16T13:47 IST · Rajeswari: UX-P2-C done — CSS custom properties pass (all 3 USS files: :root vars --mil-green/amber/red/bg), night-mode USS class + fog overlay VE, CockpitController.ApplyNightMode(isNight) wiring, threat indicator coroutine pulse (1.0↔0.4 opacity at 0.5s), sensor pane borders follow threat state (.sensor-pane-green/amber/red); ScorecardSelfTest (7/7) PASSED on feat/ui-ux-night-fog-aesthetic

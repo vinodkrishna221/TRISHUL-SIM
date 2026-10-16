@@ -666,7 +666,7 @@ TEST:
 DEPENDS: UX-P2-B               UNBLOCKS: UX-P2-D (final smoke)
 
 DEMO: ⭐ "Pitch-black screen + two sensor panes + pulsing RED indicator — visual wow moment." (Beat 4 aesthetics)
-PERSONA: ui-ux builder         STATUS: [ ] todo
+PERSONA: ui-ux builder         STATUS: [x] done — 2026-10-16 (verified with ScorecardSelfTest 7/7 PASS)
 ```
 
 ---
