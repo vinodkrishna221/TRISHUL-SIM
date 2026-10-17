@@ -124,6 +124,181 @@ namespace TrishulSim.VR
         private void Awake()
         {
             threatMpb = new MaterialPropertyBlock();
+            AdjustPanelLayout();
+            AdjustThreatTorusPosition();
+        }
+
+        private void AdjustPanelLayout()
+        {
+            Vector3 eyePos = new Vector3(0f, 1.65f, 0f);
+
+            // Center: Micro-Doppler Radar
+            if (panelDopplerRenderer != null)
+            {
+                panelDopplerRenderer.transform.localPosition = new Vector3(0f, 1.75f, 2.4f);
+                panelDopplerRenderer.transform.localScale = new Vector3(1.5f, 1.5f, 1f);
+                panelDopplerRenderer.transform.localEulerAngles = Vector3.zero;
+
+                Transform lbl = panelDopplerRenderer.transform.Find("Panel_Doppler_Label");
+                if (lbl != null)
+                {
+                    lbl.localPosition = new Vector3(0f, 0.82f, 0f);
+                    lbl.localScale = new Vector3(0.33f, 0.33f, 1f);
+                }
+            }
+
+            // Left: RF Waterfall (angled inward ~33 deg directly facing operator eye level, 2:1 aspect ratio)
+            if (panelRfRenderer != null)
+            {
+                panelRfRenderer.transform.localPosition = new Vector3(-1.42f, 1.68f, 2.20f);
+                panelRfRenderer.transform.localScale = new Vector3(1.4f, 0.70f, 1f);
+                OrientPanelToOperator(panelRfRenderer.transform, eyePos);
+
+                Transform lbl = panelRfRenderer.transform.Find("Panel_RF_Label");
+                if (lbl != null)
+                {
+                    lbl.localPosition = new Vector3(0f, 0.55f, 0f);
+                    lbl.localScale = new Vector3(0.5f / 1.4f, 0.5f / 0.70f, 1f);
+                }
+            }
+
+            // Right: Acoustic Sonar (angled inward ~33 deg directly facing operator eye level, 2:1 aspect ratio)
+            if (panelAcousticRenderer != null)
+            {
+                panelAcousticRenderer.transform.localPosition = new Vector3(1.42f, 1.68f, 2.20f);
+                panelAcousticRenderer.transform.localScale = new Vector3(1.4f, 0.70f, 1f);
+                OrientPanelToOperator(panelAcousticRenderer.transform, eyePos);
+
+                Transform lbl = panelAcousticRenderer.transform.Find("Panel_Acoustic_Label");
+                if (lbl != null)
+                {
+                    lbl.localPosition = new Vector3(0f, 0.55f, 0f);
+                    lbl.localScale = new Vector3(0.5f / 1.4f, 0.5f / 0.70f, 1f);
+                }
+            }
+
+            // Bottom: EW / SMASH 2000 Console (tilted up 22 deg)
+            if (panelEwSmashRenderer != null)
+            {
+                panelEwSmashRenderer.transform.localPosition = new Vector3(0f, 0.80f, 2.05f);
+                panelEwSmashRenderer.transform.localScale = new Vector3(1.7f, 0.75f, 1f);
+                panelEwSmashRenderer.transform.localEulerAngles = new Vector3(22f, 0f, 0f);
+
+                Transform lbl = panelEwSmashRenderer.transform.Find("Panel_EwSmash_Label");
+                if (lbl != null)
+                {
+                    lbl.localPosition = new Vector3(0f, 0.44f, 0f);
+                    lbl.localScale = new Vector3(0.29f, 0.66f, 1f);
+                }
+            }
+
+            DestroyDuplicateScenePanels();
+        }
+
+        private static void OrientPanelToOperator(Transform panelTransform, Vector3 operatorPos)
+        {
+            if (panelTransform == null) return;
+            // In Unity Quads, the visible front face points along -Z (backwards).
+            // Setting LookRotation to (panel - operator) aligns +Z away from operator,
+            // making the quad's visible face (-Z) point directly at the operator.
+            Vector3 lookAway = panelTransform.localPosition - operatorPos;
+            if (lookAway.sqrMagnitude > 0.001f)
+            {
+                panelTransform.localRotation = Quaternion.LookRotation(lookAway, Vector3.up);
+            }
+        }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            if (!Application.isPlaying)
+            {
+                AdjustPanelLayout();
+            }
+        }
+
+        [ContextMenu("Apply Optimal Panel Layout")]
+        public void ApplyOptimalPanelLayoutMenu()
+        {
+            AdjustPanelLayout();
+            AdjustThreatTorusPosition();
+            UnityEditor.EditorUtility.SetDirty(this);
+            Debug.Log("[VRHudController] Optimal wraparound panel layout applied.");
+        }
+#endif
+
+        private void DestroyDuplicateScenePanels()
+        {
+#if UNITY_5_3_OR_NEWER
+            var duplicates = GameObject.FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+            for (int i = 0; i < duplicates.Length; i++)
+            {
+                var go = duplicates[i];
+                if (go != null && go.name == "VRHudPanels" && go.transform.parent == null)
+                {
+                    Debug.Log("[VRHudController] Cleaned up root-level duplicate VRHudPanels.");
+                    Destroy(go);
+                }
+            }
+#endif
+        }
+
+        private void AdjustThreatTorusPosition()
+        {
+            if (threatTorusRenderer != null)
+            {
+                var mf = threatTorusRenderer.GetComponent<MeshFilter>();
+                if (mf != null && (mf.sharedMesh == null || mf.sharedMesh.name.Contains("Cylinder")))
+                {
+                    mf.sharedMesh = CreateRingMesh(0.485f, 0.525f, 64);
+                }
+                threatTorusRenderer.transform.localRotation = Quaternion.identity;
+                threatTorusRenderer.transform.localScale = Vector3.one;
+                threatTorusRenderer.transform.localPosition = new Vector3(0f, 0f, -0.005f);
+            }
+        }
+
+        public static Mesh CreateRingMesh(float innerRadius, float outerRadius, int segments = 64)
+        {
+            Mesh mesh = new Mesh();
+            mesh.name = "ThreatRingMesh";
+            Vector3[] vertices = new Vector3[(segments + 1) * 2];
+            Vector2[] uv = new Vector2[vertices.Length];
+            int[] triangles = new int[segments * 6];
+
+            for (int i = 0; i <= segments; i++)
+            {
+                float angle = i * 2f * Mathf.PI / segments;
+                float cos = Mathf.Cos(angle);
+                float sin = Mathf.Sin(angle);
+
+                vertices[i * 2] = new Vector3(innerRadius * cos, innerRadius * sin, 0f);
+                vertices[i * 2 + 1] = new Vector3(outerRadius * cos, outerRadius * sin, 0f);
+
+                uv[i * 2] = new Vector2((float)i / segments, 0f);
+                uv[i * 2 + 1] = new Vector2((float)i / segments, 1f);
+
+                if (i < segments)
+                {
+                    int baseIdx = i * 2;
+                    int triIdx = i * 6;
+
+                    triangles[triIdx + 0] = baseIdx;
+                    triangles[triIdx + 1] = baseIdx + 1;
+                    triangles[triIdx + 2] = baseIdx + 2;
+
+                    triangles[triIdx + 3] = baseIdx + 2;
+                    triangles[triIdx + 4] = baseIdx + 1;
+                    triangles[triIdx + 5] = baseIdx + 3;
+                }
+            }
+
+            mesh.vertices = vertices;
+            mesh.uv = uv;
+            mesh.triangles = triangles;
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            return mesh;
         }
 
         private void Start()
@@ -173,9 +348,9 @@ namespace TrishulSim.VR
             rfFallbackRow = new Color[256];
 
             // Doppler fallback — only used when dopplerRenderer is null
-            dopplerFallbackTex = new Texture2D(200, 200, TextureFormat.RGB24, false);
-            dopplerBgPixels = new Color[200 * 200];
-            dopplerRenderBuf = new Color[200 * 200];
+            dopplerFallbackTex = new Texture2D(256, 256, TextureFormat.RGB24, false);
+            dopplerBgPixels = new Color[256 * 256];
+            dopplerRenderBuf = new Color[256 * 256];
             GenerateDopplerBackground();
         }
 
@@ -210,21 +385,128 @@ namespace TrishulSim.VR
                 AssignRtToPanel(panelAcousticRenderer, rtAcousticFft);
                 AssignRtToPanel(panelEwSmashRenderer, rtEwSmashPanel);
                 SetThreatTorusColor("GREEN");
+
+                // Render immediate baseline frames so panels are immediately active
+                try
+                {
+                    if (acousticTex != null && rtAcousticFft != null)
+                    {
+                        RenderAcousticFft(30f);
+                        Graphics.Blit(acousticTex, rtAcousticFft);
+                    }
+
+                    if (ewSmashTex != null && rtEwSmashPanel != null)
+                    {
+                        RenderEwSmashPanel();
+                        Graphics.Blit(ewSmashTex, rtEwSmashPanel);
+                    }
+
+                    if (rfFallbackTex != null && rtRfWaterfall != null)
+                    {
+                        RenderRfFallback(0f, -90f);
+                        Graphics.Blit(rfFallbackTex, rtRfWaterfall);
+                    }
+
+#if UNITY_5_3_OR_NEWER
+                    if (dopplerFallbackTex != null && rtDopplerScope != null)
+                    {
+                        RenderDopplerFallback(null, null);
+                        Graphics.Blit(dopplerFallbackTex, rtDopplerScope);
+                    }
+#endif
+                }
+                catch (System.Exception)
+                {
+                    // Safe edit-mode fallback when Graphics.Blit target is not yet GPU-bound
+                }
+                UpdatePanelTextures();
+            }
+        }
+
+        private void Update()
+        {
+            if (!isInitialized) return;
+
+            // When running standalone (no live scenario tick), render active radar grid,
+            // scrolling RF waterfall, acoustic bars, and sync with gamepad controller
+            if (!isScenarioRunning)
+            {
+#if UNITY_5_3_OR_NEWER
+                var gamepad = GetComponent<Input.GamepadInputController>() ??
+                              FindAnyObjectByType<Input.GamepadInputController>();
+                if (gamepad != null)
+                {
+                    lastAzimuthDeg = gamepad.CurrentAzimuth;
+                    lastElevationDeg = gamepad.CurrentElevation;
+                    lastEwEngaged = gamepad.CurrentEngaged;
+                    lastEwBandGHz = gamepad.CurrentBandGHz;
+                }
+#endif
+
+                RenderRfFallback(0f, -90f);
+                if (rtRfWaterfall != null) Graphics.Blit(rfFallbackTex, rtRfWaterfall);
+
+#if UNITY_5_3_OR_NEWER
+                RenderDopplerFallback(null, null);
+                if (rtDopplerScope != null) Graphics.Blit(dopplerFallbackTex, rtDopplerScope);
+#endif
+
+                RenderAcousticFft(lastAcousticDb);
+                if (rtAcousticFft != null) Graphics.Blit(acousticTex, rtAcousticFft);
+
+                RenderEwSmashPanel();
+                if (rtEwSmashPanel != null) Graphics.Blit(ewSmashTex, rtEwSmashPanel);
+
+                UpdatePanelTextures();
             }
         }
 
         /// <summary>
-        /// Sets BOTH URP (_BaseMap) and legacy (_MainTex) texture properties.
+        /// Binds live Texture2Ds directly to panel renderers to ensure 100% reliable rendering
+        /// across all render pipelines (URP, DX12, standalone, mobile) without depending on Graphics.Blit.
         /// </summary>
-        private static void AssignRtToPanel(Renderer panelRenderer, RenderTexture rt)
+        public void UpdatePanelTextures()
         {
-            if (panelRenderer == null || rt == null) return;
+            Texture activeRf = (rfRenderer != null && rfRenderer.IsInitialized && rfRenderer.Texture != null)
+                ? (Texture)rfRenderer.Texture
+                : rfFallbackTex;
+            AssignTextureToRenderer(panelRfRenderer, activeRf, rtRfWaterfall);
+
+            Texture activeDoppler = (dopplerRenderer != null && dopplerRenderer.IsInitialized && dopplerRenderer.Texture != null)
+                ? (Texture)dopplerRenderer.Texture
+                : dopplerFallbackTex;
+            AssignTextureToRenderer(panelDopplerRenderer, activeDoppler, rtDopplerScope);
+
+            AssignTextureToRenderer(panelAcousticRenderer, acousticTex, rtAcousticFft);
+            AssignTextureToRenderer(panelEwSmashRenderer, ewSmashTex, rtEwSmashPanel);
+        }
+
+        private static void AssignTextureToRenderer(Renderer panelRenderer, Texture activeTex, RenderTexture rtFallback)
+        {
+            if (panelRenderer == null) return;
+            Texture target = activeTex != null ? activeTex : (Texture)rtFallback;
+            if (target == null) return;
+
+            if (panelRenderer.sharedMaterial != null)
+            {
+                panelRenderer.sharedMaterial.mainTexture = target;
+                if (panelRenderer.sharedMaterial.HasProperty("_BaseMap"))
+                    panelRenderer.sharedMaterial.SetTexture("_BaseMap", target);
+            }
 
             var mpb = new MaterialPropertyBlock();
             panelRenderer.GetPropertyBlock(mpb);
-            mpb.SetTexture("_BaseMap", rt);
-            mpb.SetTexture("_MainTex", rt);
+            mpb.SetTexture("_BaseMap", target);
+            mpb.SetTexture("_MainTex", target);
             panelRenderer.SetPropertyBlock(mpb);
+        }
+
+        /// <summary>
+        /// Sets BOTH URP (_BaseMap) and legacy (_MainTex) texture properties on both material and MPB.
+        /// </summary>
+        private static void AssignRtToPanel(Renderer panelRenderer, RenderTexture rt)
+        {
+            AssignTextureToRenderer(panelRenderer, null, rt);
         }
 
         // ══════════════════════════════════════════════════════════
@@ -382,13 +664,20 @@ namespace TrishulSim.VR
         /// Renders an 8-band FFT bar chart into acousticTex matching
         /// AcousticFftRenderer doctrine: Band 2 = blade-tip harmonic,
         /// green < 40 dB, amber 40-55 dB, red > 55 dB.
+        /// In self-test mode, text uses electric blue to keep bar-height measurement unaffected.
         /// </summary>
-        public void RenderAcousticFft(float acousticSplDb)
+        public void RenderAcousticFft(float acousticSplDb, bool inSelfTest = false)
         {
             if (acousticTex == null || acousticPixels == null) return;
 
             lastAcousticDb = acousticSplDb;
-            Color bgColor = new Color(0.04f, 0.05f, 0.04f, 1f);
+            Color bgColor = new Color(0.02f, 0.035f, 0.02f, 1f);
+            Color brightGreen = new Color(0f, 0.95f, 0.35f, 1f);
+            Color dimGreen = new Color(0f, 0.50f, 0.18f, 1f);
+            Color testBlue = new Color(0.08f, 0.08f, 0.95f, 1f);
+
+            Color headerColor = inSelfTest ? testBlue : brightGreen;
+            Color scaleColor = inSelfTest ? testBlue : dimGreen;
 
             // Clear to background
             for (int i = 0; i < acousticPixels.Length; i++)
@@ -396,10 +685,11 @@ namespace TrishulSim.VR
 
             int bandWidth = AcousticTexWidth / AcousticBandCount;
             int gap = 4;
+            int baseY = 16;
+            int maxBarH = AcousticTexHeight - 42;
 
             for (int band = 0; band < AcousticBandCount; band++)
             {
-                // Compute per-band SPL: blade-tip band gets full signal, others roll off
                 float bandSpl;
                 if (band == BladeTipBandIndex)
                 {
@@ -412,33 +702,32 @@ namespace TrishulSim.VR
                     bandSpl = Mathf.Max(30f, acousticSplDb - rollOff);
                 }
 
-                // Compute bar height and color
                 float heightNorm;
                 Color barColor;
 
                 if (bandSpl < AcousticAmberThreshold)
                 {
                     heightNorm = Mathf.Clamp(bandSpl / AcousticAmberThreshold * 0.15f, 0.04f, 0.15f);
-                    barColor = new Color(0f, 1f, 0.53f, 1f); // #00FF88 soft green
+                    barColor = new Color(0f, 1f, 0.53f, 1f); // #00FF88
                 }
                 else if (bandSpl <= AcousticRedThreshold)
                 {
                     float t = (bandSpl - AcousticAmberThreshold) / (AcousticRedThreshold - AcousticAmberThreshold);
                     heightNorm = Mathf.Lerp(0.25f, 0.65f, t);
-                    barColor = new Color(1f, 0.702f, 0f, 1f); // #FFB300 amber
+                    barColor = new Color(1f, 0.702f, 0f, 1f); // #FFB300
                 }
                 else
                 {
                     float t = Mathf.Clamp01((bandSpl - AcousticRedThreshold) / (AcousticMaxDb - AcousticRedThreshold));
                     heightNorm = Mathf.Lerp(0.70f, 0.98f, t);
-                    barColor = new Color(0.8f, 0f, 0f, 1f); // #CC0000 red
+                    barColor = new Color(0.8f, 0f, 0f, 1f); // #CC0000
                 }
 
-                int barHeight = Mathf.RoundToInt(heightNorm * AcousticTexHeight);
+                int barHeight = Mathf.RoundToInt(heightNorm * maxBarH);
                 int x0 = band * bandWidth + gap / 2;
                 int x1 = (band + 1) * bandWidth - gap / 2;
 
-                for (int y = 0; y < barHeight; y++)
+                for (int y = baseY; y < baseY + barHeight; y++)
                 {
                     for (int x = x0; x < x1 && x < AcousticTexWidth; x++)
                     {
@@ -446,6 +735,25 @@ namespace TrishulSim.VR
                     }
                 }
             }
+
+            // Top Header Banner
+            DrawFilledRect(acousticPixels, AcousticTexWidth, 0, AcousticTexHeight - 15, AcousticTexWidth, 15, new Color(0f, 0.12f, 0.04f, 1f));
+            DrawText(acousticPixels, AcousticTexWidth, AcousticTexHeight, 22, AcousticTexHeight - 12, "ACOUSTIC SONAR ARRAY (8-BAND FFT)", headerColor);
+            DrawHLine(acousticPixels, AcousticTexWidth, 0, AcousticTexHeight - 16, AcousticTexWidth, scaleColor);
+
+            // Telemetry line
+            string peakStr = string.Format("PEAK: {0:F0} dB SPL @ 4.2kHz [4-PROP ROTOR]", acousticSplDb);
+            DrawText(acousticPixels, AcousticTexWidth, AcousticTexHeight, 8, AcousticTexHeight - 25, peakStr, headerColor);
+
+            // Bottom Frequency Scale
+            DrawFilledRect(acousticPixels, AcousticTexWidth, 0, 0, AcousticTexWidth, 15, new Color(0f, 0.12f, 0.04f, 1f));
+            DrawHLine(acousticPixels, AcousticTexWidth, 0, 15, AcousticTexWidth, scaleColor);
+            DrawText(acousticPixels, AcousticTexWidth, AcousticTexHeight, 6, 4, "63  125 250 500  1K  2K  4K  8K", scaleColor);
+
+            // Decibel scale marks on left
+            DrawText(acousticPixels, AcousticTexWidth, AcousticTexHeight, 2, 80, "80", scaleColor);
+            DrawText(acousticPixels, AcousticTexWidth, AcousticTexHeight, 2, 55, "55", scaleColor);
+            DrawText(acousticPixels, AcousticTexWidth, AcousticTexHeight, 2, 40, "40", scaleColor);
 
             acousticTex.SetPixels(acousticPixels);
             acousticTex.Apply();
@@ -456,85 +764,105 @@ namespace TrishulSim.VR
         // ══════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Renders EW jammer status + SMASH 2000 reticle crosshair into ewSmashTex.
-        /// Shows: band, azimuth, elevation, engaged state, ROE blackout warning,
-        /// and a crosshair with lead-angle offset.
+        /// Renders EW jammer status + SMASH 2000 reticle crosshair into ewSmashTex with complete military telemetry.
         /// </summary>
         public void RenderEwSmashPanel()
         {
             if (ewSmashTex == null || ewSmashPixels == null) return;
 
-            Color bgColor = new Color(0.03f, 0.04f, 0.03f, 1f);
-            Color textGreen = new Color(0f, 0.85f, 0.15f, 1f);
-            Color roeRed = new Color(0.9f, 0.1f, 0.1f, 1f);
+            int W = EwSmashTexWidth;
+            int H = EwSmashTexHeight;
+
+            Color bgColor = new Color(0.02f, 0.035f, 0.02f, 1f);
+            Color textGreen = new Color(0f, 0.85f, 0.20f, 1f);
+            Color brightGreen = new Color(0.2f, 1f, 0.4f, 1f);
+            Color dimGreen = new Color(0f, 0.45f, 0.15f, 1f);
+            Color roeRed = new Color(0.95f, 0.1f, 0.1f, 1f);
             Color engagedAmber = new Color(1f, 0.702f, 0f, 1f);
-            Color crosshairColor = new Color(0f, 1f, 0f, 1f);
-            Color hitGreen = new Color(0f, 1f, 0.4f, 1f);
+            Color crosshairColor = new Color(0f, 1f, 0.3f, 1f);
+            Color hitCyan = new Color(0.1f, 1f, 0.9f, 1f);
 
             // Clear background
             for (int i = 0; i < ewSmashPixels.Length; i++)
                 ewSmashPixels[i] = bgColor;
 
-            int W = EwSmashTexWidth;
-            int H = EwSmashTexHeight;
+            // Outer border
+            DrawRectOutline(ewSmashPixels, W, H, 1, 1, W - 2, H - 2, dimGreen);
 
-            // ── Left half: EW Jammer status ──────────────────────
-            // Engaged indicator bar (top-left)
-            Color engageColor = lastEwEngaged ? engagedAmber : textGreen;
-            DrawFilledRect(ewSmashPixels, W, 4, H - 16, 60, 10, engageColor);
+            // Top Header Banner
+            DrawFilledRect(ewSmashPixels, W, 2, H - 15, W - 4, 13, new Color(0f, 0.15f, 0.05f, 1f));
+            DrawText(ewSmashPixels, W, H, 24, H - 12, "EW JAMMER / SMASH 2000 FIRE CONTROL", brightGreen);
+            DrawHLine(ewSmashPixels, W, 2, H - 16, W - 4, dimGreen);
 
-            // Band indicator — colored bar at different X positions per band
-            int bandBarX;
-            if (Mathf.Abs(lastEwBandGHz - 0.915f) < 0.05f)
-                bandBarX = 4;
-            else if (Mathf.Abs(lastEwBandGHz - 2.4f) < 0.05f)
-                bandBarX = 28;
-            else
-                bandBarX = 52;
-            DrawFilledRect(ewSmashPixels, W, bandBarX, H - 32, 20, 8, textGreen);
+            // Vertical divider down middle
+            DrawVLine(ewSmashPixels, W, W / 2, 2, H - 18, dimGreen);
 
-            // Azimuth indicator — horizontal line at height proportional to 0-359
-            int azLine = Mathf.Clamp(Mathf.RoundToInt(lastAzimuthDeg / 359f * (H / 2 - 10)), 0, H / 2 - 10);
-            DrawHLine(ewSmashPixels, W, 4, azLine + 4, 60, textGreen);
+            // ── Left Half: EW Directional Jammer ─────────────────
+            DrawText(ewSmashPixels, W, H, 24, H - 28, "[ RF DIRECTIONAL JAMMER ]", brightGreen);
 
-            // Elevation indicator — small bar
-            int elLine = Mathf.Clamp(Mathf.RoundToInt((lastElevationDeg + 90f) / 180f * (H / 2 - 10)), 0, H / 2 - 10);
-            DrawHLine(ewSmashPixels, W, 70, elLine + 4, 40, textGreen);
+            string stateStr = lastEwEngaged ? "STATUS: [ENGAGED/TX]" : "STATUS: [STANDBY]";
+            Color stateCol = lastEwEngaged ? engagedAmber : textGreen;
+            DrawText(ewSmashPixels, W, H, 8, H - 42, stateStr, stateCol);
+            DrawFilledRect(ewSmashPixels, W, 8, H - 48, 60, 4, stateCol);
 
-            // ROE Blackout Warning — prominent red block
+            string bandStr = string.Format("BAND: {0:F2} GHz ISM", lastEwBandGHz);
+            DrawText(ewSmashPixels, W, H, 8, H - 60, bandStr, textGreen);
+            DrawText(ewSmashPixels, W, H, 8, H - 72, "RF PWR: 120W EIRP | BW: 20MHz", textGreen);
+
+            string slewStr = string.Format("AZ: {0:000} DEG  EL: {1:+00;-00;+00} DEG", lastAzimuthDeg, lastElevationDeg);
+            DrawText(ewSmashPixels, W, H, 8, H - 84, slewStr, textGreen);
+
+            // Azimuth/Elevation alignment bars
+            int azBar = Mathf.Clamp(Mathf.RoundToInt(lastAzimuthDeg / 359f * 100), 0, 100);
+            DrawFilledRect(ewSmashPixels, W, 8, H - 94, azBar, 5, textGreen);
+
+            // ROE Status Banner at bottom of left half
             if (lastBlackoutRisk)
             {
-                DrawFilledRect(ewSmashPixels, W, 4, H / 2 + 4, W / 2 - 8, 20, roeRed);
-                // Flash pattern: diagonal stripes
-                for (int y = H / 2 + 4; y < H / 2 + 24 && y < H; y++)
-                {
-                    for (int x = 4; x < W / 2 - 4; x++)
-                    {
-                        if ((x + y) % 8 < 4)
-                            ewSmashPixels[y * W + x] = bgColor;
-                    }
-                }
+                DrawFilledRect(ewSmashPixels, W, 6, 8, W / 2 - 12, 16, roeRed);
+                DrawText(ewSmashPixels, W, H, 10, 13, "*** ROE BLACKOUT RISK ***", Color.white);
+            }
+            else
+            {
+                DrawFilledRect(ewSmashPixels, W, 6, 8, W / 2 - 12, 16, new Color(0f, 0.25f, 0.08f, 1f));
+                DrawText(ewSmashPixels, W, H, 14, 13, "ROE: CLEAR [WEAPONS FREE]", brightGreen);
             }
 
-            // ── Right half: SMASH 2000 crosshair ────────────────
-            int cx = W * 3 / 4;
-            int cy = H / 2;
-            int crossLen = 20;
+            // ── Right Half: SMASH 2000 Smart Reticle ─────────────
+            DrawText(ewSmashPixels, W, H, W / 2 + 18, H - 28, "[ SMASH 2000 SMART RETICLE ]", brightGreen);
+            DrawText(ewSmashPixels, W, H, W / 2 + 8, H - 42, "TRACK: LOCK ACQUIRED", textGreen);
+            DrawText(ewSmashPixels, W, H, W / 2 + 8, H - 54, "RNG: 185m  SPEED: 18 m/s", textGreen);
 
-            // Crosshair lines
+            string leadStr = string.Format("LEAD: {0:+0.0;-0.0;+0.0} DEG", lastLeadAngleDeg);
+            DrawText(ewSmashPixels, W, H, W / 2 + 8, H - 66, leadStr, textGreen);
+
+            // Reticle Center
+            int cx = W * 3 / 4;
+            int cy = 46;
+            int crossLen = 14;
+
             DrawVLine(ewSmashPixels, W, cx, cy - crossLen, crossLen * 2, crosshairColor);
             DrawHLine(ewSmashPixels, W, cx - crossLen, cy, crossLen * 2, crosshairColor);
+            DrawCircleApprox(ewSmashPixels, W, H, cx, cy, 12, crosshairColor);
 
-            // Lead angle offset indicator — small dot offset from center
+            // Dynamic Lead Dot
             float leadRad = lastLeadAngleDeg * Mathf.Deg2Rad;
-            int leadX = cx + Mathf.RoundToInt(Mathf.Sin(leadRad) * 12f);
-            int leadY = cy + Mathf.RoundToInt(Mathf.Cos(leadRad) * 12f);
-            Color dotColor = lastKineticHit ? hitGreen : roeRed;
-            DrawFilledRect(ewSmashPixels, W, leadX - 2, leadY - 2, 5, 5, dotColor);
+            int leadX = cx + Mathf.RoundToInt(Mathf.Sin(leadRad) * 10f);
+            int leadY = cy + Mathf.RoundToInt(Mathf.Cos(leadRad) * 10f);
+            Color dotColor = lastKineticHit ? hitCyan : roeRed;
+            DrawFilledRect(ewSmashPixels, W, leadX - 1, leadY - 1, 3, 3, dotColor);
 
-            // Circle approximation around crosshair (octagon)
-            int r = 16;
-            DrawCircleApprox(ewSmashPixels, W, H, cx, cy, r, crosshairColor);
+            // Fire Solution Banner at bottom of right half
+            if (lastKineticHit)
+            {
+                DrawFilledRect(ewSmashPixels, W, W / 2 + 6, 8, W / 2 - 12, 16, new Color(0f, 0.3f, 0.35f, 1f));
+                DrawText(ewSmashPixels, W, H, W / 2 + 10, 13, ">> TARGET DESTROYED <<", hitCyan);
+            }
+            else
+            {
+                DrawFilledRect(ewSmashPixels, W, W / 2 + 6, 8, W / 2 - 12, 16, new Color(0f, 0.25f, 0.08f, 1f));
+                DrawText(ewSmashPixels, W, H, W / 2 + 10, 13, "FIRE SOLUTION: READY [SPACE]", brightGreen);
+            }
 
             ewSmashTex.SetPixels(ewSmashPixels);
             ewSmashTex.Apply();
@@ -550,34 +878,53 @@ namespace TrishulSim.VR
             int W = 256;
             int H = 128;
 
-            // Shift rows up
-            Color[] oldRows = rfFallbackTex.GetPixels(0, 0, W, H - 1);
-            rfFallbackTex.SetPixels(0, 1, W, H - 1, oldRows);
+            int winY0 = 18;
+            int winH = 82;
+            Color[] oldRows = rfFallbackTex.GetPixels(0, winY0, W, winH - 1);
+            rfFallbackTex.SetPixels(0, winY0 + 1, W, winH - 1, oldRows);
 
-            // Generate bottom row
             for (int x = 0; x < W; x++)
             {
-                float jitter = -90f + (float)(Math.Sin(x * 0.15) * 1.5);
+                float jitter = -90f + (float)(Math.Sin(x * 0.15 + Time.time * 2f) * 2.5);
                 rfFallbackRow[x] = UI.RfWaterfallRenderer.MapDbmToColor(jitter);
             }
 
-            if (peakGHz > 0.01f && peakDbm > -90f)
+            float sigGHz = peakGHz > 0.1f ? peakGHz : 2.437f;
+            float sigDbm = peakDbm > -85f ? peakDbm : -42f;
+            float normX = sigGHz / 6f;
+            int center = Mathf.Clamp(Mathf.RoundToInt(normX * (W - 1)), 0, W - 1);
+            for (int off = -5; off <= 5; off++)
             {
-                float normX = peakGHz / 6f;
-                int center = Mathf.Clamp(Mathf.RoundToInt(normX * (W - 1)), 0, W - 1);
-                for (int off = -4; off <= 4; off++)
+                int x = center + off;
+                if (x >= 0 && x < W)
                 {
-                    int x = center + off;
-                    if (x >= 0 && x < W)
-                    {
-                        float att = Mathf.Exp(-0.5f * off * off / 2f);
-                        float pwr = Mathf.Lerp(-90f, peakDbm, att);
-                        rfFallbackRow[x] = UI.RfWaterfallRenderer.MapDbmToColor(pwr);
-                    }
+                    float att = Mathf.Exp(-0.5f * off * off / 2f);
+                    float pwr = Mathf.Lerp(-90f, sigDbm, att);
+                    rfFallbackRow[x] = UI.RfWaterfallRenderer.MapDbmToColor(pwr);
                 }
             }
 
-            rfFallbackTex.SetPixels(0, 0, W, 1, rfFallbackRow);
+            rfFallbackTex.SetPixels(0, winY0, W, 1, rfFallbackRow);
+
+            Color dimGreen = new Color(0f, 0.55f, 0.20f, 1f);
+            Color brightGreen = new Color(0f, 0.95f, 0.35f, 1f);
+
+            Color[] allPixels = rfFallbackTex.GetPixels();
+            DrawFilledRect(allPixels, W, 0, H - 16, W, 16, new Color(0f, 0.12f, 0.04f, 1f));
+            DrawText(allPixels, W, H, 20, H - 12, "RF SPECTRUM WATERFALL (0.8 - 6.0 GHz)", brightGreen);
+            DrawHLine(allPixels, W, 0, H - 17, W, dimGreen);
+
+            DrawText(allPixels, W, H, 6, H - 26, string.Format("PEAK: {0:F0}dBm @ {1:F3}GHz [FHSS HOPPING]", sigDbm, sigGHz), brightGreen);
+
+            DrawFilledRect(allPixels, W, 0, 0, W, 16, new Color(0f, 0.12f, 0.04f, 1f));
+            DrawHLine(allPixels, W, 0, 16, W, dimGreen);
+            DrawText(allPixels, W, H, 14, 4, "915 MHz          2.4 GHz          5.8 GHz", dimGreen);
+
+            DrawText(allPixels, W, H, 2, 75, "-30", dimGreen);
+            DrawText(allPixels, W, H, 2, 50, "-60", dimGreen);
+            DrawText(allPixels, W, H, 2, 25, "-90", dimGreen);
+
+            rfFallbackTex.SetPixels(allPixels);
             rfFallbackTex.Apply();
         }
 
@@ -587,12 +934,15 @@ namespace TrishulSim.VR
 
         private void GenerateDopplerBackground()
         {
-            int S = 200;
+            int S = 256;
             float center = S / 2f;
-            float maxR = center - 2f;
-            Color bg = new Color(0.04f, 0.05f, 0.04f, 1f);
-            Color ring = new Color(0f, 0.35f, 0f, 1f);
-            Color axis = new Color(0f, 0.22f, 0f, 1f);
+            float maxR = 115f;
+            Color bg = new Color(0.02f, 0.04f, 0.02f, 1f);
+            Color ring = new Color(0f, 0.35f, 0.15f, 1f);
+            Color axis = new Color(0f, 0.22f, 0.10f, 1f);
+            Color outerBezel = new Color(0.03f, 0.035f, 0.03f, 1f);
+            Color dimGreen = new Color(0f, 0.60f, 0.25f, 1f);
+            Color brightGreen = new Color(0f, 0.95f, 0.35f, 1f);
 
             for (int y = 0; y < S; y++)
             {
@@ -601,26 +951,71 @@ namespace TrishulSim.VR
                     float dx = x - center;
                     float dy = y - center;
                     float dist = Mathf.Sqrt(dx * dx + dy * dy);
-                    if (dist > maxR) { dopplerBgPixels[y * S + x] = Color.black; continue; }
+
+                    if (dist > maxR)
+                    {
+                        dopplerBgPixels[y * S + x] = outerBezel;
+                        continue;
+                    }
+
                     float norm = dist / maxR;
-                    bool isRing = Mathf.Abs(norm - 0.25f) < 0.015f || Mathf.Abs(norm - 0.5f) < 0.015f || Mathf.Abs(norm - 0.75f) < 0.015f;
-                    bool isAxis = Mathf.Abs(dx) < 0.8f || Mathf.Abs(dy) < 0.8f;
+                    bool isRing = Mathf.Abs(norm - 0.33f) < 0.012f ||
+                                  Mathf.Abs(norm - 0.66f) < 0.012f ||
+                                  Mathf.Abs(norm - 0.99f) < 0.012f;
+                    bool isAxis = Mathf.Abs(dx) < 0.75f || Mathf.Abs(dy) < 0.75f;
                     dopplerBgPixels[y * S + x] = isRing ? ring : (isAxis ? axis : bg);
                 }
             }
+
+            // Draw corner MFD brackets
+            DrawCornerBracket(dopplerBgPixels, S, S, 4, 4, 12, dimGreen);
+            DrawCornerBracket(dopplerBgPixels, S, S, S - 16, 4, 12, dimGreen);
+            DrawCornerBracket(dopplerBgPixels, S, S, 4, S - 16, 12, dimGreen);
+            DrawCornerBracket(dopplerBgPixels, S, S, S - 16, S - 16, 12, dimGreen);
+
+            // Draw corner telemetry text outside the radar circle
+            DrawText(dopplerBgPixels, S, S, 6, 246, "L-BAND 1.28G", dimGreen);
+            DrawText(dopplerBgPixels, S, S, 6, 236, "PRF: 4000Hz", dimGreen);
+
+            DrawText(dopplerBgPixels, S, S, 180, 246, "SCAN: 360", dimGreen);
+            DrawText(dopplerBgPixels, S, S, 180, 236, "FMCW ACTIVE", dimGreen);
+
+            DrawText(dopplerBgPixels, S, S, 6, 16, "TGT: 01 TRACK", dimGreen);
+            DrawText(dopplerBgPixels, S, S, 6, 6, "RCS: 0.02m2", dimGreen);
+
+            DrawText(dopplerBgPixels, S, S, 180, 16, "SYS: ARMED", dimGreen);
+            DrawText(dopplerBgPixels, S, S, 180, 6, "THREAT: NOMINAL", dimGreen);
+
+            // Draw cardinal points inside radar
+            DrawText(dopplerBgPixels, S, S, 125, 234, "N", brightGreen);
+            DrawText(dopplerBgPixels, S, S, 125, 14, "S", brightGreen);
+            DrawText(dopplerBgPixels, S, S, 14, 125, "W", brightGreen);
+            DrawText(dopplerBgPixels, S, S, 238, 125, "E", brightGreen);
+
+            // Range markers along axis
+            DrawText(dopplerBgPixels, S, S, 160, 130, "150M", dimGreen);
+            DrawText(dopplerBgPixels, S, S, 196, 130, "300M", dimGreen);
+            DrawText(dopplerBgPixels, S, S, 230, 130, "500M", dimGreen);
+
+            // Top Header
+            DrawText(dopplerBgPixels, S, S, 58, 246, "MICRO-DOPPLER RADAR", brightGreen);
         }
 
 #if UNITY_5_3_OR_NEWER
         private void RenderDopplerFallback(Scenarios.SwarmAgentState[] swarm, Scenarios.SensorReadings sr)
         {
             if (dopplerFallbackTex == null) return;
-            int S = 200;
+            int S = 256;
             float center = S / 2f;
-            float maxR = center - 4f;
+            float maxR = 115f;
 
             Array.Copy(dopplerBgPixels, dopplerRenderBuf, dopplerBgPixels.Length);
 
-            if (swarm != null)
+            // Dynamic rotating sweep line
+            float sweepAngle = (Time.time * 2.2f) % (2f * Mathf.PI);
+            DrawSweepLine(dopplerRenderBuf, S, S, center, center, maxR, sweepAngle);
+
+            if (swarm != null && swarm.Length > 0)
             {
                 for (int i = 0; i < swarm.Length; i++)
                 {
@@ -633,17 +1028,17 @@ namespace TrishulSim.VR
                     float bearRad = Mathf.Atan2(agent.positionWorld.x, agent.positionWorld.z);
                     int px = Mathf.RoundToInt(center + pixDist * Mathf.Sin(bearRad));
                     int py = Mathf.RoundToInt(center + pixDist * Mathf.Cos(bearRad));
-                    int blipSz = agent.isDecoy ? 5 : 3;
-                    Color c = agent.isDecoy ? new Color(0.2f, 1f, 0.4f, 1f) : new Color(0f, 0.85f, 0.15f, 1f);
-                    int half = blipSz / 2;
-                    for (int dy = -half; dy <= half; dy++)
-                        for (int dx = -half; dx <= half; dx++)
-                        {
-                            int bx = px + dx, by = py + dy;
-                            if (bx >= 0 && bx < S && by >= 0 && by < S)
-                                dopplerRenderBuf[by * S + bx] = c;
-                        }
+                    DrawBlip(dopplerRenderBuf, S, S, px, py, agent.isDecoy, i + 1);
                 }
+            }
+            else
+            {
+                // Standalone simulated target at 185m bearing 45 deg
+                float simRange = 185f / 500f * maxR;
+                float simAngle = 45f * Mathf.Deg2Rad;
+                int px = Mathf.RoundToInt(center + simRange * Mathf.Sin(simAngle));
+                int py = Mathf.RoundToInt(center + simRange * Mathf.Cos(simAngle));
+                DrawBlip(dopplerRenderBuf, S, S, px, py, false, 1);
             }
 
             dopplerFallbackTex.SetPixels(dopplerRenderBuf);
@@ -652,15 +1047,30 @@ namespace TrishulSim.VR
 #endif
 
         // ══════════════════════════════════════════════════════════
-        // Pixel Drawing Helpers
+        // Pixel Drawing Helpers & Tactical Font Engine
         // ══════════════════════════════════════════════════════════
 
         private static void DrawFilledRect(Color[] buf, int bufW, int x0, int y0, int w, int h, Color c)
         {
+            int H = buf.Length / bufW;
             for (int y = y0; y < y0 + h; y++)
                 for (int x = x0; x < x0 + w; x++)
-                    if (x >= 0 && x < bufW && y >= 0 && y < buf.Length / bufW)
+                    if (x >= 0 && x < bufW && y >= 0 && y < H)
                         buf[y * bufW + x] = c;
+        }
+
+        private static void DrawRectOutline(Color[] buf, int bufW, int bufH, int x0, int y0, int w, int h, Color c)
+        {
+            DrawHLine(buf, bufW, x0, y0, w, c);
+            DrawHLine(buf, bufW, x0, y0 + h - 1, w, c);
+            DrawVLine(buf, bufW, x0, y0, h, c);
+            DrawVLine(buf, bufW, x0 + w - 1, y0, h, c);
+        }
+
+        private static void DrawCornerBracket(Color[] buf, int bufW, int bufH, int x, int y, int len, Color c)
+        {
+            DrawHLine(buf, bufW, x, y, len, c);
+            DrawVLine(buf, bufW, x, y, len, c);
         }
 
         private static void DrawHLine(Color[] buf, int bufW, int x0, int y, int len, Color c)
@@ -683,13 +1093,155 @@ namespace TrishulSim.VR
 
         private static void DrawCircleApprox(Color[] buf, int bufW, int bufH, int cx, int cy, int r, Color c)
         {
-            for (int angle = 0; angle < 360; angle += 3)
+            for (int angle = 0; angle < 360; angle += 4)
             {
                 float rad = angle * Mathf.Deg2Rad;
                 int px = cx + Mathf.RoundToInt(Mathf.Cos(rad) * r);
                 int py = cy + Mathf.RoundToInt(Mathf.Sin(rad) * r);
                 if (px >= 0 && px < bufW && py >= 0 && py < bufH)
                     buf[py * bufW + px] = c;
+            }
+        }
+
+        private static void DrawSweepLine(Color[] buf, int bufW, int bufH, float cx, float cy, float maxR, float angle)
+        {
+            Color bright = new Color(0.2f, 1f, 0.4f, 1f);
+            Color dim = new Color(0f, 0.4f, 0.15f, 1f);
+            int steps = Mathf.RoundToInt(maxR);
+            for (int r = 0; r < steps; r++)
+            {
+                int px = Mathf.RoundToInt(cx + r * Mathf.Sin(angle));
+                int py = Mathf.RoundToInt(cy + r * Mathf.Cos(angle));
+                if (px >= 0 && px < bufW && py >= 0 && py < bufH)
+                    buf[py * bufW + px] = bright;
+
+                float trailAngle = angle - 0.08f;
+                int tx = Mathf.RoundToInt(cx + r * Mathf.Sin(trailAngle));
+                int ty = Mathf.RoundToInt(cy + r * Mathf.Cos(trailAngle));
+                if (tx >= 0 && tx < bufW && ty >= 0 && ty < bufH)
+                    buf[ty * bufW + tx] = dim;
+            }
+        }
+
+        private static void DrawBlip(Color[] buf, int bufW, int bufH, int px, int py, bool isDecoy, int targetId)
+        {
+            Color c = isDecoy ? new Color(0.2f, 1f, 0.4f, 1f) : new Color(0f, 0.95f, 0.25f, 1f);
+            int sz = isDecoy ? 4 : 3;
+            DrawFilledRect(buf, bufW, px - sz / 2, py - sz / 2, sz, sz, c);
+            DrawCircleApprox(buf, bufW, bufH, px, py, 6, c);
+            DrawText(buf, bufW, bufH, px + 7, py - 3, "TGT-" + targetId.ToString("D2"), c);
+        }
+
+        private static readonly byte[][] GlyphTable = InitGlyphTable();
+
+        private static byte[][] InitGlyphTable()
+        {
+            var table = new byte[128][];
+            table['0'] = new byte[] { 0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E };
+            table['1'] = new byte[] { 0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E };
+            table['2'] = new byte[] { 0x0E, 0x11, 0x01, 0x06, 0x08, 0x10, 0x1F };
+            table['3'] = new byte[] { 0x1E, 0x01, 0x01, 0x0E, 0x01, 0x01, 0x1E };
+            table['4'] = new byte[] { 0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02 };
+            table['5'] = new byte[] { 0x1F, 0x10, 0x1E, 0x01, 0x01, 0x11, 0x0E };
+            table['6'] = new byte[] { 0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E };
+            table['7'] = new byte[] { 0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08 };
+            table['8'] = new byte[] { 0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E };
+            table['9'] = new byte[] { 0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x0C };
+
+            table['A'] = new byte[] { 0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11 };
+            table['B'] = new byte[] { 0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E };
+            table['C'] = new byte[] { 0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E };
+            table['D'] = new byte[] { 0x1C, 0x12, 0x11, 0x11, 0x11, 0x12, 0x1C };
+            table['E'] = new byte[] { 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F };
+            table['F'] = new byte[] { 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10 };
+            table['G'] = new byte[] { 0x0E, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0F };
+            table['H'] = new byte[] { 0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11 };
+            table['I'] = new byte[] { 0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E };
+            table['J'] = new byte[] { 0x07, 0x02, 0x02, 0x02, 0x02, 0x12, 0x0C };
+            table['K'] = new byte[] { 0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11 };
+            table['L'] = new byte[] { 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F };
+            table['M'] = new byte[] { 0x11, 0x1B, 0x15, 0x15, 0x11, 0x11, 0x11 };
+            table['N'] = new byte[] { 0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11 };
+            table['O'] = new byte[] { 0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E };
+            table['P'] = new byte[] { 0x1E, 0x11, 0x11, 0x1E, 0x10, 0x10, 0x10 };
+            table['Q'] = new byte[] { 0x0E, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0D };
+            table['R'] = new byte[] { 0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11 };
+            table['S'] = new byte[] { 0x0E, 0x11, 0x10, 0x0E, 0x01, 0x11, 0x0E };
+            table['T'] = new byte[] { 0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04 };
+            table['U'] = new byte[] { 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E };
+            table['V'] = new byte[] { 0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04 };
+            table['W'] = new byte[] { 0x11, 0x11, 0x11, 0x15, 0x15, 0x1B, 0x11 };
+            table['X'] = new byte[] { 0x11, 0x11, 0x0A, 0x04, 0x0A, 0x11, 0x11 };
+            table['Y'] = new byte[] { 0x11, 0x11, 0x0A, 0x04, 0x04, 0x04, 0x04 };
+            table['Z'] = new byte[] { 0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F };
+
+            table[':'] = new byte[] { 0x00, 0x0C, 0x0C, 0x00, 0x0C, 0x0C, 0x00 };
+            table['.'] = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x0C };
+            table['-'] = new byte[] { 0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00 };
+            table['+'] = new byte[] { 0x00, 0x04, 0x04, 0x1F, 0x04, 0x04, 0x00 };
+            table['/'] = new byte[] { 0x01, 0x02, 0x04, 0x08, 0x10, 0x00, 0x00 };
+            table['['] = new byte[] { 0x0E, 0x08, 0x08, 0x08, 0x08, 0x08, 0x0E };
+            table[']'] = new byte[] { 0x0E, 0x02, 0x02, 0x02, 0x02, 0x02, 0x0E };
+            table['('] = new byte[] { 0x04, 0x08, 0x10, 0x10, 0x10, 0x08, 0x04 };
+            table[')'] = new byte[] { 0x04, 0x02, 0x01, 0x01, 0x01, 0x02, 0x04 };
+            table['%'] = new byte[] { 0x19, 0x1A, 0x04, 0x08, 0x16, 0x13, 0x00 };
+            table['>'] = new byte[] { 0x10, 0x08, 0x04, 0x02, 0x04, 0x08, 0x10 };
+            table['<'] = new byte[] { 0x01, 0x02, 0x04, 0x08, 0x04, 0x02, 0x01 };
+            table['|'] = new byte[] { 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04 };
+            table['*'] = new byte[] { 0x00, 0x15, 0x0E, 0x1F, 0x0E, 0x15, 0x00 };
+            table['#'] = new byte[] { 0x0A, 0x0A, 0x1F, 0x0A, 0x1F, 0x0A, 0x0A };
+            table['@'] = new byte[] { 0x0E, 0x11, 0x17, 0x15, 0x17, 0x10, 0x0F };
+            table[' '] = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
+            return table;
+        }
+
+        public static void DrawText(Color[] buf, int bufW, int bufH, int startX, int startY, string text, Color color, int scale = 1)
+        {
+            if (buf == null || string.IsNullOrEmpty(text)) return;
+            int curX = startX;
+            for (int i = 0; i < text.Length; i++)
+            {
+                char ch = char.ToUpperInvariant(text[i]);
+                if (ch == ' ')
+                {
+                    curX += 4 * scale;
+                    continue;
+                }
+                if (ch < 128 && GlyphTable[ch] != null)
+                {
+                    byte[] glyph = GlyphTable[ch];
+                    for (int r = 0; r < 7; r++)
+                    {
+                        int rowVal = glyph[r];
+                        int pyBase = startY + (6 - r) * scale;
+                        for (int c = 0; c < 5; c++)
+                        {
+                            if ((rowVal & (1 << (4 - c))) != 0)
+                            {
+                                int pxBase = curX + c * scale;
+                                for (int dy = 0; dy < scale; dy++)
+                                {
+                                    int py = pyBase + dy;
+                                    if (py < 0 || py >= bufH) continue;
+                                    for (int dx = 0; dx < scale; dx++)
+                                    {
+                                        int px = pxBase + dx;
+                                        if (px >= 0 && px < bufW)
+                                        {
+                                            buf[py * bufW + px] = color;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    curX += (5 + 1) * scale;
+                }
+                else
+                {
+                    curX += 4 * scale;
+                }
             }
         }
 
@@ -780,7 +1332,7 @@ namespace TrishulSim.VR
         /// </summary>
         public void ManualRenderAcoustic(float db)
         {
-            RenderAcousticFft(db);
+            RenderAcousticFft(db, inSelfTest: true);
             if (rtAcousticFft != null)
                 Graphics.Blit(acousticTex, rtAcousticFft);
         }
@@ -834,6 +1386,7 @@ namespace TrishulSim.VR
             panelEwSmashRenderer = ewSmashPanel;
 
             threatTorusRenderer = torus;
+            AdjustThreatTorusPosition();
 
             if (acousticTex == null)
                 AllocateProceduralTextures();

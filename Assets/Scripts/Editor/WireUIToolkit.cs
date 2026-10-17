@@ -28,12 +28,13 @@ namespace TrishulSim.Editor
                 }
                 WirePrefab("Assets/Prefabs/InstructorC2Root.prefab", true);
                 WirePrefab("Assets/Prefabs/TraineeCockpitRoot.prefab", false);
+                TrishulSim.VR.Editor.VRHudSetup.ExportHudPrefabAndAssets(false);
                 AssetDatabase.SaveAssets();
                 Debug.Log("[WireUIToolkit] ✅ Successfully wired UI Toolkit documents to scenes and prefabs!");
             }
             catch (System.Exception ex)
             {
-                Debug.LogError("[WireUIToolkit] Error wiring UI Toolkit: " + ex.Message);
+                Debug.LogError("[WireUIToolkit] Error wiring UI Toolkit: " + ex.Message + "\n" + ex.StackTrace);
             }
         }
 
@@ -145,6 +146,29 @@ namespace TrishulSim.Editor
                 {
                     cockpitCtrl = cockpitRoot.AddComponent<CockpitController>();
                     modified = true;
+                }
+            }
+
+            // 3. VR Sentry Post (VRRig)
+            GameObject vrRig = null;
+            foreach (var rootGo in scene.GetRootGameObjects())
+            {
+                if (rootGo.name == "VRRig") vrRig = rootGo;
+            }
+            if (vrRig != null)
+            {
+                var env = GameObject.Find("Punjab_Military_Environment");
+                if (env == null || env.transform.childCount == 0)
+                {
+                    TrishulSim.VR.Editor.VRHudSetup.SetupPunjabEnvironment(false);
+                    modified = true;
+                    Debug.Log("[WireUIToolkit] Configured Punjab Military Environment in scene: " + scene.name);
+                }
+                if (vrRig.transform.Find("Panel_RF") == null || vrRig.GetComponent<TrishulSim.VR.VRHudController>() == null)
+                {
+                    TrishulSim.VR.Editor.VRHudSetup.SetupHudPanels(false);
+                    modified = true;
+                    Debug.Log("[WireUIToolkit] Configured VR HUD Panels on VRRig in scene: " + scene.name);
                 }
             }
 

@@ -44,3 +44,9 @@ AFFECTS: All phase plans; missions will be generated per this 4-track split.
 CHOSE: No new kit rules/packs required; one optional micro-addition (rules/stack/unity-cs.md, 3 lines) pending human approval.
 BECAUSE: All tech gaps are Unity/C# stdlib — no external vendor rules needed; existing WarRoom rules cover all process concerns.
 AFFECTS: Kit is frozen; unity-cs.md added only if human approves the diff in board/FIT-AUDIT.md.
+
+### 9 · Punjab military watchtower environment & fog   2026-10-17 · by Vinod (vr-gamepad)
+CHOSE: Centered Punjab watchtower FBX at origin with cabin door swung 75° open; removed Blender volumetric fog cube and used native Unity URP ExponentialSquared fog.
+BECAUSE: Blender volumetric fog exports as an opaque solid mesh to Unity FBX; URP native fog handles atmospheric riverine fog properly without occluding viewports; origin centering aligns sentry eye level (1.65m) and HUD panels seamlessly.
+AFFECTS: Assets/Scenes/VRSentryPost.unity, Assets/Models/punjab_military_terrain_watchtower.fbx, Assets/Scripts/VR/Editor/VRHudSetup.cs.
+

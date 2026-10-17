@@ -100,6 +100,7 @@ namespace TrishulSim.VR
         public OperationMode PreviousMode { get { return previousMode; } set { previousMode = value; } }
         public string VrSceneName { get { return vrSceneName; } set { vrSceneName = value; } }
         public string DesktopCockpitSceneName { get { return desktopCockpitSceneName; } set { desktopCockpitSceneName = value; } }
+        public string InstructorC2SceneName { get { return instructorC2SceneName; } set { instructorC2SceneName = value; } }
         public Camera LeftEyeCamera { get { return leftEyeCamera; } set { leftEyeCamera = value; } }
         public Camera RightEyeCamera { get { return rightEyeCamera; } set { rightEyeCamera = value; } }
         public Camera C2Camera { get { return c2Camera; } set { c2Camera = value; } }

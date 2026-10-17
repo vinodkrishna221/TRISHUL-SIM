@@ -79,6 +79,9 @@ namespace TrishulSim.Input
             TestCanonicalJsonControlSchemes();
             Console.WriteLine("[PASS] TestCanonicalJsonControlSchemes");
 
+            TestCameraLookAccumulationAndClamping();
+            Console.WriteLine("[PASS] TestCameraLookAccumulationAndClamping");
+
             TestNullSafetyWithoutCockpit();
             Console.WriteLine("[PASS] TestNullSafetyWithoutCockpit");
         }
@@ -96,7 +99,7 @@ namespace TrishulSim.Input
             // Assert map
             Assert(json.Contains("\"name\": \"Trainee\""), "Action map 'Trainee' must exist in TrishulInputActions.inputactions");
 
-            // Assert 7 actions
+            // Assert 8 actions
             string[] requiredActions = new string[]
             {
                 "JammerAzimuth",
@@ -105,7 +108,8 @@ namespace TrishulSim.Input
                 "ToggleJammer",
                 "BandUp",
                 "BandDown",
-                "Recalibrate"
+                "Recalibrate",
+                "CameraLook"
             };
 
             foreach (var act in requiredActions)
@@ -121,6 +125,7 @@ namespace TrishulSim.Input
             Assert(json.Contains("<Gamepad>/buttonNorth"), "Binding <Gamepad>/buttonNorth must exist");
             Assert(json.Contains("<Gamepad>/buttonWest"), "Binding <Gamepad>/buttonWest must exist");
             Assert(json.Contains("<Gamepad>/select"), "Binding <Gamepad>/select must exist");
+            Assert(json.Contains("<Gamepad>/rightStick"), "Binding <Gamepad>/rightStick must exist");
 
             // Assert keyboard fallbacks
             Assert(json.Contains("<Keyboard>/a"), "Keyboard fallback <Keyboard>/a must exist");
@@ -132,6 +137,10 @@ namespace TrishulSim.Input
             Assert(json.Contains("<Keyboard>/equals"), "Keyboard fallback <Keyboard>/equals must exist");
             Assert(json.Contains("<Keyboard>/minus"), "Keyboard fallback <Keyboard>/minus must exist");
             Assert(json.Contains("<Keyboard>/r"), "Keyboard fallback <Keyboard>/r must exist");
+            Assert(json.Contains("<Keyboard>/upArrow"), "Keyboard fallback <Keyboard>/upArrow must exist");
+            Assert(json.Contains("<Keyboard>/downArrow"), "Keyboard fallback <Keyboard>/downArrow must exist");
+            Assert(json.Contains("<Keyboard>/leftArrow"), "Keyboard fallback <Keyboard>/leftArrow must exist");
+            Assert(json.Contains("<Keyboard>/rightArrow"), "Keyboard fallback <Keyboard>/rightArrow must exist");
         }
 
         public static void TestAzimuthAccumulationAndWrapping()
@@ -413,6 +422,53 @@ namespace TrishulSim.Input
             Assert(json.Contains("\"name\": \"Keyboard\""), "CanonicalInputActionsJson must have Keyboard scheme");
             Assert(json.Contains("<Gamepad>/leftStick/x"), "CanonicalInputActionsJson must bind leftStick/x");
             Assert(json.Contains("<Keyboard>/a"), "CanonicalInputActionsJson must bind Keyboard a");
+            Assert(json.Contains("<Gamepad>/rightStick"), "CanonicalInputActionsJson must bind rightStick");
+            Assert(json.Contains("CameraLook"), "CanonicalInputActionsJson must define CameraLook action");
+        }
+
+        public static void TestCameraLookAccumulationAndClamping()
+        {
+            var controller = new GamepadInputController();
+
+            // 1. Initial camera yaw and pitch must be 0°
+            Assert(controller.CurrentCameraYaw == 0f, "Initial camera yaw must be 0°");
+            Assert(controller.CurrentCameraPitch == 0f, "Initial camera pitch must be 0°");
+
+            // 2. Deadzone filtering: deflection below deadzone (0.05 radial magnitude) has no effect
+            controller.ApplyCameraLookDelta(0.03f, 0.03f, 1.0f);
+            Assert(controller.CurrentCameraYaw == 0f, "Deadzone deflection should not change camera yaw");
+            Assert(controller.CurrentCameraPitch == 0f, "Deadzone deflection should not change camera pitch");
+
+            // 3. Full right deflection (+1.0) for 1 second at 60°/s must add 60° to yaw
+            controller.ApplyCameraLookDelta(1.0f, 0.0f, 1.0f);
+            Assert(Math.Abs(controller.CurrentCameraYaw - 60.0f) < 0.001f, "Full right deflection for 1s at 60°/s must add 60° to yaw");
+
+            // 4. Upward deflection (+1.0) tilts pitch up (-60°)
+            controller.ApplyCameraLookDelta(0.0f, 1.0f, 1.0f);
+            Assert(Math.Abs(controller.CurrentCameraPitch - (-60.0f)) < 0.001f, "Full up deflection for 1s at 60°/s must tilt pitch to -60°");
+
+            // 5. Pitch clamping at -80° minimum
+            controller.ApplyCameraLookDelta(0.0f, 1.0f, 1.0f);
+            Assert(Math.Abs(controller.CurrentCameraPitch - (-80.0f)) < 0.001f, "Pitch must clamp to -80° minimum");
+
+            // 6. Pitch clamping at +80° maximum
+            controller.ApplyCameraLookDelta(0.0f, -1.0f, 5.0f);
+            Assert(Math.Abs(controller.CurrentCameraPitch - 80.0f) < 0.001f, "Pitch must clamp to +80° maximum");
+
+            // 7. Yaw wrapping [0°, 360°)
+            var wrapController = new GamepadInputController();
+            // 7 seconds of right deflection at 60°/s = 420° -> wrapped to 60°
+            wrapController.ApplyCameraLookDelta(1.0f, 0.0f, 7.0f);
+            Assert(Math.Abs(wrapController.CurrentCameraYaw - 60.0f) < 0.001f, "Yaw 420° must wrap to 60°");
+
+            // Reverse deflection: 2 seconds at -1.0 = -120° -> 60 - 120 = -60° -> wrapped to 300°
+            wrapController.ApplyCameraLookDelta(-1.0f, 0.0f, 2.0f);
+            Assert(Math.Abs(wrapController.CurrentCameraYaw - 300.0f) < 0.001f, "Negative yaw -60° must wrap to 300°");
+
+            // 8. TriggerRecalibrate resets camera yaw and pitch
+            wrapController.TriggerRecalibrate();
+            Assert(wrapController.CurrentCameraYaw == 0f, "TriggerRecalibrate must reset camera yaw to 0°");
+            Assert(wrapController.CurrentCameraPitch == 0f, "TriggerRecalibrate must reset camera pitch to 0°");
         }
 
         public static void TestNullSafetyWithoutCockpit()
@@ -431,6 +487,8 @@ namespace TrishulSim.Input
             controller.TriggerRecalibrate();
             controller.PushStateToCockpit();
             controller.SyncWithCockpitState();
+            controller.ApplyCameraLook(0.5f, -0.5f);
+            controller.ApplyCameraLookDelta(0.5f, -0.5f, 0.016f);
         }
 
         private static void Assert(bool condition, string message)

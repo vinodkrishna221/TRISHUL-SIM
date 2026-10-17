@@ -31,6 +31,108 @@ namespace TrishulSim.VR.Editor
         private const string RT_DIR = "Assets/RenderTextures";
         private const string MAT_DIR = "Assets/Materials/VR";
         private const string PREFAB_DIR = "Assets/Prefabs/VR";
+        private const string PUNJAB_FBX_PATH = "Assets/Models/punjab_military_terrain_watchtower.fbx";
+
+        // ══════════════════════════════════════════════════════════
+        // Menu: Setup Punjab Environment & Watchtower
+        // ══════════════════════════════════════════════════════════
+
+        [MenuItem("TRISHUL-SIM/VR/Setup Punjab Watchtower Environment", false, 99)]
+        public static void SetupPunjabEnvironmentMenu()
+        {
+            SetupPunjabEnvironment(true);
+        }
+
+        public static GameObject SetupPunjabEnvironment(bool showDialog = false)
+        {
+            GameObject fbxAsset = AssetDatabase.LoadAssetAtPath<GameObject>(PUNJAB_FBX_PATH);
+            if (fbxAsset == null)
+            {
+                Debug.LogWarning("[VRHudSetup] Punjab terrain FBX not found at: " + PUNJAB_FBX_PATH);
+                return null;
+            }
+
+            GameObject envGo = GameObject.Find("Punjab_Military_Environment");
+            if (envGo == null)
+            {
+                envGo = (GameObject)PrefabUtility.InstantiatePrefab(fbxAsset);
+                if (envGo == null)
+                    envGo = Object.Instantiate(fbxAsset);
+                envGo.name = "Punjab_Military_Environment";
+            }
+
+            // Model is pre-centered in Blender directly at the watchtower sentry station (0, 0, 0):
+            envGo.transform.position = Vector3.zero;
+            envGo.transform.rotation = Quaternion.identity;
+            envGo.transform.localScale = Vector3.one;
+
+            // Configure glass transparency so the landscape is clearly visible through windows
+            foreach (var r in envGo.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                if (r.gameObject.name.Contains("Glass"))
+                {
+                    foreach (var mat in r.sharedMaterials)
+                    {
+                        if (mat != null)
+                        {
+                            if (mat.HasProperty("_Surface"))
+                                mat.SetFloat("_Surface", 1); // Transparent
+                            if (mat.HasProperty("_Blend"))
+                                mat.SetFloat("_Blend", 0);   // Alpha
+                            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+                            mat.SetOverrideTag("RenderType", "Transparent");
+                            if (mat.HasProperty("_BaseColor"))
+                            {
+                                Color c = mat.GetColor("_BaseColor");
+                                c.a = 0.25f;
+                                mat.SetColor("_BaseColor", c);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Hide the legacy primitive stub posts/rails so only the real Punjab Watchtower renders
+            GameObject oldTower = GameObject.Find("Watchtower");
+            if (oldTower != null)
+            {
+                foreach (Transform child in oldTower.transform)
+                {
+                    if (child.name.StartsWith("RailingPost_") || child.name.StartsWith("Rail_"))
+                    {
+                        var mr = child.GetComponent<MeshRenderer>();
+                        if (mr != null) mr.enabled = false;
+                    }
+                    if (child.name == "GroundQuad")
+                    {
+                        var mr = child.GetComponent<MeshRenderer>();
+                        if (mr != null) mr.enabled = false; // Real watchtower provides visual deck
+                    }
+                }
+            }
+
+            // Ensure VR HUD panels are set up cleanly
+            SetupHudPanels(false);
+
+            AssetDatabase.SaveAssets();
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
+                UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene()
+            );
+            Debug.Log("[VRHudSetup] Punjab Military Watchtower environment positioned and integrated with VR HUD.");
+
+            if (showDialog)
+            {
+                EditorUtility.DisplayDialog(
+                    "Punjab Watchtower Integrated",
+                    "Punjab border terrain and Military Watchtower added to VR scene.\n\n" +
+                    "• Cabin observation post aligned with VRRig at (0, 0, 0)\n" +
+                    "• HUD panels mapped across forward window and tactical console.\n\n" +
+                    "Save the scene to persist.",
+                    "OK"
+                );
+            }
+            return envGo;
+        }
 
         // Panel layout from VG-P1-C card spec
         private struct PanelSpec
@@ -55,22 +157,22 @@ namespace TrishulSim.VR.Editor
         {
             new PanelSpec(
                 "Panel_RF", "RF WATERFALL",
-                new Vector3(-2.0f, 1.5f, 2.5f), new Vector3(1.6f, 0.9f, 1f), new Vector3(0f, 30f, 0f),
-                512, 512, new Color(0f, 1f, 0.53f, 0.27f)
+                new Vector3(-1.42f, 1.68f, 2.20f), new Vector3(1.4f, 0.70f, 1f), new Vector3(0.65f, -32.84f, 0f),
+                512, 256, new Color(0f, 1f, 0.53f, 0.27f)
             ),
             new PanelSpec(
                 "Panel_Doppler", "MICRO-DOPPLER RADAR",
-                new Vector3(0f, 1.8f, 2.8f), new Vector3(1.6f, 1.6f, 1f), new Vector3(0f, 0f, 0f),
+                new Vector3(0f, 1.75f, 2.4f), new Vector3(1.5f, 1.5f, 1f), new Vector3(0f, 0f, 0f),
                 512, 512, new Color(0f, 1f, 0.53f, 0.27f)
             ),
             new PanelSpec(
                 "Panel_Acoustic", "ACOUSTIC SONAR",
-                new Vector3(2.0f, 1.5f, 2.5f), new Vector3(1.2f, 0.6f, 1f), new Vector3(0f, -30f, 0f),
+                new Vector3(1.42f, 1.68f, 2.20f), new Vector3(1.4f, 0.70f, 1f), new Vector3(0.65f, 32.84f, 0f),
                 512, 256, new Color(0f, 1f, 0.53f, 0.27f)
             ),
             new PanelSpec(
                 "Panel_EwSmash", "EW / SMASH 2000",
-                new Vector3(0f, 0.7f, 2.0f), new Vector3(1.8f, 0.8f, 1f), new Vector3(20f, 0f, 0f),
+                new Vector3(0f, 0.80f, 2.05f), new Vector3(1.7f, 0.75f, 1f), new Vector3(22f, 0f, 0f),
                 512, 256, new Color(0f, 1f, 0.53f, 0.27f)
             )
         };
@@ -88,8 +190,14 @@ namespace TrishulSim.VR.Editor
         // ══════════════════════════════════════════════════════════
 
         [MenuItem("TRISHUL-SIM/VR/Setup HUD Panels", false, 100)]
-        public static void SetupHudPanels()
+        public static void SetupHudPanelsMenu()
         {
+            SetupHudPanels(true);
+        }
+
+        public static void SetupHudPanels(bool showDialog = false)
+        {
+            CleanupDuplicateHudPanels();
             EnsureDirectory(RT_DIR);
             EnsureDirectory(MAT_DIR);
 
@@ -108,6 +216,14 @@ namespace TrishulSim.VR.Editor
             BuildPanelHierarchy(vrRig, mats, out panelRenderers, out torusRenderer);
             WireController(vrRig, rts, panelRenderers, torusRenderer);
 
+            // Wire GyroReceiver on VRRig if not present
+            var gyro = vrRig.GetComponent<TrishulSim.VR.GyroReceiver>();
+            if (gyro == null)
+            {
+                gyro = vrRig.AddComponent<TrishulSim.VR.GyroReceiver>();
+                Debug.Log("[VRHudSetup] Attached GyroReceiver to VRRig.");
+            }
+
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
@@ -115,11 +231,14 @@ namespace TrishulSim.VR.Editor
             );
 
             Debug.Log("[VRHudSetup] VR HUD panel setup complete! Save the scene.");
-            EditorUtility.DisplayDialog(
-                "VR HUD Setup Complete",
-                "4 floating panels, labels, threat torus, and VRHudController created.\n\nSave the scene to persist changes.",
-                "OK"
-            );
+            if (showDialog)
+            {
+                EditorUtility.DisplayDialog(
+                    "VR HUD Setup Complete",
+                    "4 floating panels, labels, threat torus, and VRHudController created.\n\nSave the scene to persist changes.",
+                    "OK"
+                );
+            }
         }
 
         // ══════════════════════════════════════════════════════════
@@ -127,8 +246,28 @@ namespace TrishulSim.VR.Editor
         // ══════════════════════════════════════════════════════════
 
         [MenuItem("TRISHUL-SIM/VR/Export HUD Prefab && Assets", false, 101)]
-        public static void ExportHudPrefabAndAssets()
+        public static void ExportHudPrefabAndAssetsMenu()
         {
+            ExportHudPrefabAndAssets(true);
+        }
+
+        public static void CleanupDuplicateHudPanels()
+        {
+            var scene = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
+            if (!scene.isLoaded) return;
+            foreach (var go in scene.GetRootGameObjects())
+            {
+                if (go != null && go.name == "VRHudPanels")
+                {
+                    Object.DestroyImmediate(go);
+                    Debug.Log("[VRHudSetup] Cleaned up orphaned root VRHudPanels.");
+                }
+            }
+        }
+
+        public static void ExportHudPrefabAndAssets(bool showDialog = false)
+        {
+            CleanupDuplicateHudPanels();
             EnsureDirectory(RT_DIR);
             EnsureDirectory(MAT_DIR);
             EnsureDirectory(PREFAB_DIR);
@@ -140,44 +279,53 @@ namespace TrishulSim.VR.Editor
             // Build a temporary root GO
             GameObject root = new GameObject("VRHudPanels");
             root.transform.position = Vector3.zero;
-
-            Renderer[] panelRenderers;
-            Renderer torusRenderer;
-            BuildPanelHierarchy(root, mats, out panelRenderers, out torusRenderer);
-            WireController(root, rts, panelRenderers, torusRenderer);
-
-            // Save as prefab
             string prefabPath = PREFAB_DIR + "/VRHudPanels.prefab";
-            GameObject existingPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-            if (existingPrefab != null)
-            {
-                PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
-                Debug.Log(string.Format("[VRHudSetup] Updated prefab: {0}", prefabPath));
-            }
-            else
-            {
-                PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
-                Debug.Log(string.Format("[VRHudSetup] Created prefab: {0}", prefabPath));
-            }
 
-            // Destroy temp root from scene
-            Object.DestroyImmediate(root);
+            try
+            {
+                Renderer[] panelRenderers;
+                Renderer torusRenderer;
+                BuildPanelHierarchy(root, mats, out panelRenderers, out torusRenderer);
+                WireController(root, rts, panelRenderers, torusRenderer);
+
+                // Save as prefab
+                GameObject existingPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+                if (existingPrefab != null)
+                {
+                    PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+                    Debug.Log(string.Format("[VRHudSetup] Updated prefab: {0}", prefabPath));
+                }
+                else
+                {
+                    PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+                    Debug.Log(string.Format("[VRHudSetup] Created prefab: {0}", prefabPath));
+                }
+            }
+            finally
+            {
+                // Always destroy temp root from scene
+                if (root != null)
+                    Object.DestroyImmediate(root);
+            }
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
             Debug.Log("[VRHudSetup] Prefab & asset export complete.");
-            EditorUtility.DisplayDialog(
-                "VR HUD Export Complete",
-                string.Format(
-                    "Exported:\n" +
-                    "• 4 RenderTextures → {0}/\n" +
-                    "• 4 + 1 Materials → {1}/\n" +
-                    "• Prefab → {2}\n\n" +
-                    "These files can be committed to Git now.",
-                    RT_DIR, MAT_DIR, prefabPath),
-                "OK"
-            );
+            if (showDialog)
+            {
+                EditorUtility.DisplayDialog(
+                    "VR HUD Export Complete",
+                    string.Format(
+                        "Exported:\n" +
+                        "• 4 RenderTextures → {0}/\n" +
+                        "• 4 + 1 Materials → {1}/\n" +
+                        "• Prefab → {2}\n\n" +
+                        "These files can be committed to Git now.",
+                        RT_DIR, MAT_DIR, prefabPath),
+                    "OK"
+                );
+            }
         }
 
         // ══════════════════════════════════════════════════════════
@@ -231,6 +379,11 @@ namespace TrishulSim.VR.Editor
                     AssetDatabase.CreateAsset(mats[i], matPath);
                     Debug.Log(string.Format("[VRHudSetup] Created Material: {0}", matPath));
                 }
+                else if (mats[i].shader == null || mats[i].shader.name == "Hidden/InternalErrorShader")
+                {
+                    mats[i].shader = FindBestUnlitShader();
+                    EditorUtility.SetDirty(mats[i]);
+                }
             }
 
             // Torus material
@@ -254,6 +407,11 @@ namespace TrishulSim.VR.Editor
 
                 AssetDatabase.CreateAsset(mats[4], torusMatPath);
                 Debug.Log("[VRHudSetup] Created ThreatTorus material.");
+            }
+            else if (mats[4].shader == null || mats[4].shader.name == "Hidden/InternalErrorShader")
+            {
+                mats[4].shader = FindBestUnlitShader();
+                EditorUtility.SetDirty(mats[4]);
             }
 
             return mats;
@@ -295,7 +453,8 @@ namespace TrishulSim.VR.Editor
                 {
                     GameObject labelGo = new GameObject(labelName);
                     labelGo.transform.SetParent(panel.transform, false);
-                    labelGo.transform.localPosition = new Vector3(0f, 0.65f, 0f);
+                    float labelY = (i == 1) ? 0.82f : ((i == 3) ? 0.44f : 0.55f);
+                    labelGo.transform.localPosition = new Vector3(0f, labelY, 0f);
                     labelGo.transform.localScale = new Vector3(0.5f / Panels[i].scale.x, 0.5f / Panels[i].scale.y, 1f);
                     labelGo.transform.localEulerAngles = Vector3.zero;
 
@@ -328,22 +487,23 @@ namespace TrishulSim.VR.Editor
                 if (torusTransform != null)
                 {
                     torusGo = torusTransform.gameObject;
+                    var mf = torusGo.GetComponent<MeshFilter>();
+                    if (mf != null && (mf.sharedMesh == null || mf.sharedMesh.name.Contains("Cylinder")))
+                    {
+                        mf.sharedMesh = VRHudController.CreateRingMesh(0.485f, 0.525f, 64);
+                    }
                 }
                 else
                 {
-                    torusGo = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                    torusGo.name = torusName;
+                    torusGo = new GameObject(torusName);
                     torusGo.transform.SetParent(dopplerPanel, false);
-                    torusGo.transform.localPosition = Vector3.zero;
-                    torusGo.transform.localScale = new Vector3(
-                        1.8f / dopplerPanel.localScale.x,
-                        0.02f / dopplerPanel.localScale.y,
-                        1.8f / dopplerPanel.localScale.z
-                    );
-                    torusGo.transform.localEulerAngles = new Vector3(90f, 0f, 0f);
-                    var collider = torusGo.GetComponent<Collider>();
-                    if (collider != null) Object.DestroyImmediate(collider);
+                    var mf = torusGo.AddComponent<MeshFilter>();
+                    mf.sharedMesh = VRHudController.CreateRingMesh(0.485f, 0.525f, 64);
+                    torusGo.AddComponent<MeshRenderer>();
                 }
+                torusGo.transform.localPosition = new Vector3(0f, 0f, -0.005f);
+                torusGo.transform.localRotation = Quaternion.identity;
+                torusGo.transform.localScale = Vector3.one;
 
                 torusGo.GetComponent<MeshRenderer>().sharedMaterial = mats[4];
                 torusRenderer = torusGo.GetComponent<MeshRenderer>();

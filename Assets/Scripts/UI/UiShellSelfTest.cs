@@ -609,6 +609,32 @@ namespace TrishulSim.UI
         {
             field.value = newVal;
         }
+
+        public static void SimulateClick(this Button button)
+        {
+            if (button == null) return;
+            var clickable = button.clickable;
+            if (clickable != null)
+            {
+                var invokeMethod = typeof(Clickable).GetMethod("Invoke", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (invokeMethod != null)
+                {
+                    invokeMethod.Invoke(clickable, new object[] { null });
+                    return;
+                }
+
+                var clickedField = typeof(Clickable).GetField("clicked", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (clickedField != null)
+                {
+                    var action = clickedField.GetValue(clickable) as Action;
+                    if (action != null)
+                    {
+                        action.Invoke();
+                        return;
+                    }
+                }
+            }
+        }
     }
 #endif
 
