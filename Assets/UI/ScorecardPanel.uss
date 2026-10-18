@@ -1,11 +1,27 @@
 /* ============================================================
    ScorecardPanel.uss — Tactical Performance Scorecard Stylesheet
-   TRISHUL-SIM · UX-P1-D · MIL-STD-2525 colour palette
+   TRISHUL-SIM · UX-P1-D / UX-P2-C · MIL-STD-2525 palette
+   via CSS custom properties
    ============================================================ */
 
+/* --- CSS Custom Properties (MIL-STD-2525) --- */
+:root {
+    --mil-green: #00B300;
+    --mil-amber: #FFB300;
+    --mil-red: #CC0000;
+    --bg: #0E0E0E;
+    --bg-section: #121212;
+    --border-default: #222222;
+    --border-subtle: #1A1A1A;
+    --text-primary: #E0E0E0;
+    --text-bright: #FFFFFF;
+    --text-muted: #888888;
+    --text-dim: #777777;
+}
+
 .scorecard-root {
-    background-color: #0E0E0E;
-    color: #E0E0E0;
+    background-color: var(--bg);
+    color: var(--text-primary);
     font-size: 13px;
     padding: 12px 16px;
     border-radius: 6px;
@@ -18,14 +34,14 @@
 .scorecard-header {
     margin-bottom: 12px;
     border-bottom-width: 1px;
-    border-bottom-color: #222222;
+    border-bottom-color: var(--border-default);
     padding-bottom: 8px;
 }
 
 .scorecard-title {
     font-size: 16px;
     -unity-font-style: bold;
-    color: #00B300; /* MIL-STD-2525 GREEN */
+    color: var(--mil-green);
     letter-spacing: 2px;
     margin-bottom: 4px;
 }
@@ -39,13 +55,13 @@
 
 .scenario-name {
     font-size: 13px;
-    color: #FFFFFF;
+    color: var(--text-bright);
     -unity-font-style: bold;
 }
 
 .trainee-id-label {
     font-size: 12px;
-    color: #888888;
+    color: var(--text-muted);
 }
 
 /* --- Doctrine Badge --- */
@@ -66,18 +82,18 @@
 }
 
 .badge-pass {
-    background-color: #00B300; /* MIL-STD-2525 GREEN */
+    background-color: var(--mil-green);
 }
 
 .badge-fail {
-    background-color: #CC0000; /* MIL-STD-2525 RED */
+    background-color: var(--mil-red);
 }
 
 /* --- Section Headings --- */
 .section-title {
     font-size: 11px;
     -unity-font-style: bold;
-    color: #888888;
+    color: var(--text-muted);
     letter-spacing: 1.5px;
     margin-bottom: 6px;
 }
@@ -85,11 +101,11 @@
 /* --- Metrics Table --- */
 .metrics-section {
     margin-bottom: 14px;
-    background-color: #121212;
+    background-color: var(--bg-section);
     border-radius: 4px;
     padding: 8px 10px;
     border-width: 1px;
-    border-color: #222222;
+    border-color: var(--border-default);
 }
 
 .metrics-header-row {
@@ -103,14 +119,14 @@
 .th-metric {
     flex: 3;
     font-size: 10px;
-    color: #777777;
+    color: var(--text-dim);
     -unity-font-style: bold;
 }
 
 .th-value {
     flex: 2;
     font-size: 10px;
-    color: #777777;
+    color: var(--text-dim);
     -unity-font-style: bold;
     -unity-text-align: middle-left;
 }
@@ -118,7 +134,7 @@
 .th-benchmark {
     flex: 2;
     font-size: 10px;
-    color: #777777;
+    color: var(--text-dim);
     -unity-font-style: bold;
     -unity-text-align: middle-left;
 }
@@ -126,7 +142,7 @@
 .th-verdict {
     flex: 1.5;
     font-size: 10px;
-    color: #777777;
+    color: var(--text-dim);
     -unity-font-style: bold;
     -unity-text-align: middle-center;
 }
@@ -136,7 +152,7 @@
     align-items: center;
     padding: 3px 0;
     border-bottom-width: 1px;
-    border-bottom-color: #1A1A1A;
+    border-bottom-color: var(--border-subtle);
 }
 
 .metric-col-name {
@@ -148,14 +164,14 @@
 .metric-col-val {
     flex: 2;
     font-size: 12px;
-    color: #FFFFFF;
+    color: var(--text-bright);
     -unity-font-style: bold;
 }
 
 .metric-col-bench {
     flex: 2;
     font-size: 11px;
-    color: #888888;
+    color: var(--text-muted);
 }
 
 .metric-col-verdict {
@@ -166,24 +182,24 @@
 }
 
 .metric-pass {
-    color: #00B300; /* MIL-STD-2525 GREEN */
+    color: var(--mil-green);
 }
 
 .metric-fail {
-    color: #CC0000; /* MIL-STD-2525 RED */
+    color: var(--mil-red);
 }
 
 .metric-info {
-    color: #888888;
+    color: var(--text-muted);
 }
 
 /* --- Timeline Section --- */
 .timeline-section {
-    background-color: #121212;
+    background-color: var(--bg-section);
     border-radius: 4px;
     padding: 8px 10px;
     border-width: 1px;
-    border-color: #222222;
+    border-color: var(--border-default);
     margin-bottom: 12px;
 }
 
@@ -197,7 +213,7 @@
 .timeline-time {
     font-size: 13px;
     -unity-font-style: bold;
-    color: #FFB300; /* MIL-STD-2525 AMBER */
+    color: var(--mil-amber);
     letter-spacing: 1px;
 }
 
@@ -301,7 +317,7 @@
 }
 
 .dot-attacker {
-    background-color: #CC0000; /* Attacker Red */
+    background-color: var(--mil-red); /* Attacker Red */
 }
 
 .dot-neutralised {
@@ -329,7 +345,7 @@
 
 .legend-text {
     font-size: 10px;
-    color: #888888;
+    color: var(--text-muted);
 }
 
 /* --- Actions & PDF Export (UX-P2-A) --- */
@@ -345,7 +361,7 @@
 }
 
 .btn-pdf-export {
-    background-color: #00B300;
+    background-color: var(--mil-green);
     color: #FFFFFF;
     border-color: #009900;
     font-size: 12px;
@@ -362,7 +378,7 @@
     width: 18px;
     height: 18px;
     border-width: 2px;
-    border-color: #00B300;
+    border-color: var(--mil-green);
     border-top-color: rgba(0, 0, 0, 0);
     border-radius: 9px;
     margin-left: 8px;
@@ -371,13 +387,13 @@
 
 .pdf-status-label {
     font-size: 11px;
-    color: #00B300;
+    color: var(--mil-green);
     margin-top: 4px;
 }
 
 .pdf-error-label {
     font-size: 11px;
-    color: #CC0000;
+    color: var(--mil-red);
     margin-top: 4px;
     -unity-font-style: bold;
 }

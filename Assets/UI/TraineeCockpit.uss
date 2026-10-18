@@ -1,12 +1,29 @@
 /* ============================================================
    TraineeCockpit.uss — Trainee Cockpit Stylesheet
-   TRISHUL-SIM · UX-P0-A / UX-P1-A / UX-P1-B · MIL-STD-2525 palette
+   TRISHUL-SIM · UX-P0-A / UX-P1-A / UX-P1-B / UX-P2-C
+   MIL-STD-2525 palette via CSS custom properties
    ============================================================ */
+
+/* --- CSS Custom Properties (MIL-STD-2525) --- */
+:root {
+    --mil-green: #00B300;
+    --mil-amber: #FFB300;
+    --mil-red: #CC0000;
+    --bg: #0D0D0D;
+    --bg-panel: #111111;
+    --bg-controls: #141414;
+    --bg-dark: #181818;
+    --border-default: #333333;
+    --border-subtle: #2A2A2A;
+    --text-primary: #E0E0E0;
+    --text-muted: #888888;
+    --text-dim: #555555;
+}
 
 /* --- Root --- */
 .cockpit-root {
-    background-color: #0D0D0D;
-    color: #E0E0E0;
+    background-color: var(--bg);
+    color: var(--text-primary);
     font-size: 14px;
     flex-grow: 1;
     padding: 8px;
@@ -21,6 +38,8 @@
     margin-bottom: 8px;
     border-radius: 4px;
     min-height: 32px;
+    transition-duration: 0.3s;
+    transition-property: background-color, opacity;
 }
 
 .threat-text {
@@ -32,15 +51,32 @@
 }
 
 .threat-green {
-    background-color: #00B300; /* MIL-STD-2525 GREEN */
+    background-color: var(--mil-green);
 }
 
 .threat-amber {
-    background-color: #FFB300; /* MIL-STD-2525 AMBER */
+    background-color: var(--mil-amber);
 }
 
 .threat-red {
-    background-color: #CC0000; /* MIL-STD-2525 RED */
+    background-color: var(--mil-red);
+}
+
+/* --- Threat RED Pulse Animation --- */
+.threat-red-pulse {
+    background-color: var(--mil-red);
+}
+
+/* USS does not support @keyframes natively; pulse is driven by
+   CockpitController toggling opacity between 1.0 and 0.4 on a
+   coroutine timer. The transition-duration above provides the smooth
+   fade. The class names below are toggled programmatically: */
+.pulse-bright {
+    opacity: 1.0;
+}
+
+.pulse-dim {
+    opacity: 0.4;
 }
 
 /* --- Sensor Row --- */
@@ -55,23 +91,38 @@
     flex-grow: 1;
     flex-basis: 0;
     margin: 0 4px;
-    background-color: #111111;
+    background-color: var(--bg-panel);
     border-width: 1px;
-    border-color: #333333;
+    border-color: var(--border-default);
     border-radius: 4px;
     padding: 4px;
     min-width: 200px;
+    transition-duration: 0.3s;
+    transition-property: border-color;
+}
+
+/* Sensor pane borders follow threat state */
+.sensor-pane-green {
+    border-color: var(--mil-green);
+}
+
+.sensor-pane-amber {
+    border-color: var(--mil-amber);
+}
+
+.sensor-pane-red {
+    border-color: var(--mil-red);
 }
 
 .pane-title {
     font-size: 11px;
     -unity-font-style: bold;
-    color: #00B300;
+    color: var(--mil-green);
     letter-spacing: 2px;
     -unity-text-align: upper-center;
     padding: 4px 0;
     border-bottom-width: 1px;
-    border-bottom-color: #2A2A2A;
+    border-bottom-color: var(--border-subtle);
     margin-bottom: 4px;
 }
 
@@ -92,7 +143,7 @@
 
 .stub-label {
     font-size: 11px;
-    color: #555555;
+    color: var(--text-dim);
     -unity-font-style: italic;
     -unity-text-align: middle-center;
 }
@@ -112,7 +163,7 @@
 /* --- Sensor Reading Labels --- */
 .sensor-reading {
     font-size: 11px;
-    color: #888888;
+    color: var(--text-muted);
     -unity-text-align: upper-center;
     padding: 4px 0;
 }
@@ -154,7 +205,7 @@
 }
 
 .reticle-miss .reticle-ring {
-    border-color: #CC0000;
+    border-color: var(--mil-red);
     background-color: rgba(204, 0, 0, 0.25);
 }
 
@@ -197,20 +248,20 @@
 .controls-row {
     flex-direction: row;
     padding: 8px;
-    background-color: #141414;
+    background-color: var(--bg-controls);
     border-radius: 4px;
     border-width: 1px;
-    border-color: #2A2A2A;
+    border-color: var(--border-subtle);
     margin-bottom: 8px;
 }
 
 .controls-panel {
     flex-grow: 1;
     flex-basis: 0;
-    background-color: #181818;
+    background-color: var(--bg-dark);
     border-radius: 4px;
     border-width: 1px;
-    border-color: #333333;
+    border-color: var(--border-default);
     padding: 8px;
     margin: 0 4px;
 }
@@ -218,11 +269,11 @@
 .panel-label {
     font-size: 12px;
     -unity-font-style: bold;
-    color: #00B300;
+    color: var(--mil-green);
     letter-spacing: 1px;
     margin-bottom: 6px;
     border-bottom-width: 1px;
-    border-bottom-color: #2A2A2A;
+    border-bottom-color: var(--border-subtle);
     padding-bottom: 2px;
 }
 
@@ -246,7 +297,7 @@
     font-size: 11px;
     -unity-font-style: bold;
     color: #FFFFFF;
-    background-color: #CC0000; /* MIL-STD-2525 RED */
+    background-color: var(--mil-red);
     padding: 4px 8px;
     border-radius: 3px;
     -unity-text-align: middle-center;
@@ -272,7 +323,7 @@
 .smash-lock-label {
     font-size: 11px;
     -unity-font-style: bold;
-    color: #888888;
+    color: var(--text-muted);
 }
 
 .locked-active {
@@ -281,7 +332,7 @@
 
 .smash-lead-label {
     font-size: 11px;
-    color: #00B300;
+    color: var(--mil-green);
     -unity-font-style: bold;
 }
 
@@ -294,7 +345,7 @@
     letter-spacing: 2px;
     border-radius: 4px;
     border-width: 1px;
-    border-color: #CC0000;
+    border-color: var(--mil-red);
     margin-top: 4px;
     margin-bottom: 4px;
 }
@@ -318,27 +369,27 @@
 }
 
 .feedback-hit {
-    background-color: #00B300;
+    background-color: var(--mil-green);
     color: #FFFFFF;
 }
 
 .feedback-miss {
-    background-color: #CC0000;
+    background-color: var(--mil-red);
     color: #FFFFFF;
 }
 
 /* --- Scorecard Panel (stub) --- */
 .scorecard-panel {
     padding: 16px;
-    background-color: #141414;
+    background-color: var(--bg-controls);
     border-radius: 4px;
     border-width: 1px;
-    border-color: #2A2A2A;
+    border-color: var(--border-subtle);
 }
 
 .scorecard-stub {
     font-size: 14px;
-    color: #888888;
+    color: var(--text-muted);
     -unity-font-style: italic;
     -unity-text-align: middle-center;
 }
@@ -358,8 +409,47 @@
 .computing-text {
     font-size: 20px;
     -unity-font-style: bold;
-    color: #FFB300;
+    color: var(--mil-amber);
     letter-spacing: 2px;
+}
+
+/* ============================================================
+   NIGHT MODE (UX-P2-C) — Punjab Pincer / isNight=true
+   Applied by CockpitController when WeatherPreset.isNight == true
+   ============================================================ */
+
+/* Pitch-black background — PRD §3 Beat 4 aesthetic */
+.night-mode {
+    background-color: #000000;
+}
+
+/* Glowing sensor pane borders in night mode */
+.night-mode .sensor-pane {
+    border-color: var(--mil-green);
+    border-width: 2px;
+}
+
+/* Night-mode pane titles glow brighter */
+.night-mode .pane-title {
+    color: #33FF33;
+}
+
+/* Night-mode controls panel subtle green accent */
+.night-mode .controls-row {
+    background-color: #0A0A0A;
+    border-color: #1A3A1A;
+}
+
+/* ============================================================
+   FOG OVERLAY (UX-P2-C)
+   Placed behind sensors as a subtle atmospheric haze
+   ============================================================ */
+.fog-overlay {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-color: #B0C4DE;
+    opacity: 0.12;
 }
 
 /* --- Utility --- */

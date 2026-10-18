@@ -318,10 +318,19 @@ namespace UnityEngine
         public T AddComponent<T>() where T : Component, new() { return new T(); }
     }
 
+    public sealed class Coroutine { }
+
+    public class WaitForSeconds
+    {
+        public WaitForSeconds(float seconds) { }
+    }
+
     public class MonoBehaviour : Component
     {
         public static void DontDestroyOnLoad(Object target) { }
         public static void Destroy(Object obj) { }
+        public Coroutine StartCoroutine(System.Collections.IEnumerator routine) { return new Coroutine(); }
+        public void StopCoroutine(Coroutine routine) { }
     }
 
     public class TextAsset : Object
@@ -423,6 +432,7 @@ namespace UnityEngine.UIElements
         public Color backgroundColor { get; set; }
         public Length borderTopLeftRadius { get; set; }
         public Length borderTopRightRadius { get; set; }
+        public float opacity { get; set; }
     }
 
     public class VisualElement
@@ -436,6 +446,15 @@ namespace UnityEngine.UIElements
         public int childCount { get { return children.Count; } }
 
         public void Add(VisualElement child) { if (child != null) children.Add(child); }
+        public void Insert(int index, VisualElement child)
+        {
+            if (child != null)
+            {
+                if (index < 0) index = 0;
+                if (index > children.Count) index = children.Count;
+                children.Insert(index, child);
+            }
+        }
         public void Clear() { children.Clear(); }
         public List<VisualElement> Children() { return new List<VisualElement>(children); }
         public void AddToClassList(string className)
@@ -451,16 +470,18 @@ namespace UnityEngine.UIElements
             return classes.Contains(className);
         }
 
-        public T Q<T>(string elementName = null) where T : VisualElement
+        public T Q<T>(string elementName = null, string className = null) where T : VisualElement
         {
             foreach (var child in children)
             {
-                if (elementName == null || child.name == elementName)
+                bool matchName = elementName == null || child.name == elementName;
+                bool matchClass = className == null || child.ClassListContains(className);
+                if (matchName && matchClass)
                 {
                     var casted = child as T;
                     if (casted != null) return casted;
                 }
-                var nested = child.Q<T>(elementName);
+                var nested = child.Q<T>(elementName, className);
                 if (nested != null) return nested;
             }
             return null;

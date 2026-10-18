@@ -279,7 +279,7 @@ TEST:
   Threat indicator pulses red during RED state.
   Switch to Desert FOB (isNight=false): lighter background.
 DEMO: ⭐ "Pitch-black screen + two sensor panes — visual centrepiece of Beat 4." (Beat 4 aesthetic)
-STATUS: [ ] todo
+STATUS: [x] done — 2026-10-16 (CSS vars, night-mode, fog overlay, pulse, sensor borders; ScorecardSelfTest 7/7 PASS)
 ```
 
 ---
