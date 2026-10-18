@@ -241,6 +241,7 @@ MonoBehaviour:
   traineeCockpitSceneName: TraineeCockpit
   twoLaptopSceneName: InstructorC2
   splitScreenSceneName: SplitScreen
+  vrSentrySceneName: VRSentryPost
   currentMode: 1
   loadSceneOnScenarioStart: 0
   ackTimeoutMs: 1000

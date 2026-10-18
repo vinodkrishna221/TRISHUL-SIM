@@ -2,85 +2,181 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
 <title>TRISHUL-SIM · Gyro Sender</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #0a0a1a;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #080814;
     color: #e0e0e0;
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
+    overflow-x: hidden;
     -webkit-user-select: none;
     user-select: none;
+    touch-action: manipulation;
+    padding: 1.5rem;
 }
-h1 { font-size: 1.2rem; color: #00ff88; margin-bottom: 0.5rem; }
-.subtitle { font-size: 0.8rem; color: #888; margin-bottom: 2rem; }
+h1 { font-size: 1.3rem; color: #00ff88; margin-bottom: 0.3rem; letter-spacing: 1px; }
+.subtitle { font-size: 0.8rem; color: #8888aa; margin-bottom: 1.5rem; text-align: center; }
 #status {
-    font-size: 2rem;
-    font-weight: bold;
-    padding: 1.5rem 3rem;
+    font-size: 1.8rem;
+    font-weight: 800;
+    padding: 1.2rem 2.5rem;
     border-radius: 12px;
-    margin-bottom: 1.5rem;
-    transition: all 0.3s;
+    margin-bottom: 1.2rem;
+    letter-spacing: 1.5px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    cursor: pointer;
+    transition: background 0.25s ease, transform 0.1s ease;
+    text-align: center;
 }
-.status-disconnected { background: #cc0000; color: #fff; }
-.status-connecting   { background: #ffb300; color: #000; }
-.status-tracking     { background: #00b300; color: #fff; }
+#status:active { transform: scale(0.98); }
+.status-disconnected { background: #d32f2f; color: #ffffff; }
+.status-connecting   { background: #f57c00; color: #ffffff; }
+.status-tracking     { background: #2e7d32; color: #ffffff; box-shadow: 0 0 25px rgba(0,255,136,0.35); }
+
 #btn-start {
-    font-size: 1.5rem;
-    padding: 1rem 3rem;
+    font-size: 1.1rem;
+    padding: 0.8rem 2rem;
     border: none;
     border-radius: 8px;
     background: #00ff88;
     color: #000;
     font-weight: bold;
     cursor: pointer;
+    margin-bottom: 1rem;
     display: none;
 }
 #btn-start:active { background: #00cc6a; }
+
 #angles {
-    font-family: 'Courier New', monospace;
-    font-size: 0.9rem;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1.05rem;
     color: #00ff88;
-    margin-top: 1.5rem;
+    background: rgba(0, 255, 136, 0.05);
+    border: 1px solid rgba(0, 255, 136, 0.2);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    min-width: 260px;
+    line-height: 1.6;
     text-align: left;
+    white-space: pre;
 }
-.info { font-size: 0.7rem; color: #666; margin-top: 2rem; text-align: center; max-width: 80%; }
+
+#stats {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.75rem;
+    color: #777;
+    margin-top: 0.8rem;
+}
+
+.notice {
+    font-size: 0.75rem;
+    color: #ffb74d;
+    background: rgba(255, 183, 77, 0.1);
+    border: 1px solid rgba(255, 183, 77, 0.3);
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    margin-top: 1.2rem;
+    text-align: left;
+    max-width: 320px;
+    line-height: 1.4;
+    display: none;
+}
+.notice code {
+    background: rgba(0,0,0,0.4);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-family: monospace;
+    color: #fff;
+    word-break: break-all;
+}
+
+.info {
+    font-size: 0.72rem;
+    color: #666688;
+    margin-top: 1.5rem;
+    text-align: center;
+    max-width: 320px;
+    line-height: 1.4;
+}
 </style>
 </head>
 <body>
 <h1>TRISHUL-SIM</h1>
-<p class="subtitle">Phone Gyroscope Head Tracking</p>
-<div id="status" class="status-disconnected">DISCONNECTED</div>
-<button id="btn-start" onclick="requestPermissionAndStart()">TAP TO START TRACKING</button>
-<div id="angles"></div>
-<p class="info">Point phone forward, then press SELECT on gamepad to recalibrate zero.</p>
+<p class="subtitle">Phone Gyroscope Head Tracking (VR BOX)</p>
+
+<div id="status" class="status-disconnected" onclick="handleStatusClick()">DISCONNECTED</div>
+<button id="btn-start" onclick="requestPermissionAndStart()">TAP TO START SENSOR</button>
+
+<div id="angles">α (yaw):   0.0°
+β (pitch): 0.0°
+γ (roll):  0.0°</div>
+
+<div id="stats">Frames: 0 · 0 Hz</div>
+
+<div id="notice-insecure" class="notice">
+    ⚠️ <strong>Android Chrome Sensor Policy</strong><br>
+    Chrome blocks motion sensors on plain HTTP. If angles remain 0.0°:<br>
+    1. Open <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code><br>
+    2. Add <code id="origin-url">http://...</code> and Relaunch.<br>
+    3. Tap anywhere to resume tracking.
+</div>
+
+<p class="info">Point phone forward into VR BOX headset.<br>Press SELECT on gamepad to recalibrate zero.</p>
 
 <script>
 // ── Configuration ──────────────────────────────────────────
-// LAPTOP_IP is replaced by serve-gyro.ps1 at serve-time
-const WS_URL = 'ws://LAPTOP_IP:9800';
-const SEND_INTERVAL_MS = 16; // ~60 Hz
+// WebSocket endpoint proxies through serve-gyro.py on port 8080 to Unity on port 9800
+const WS_URL = location.host
+    ? ((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/')
+    : 'ws://LAPTOP_IP:8080/';
+
+const SEND_INTERVAL_MS = 16; // ~60 Hz streaming interval
 
 // ── State ──────────────────────────────────────────────────
 let ws = null;
 let tracking = false;
 let lastAlpha = 0, lastBeta = 0, lastGamma = 0;
+let hasReceivedOrientation = false;
 let sendTimer = null;
 let reconnectTimer = null;
 
+let frameCount = 0;
+let lastFpsTime = performance.now();
+let fpsFrames = 0;
+let currentHz = 0;
+
 const statusEl  = document.getElementById('status');
 const anglesEl  = document.getElementById('angles');
+const statsEl   = document.getElementById('stats');
 const btnStart  = document.getElementById('btn-start');
+const noticeEl  = document.getElementById('notice-insecure');
+const originUrl = document.getElementById('origin-url');
 
-// ── Permission (iOS 13+ requires explicit request) ─────────
+if (originUrl) {
+    originUrl.textContent = location.origin || 'http://LAPTOP_IP:8080';
+}
+
+// ── Screen Wake Lock (prevents display sleep inside VR headset) ──
+async function requestWakeLock() {
+    try {
+        if ('wakeLock' in navigator) {
+            await navigator.wakeLock.request('screen');
+        }
+    } catch (e) {
+        // Optional feature
+    }
+}
+
+// ── Permission Handling ────────────────────────────────────
 function requestPermissionAndStart() {
+    requestWakeLock();
     if (typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
@@ -93,7 +189,6 @@ function requestPermissionAndStart() {
             })
             .catch(function(err) {
                 console.error('Permission error:', err);
-                // Fallback: try anyway (some Android browsers)
                 startTracking();
             });
     } else {
@@ -101,17 +196,32 @@ function requestPermissionAndStart() {
     }
 }
 
-// ── Check if deviceorientation is available ────────────────
+function handleStatusClick() {
+    requestWakeLock();
+    if (!tracking) {
+        requestPermissionAndStart();
+    } else if (!ws || ws.readyState !== WebSocket.OPEN) {
+        connectWs();
+    }
+}
+
+// ── Sensor Support Check ───────────────────────────────────
 function checkGyroSupport() {
+    // Check for Secure Context warning on Android Chrome
+    const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if (window.isSecureContext === false && !isLocalhost) {
+        if (noticeEl) noticeEl.style.display = 'block';
+    }
+
     if (typeof DeviceOrientationEvent === 'undefined') {
         setStatus('NO GYROSCOPE', 'status-disconnected');
         return;
     }
-    // iOS needs user gesture; show button
+
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
         btnStart.style.display = 'block';
     } else {
-        // Android / desktop: start immediately
+        // Android / Desktop auto-start
         startTracking();
     }
 }
@@ -120,63 +230,72 @@ function checkGyroSupport() {
 function startTracking() {
     btnStart.style.display = 'none';
     tracking = true;
+
+    // Listen to standard and absolute orientation events (covers all Android / iOS devices)
     window.addEventListener('deviceorientation', onOrientation, true);
+    window.addEventListener('deviceorientationabsolute', onOrientation, true);
+
+    requestWakeLock();
     connectWs();
+
+    // Check after 3 seconds if sensor events actually arrived
+    setTimeout(function() {
+        if (!hasReceivedOrientation && noticeEl && (window.isSecureContext === false)) {
+            noticeEl.style.display = 'block';
+        }
+    }, 3000);
 }
 
 function onOrientation(e) {
-    if (e.alpha !== null) lastAlpha = e.alpha;
-    if (e.beta  !== null) lastBeta  = e.beta;
-    if (e.gamma !== null) lastGamma = e.gamma;
+    let valid = false;
+    if (e.alpha !== null && !isNaN(e.alpha)) { lastAlpha = e.alpha; valid = true; }
+    if (e.beta  !== null && !isNaN(e.beta))  { lastBeta  = e.beta;  valid = true; }
+    if (e.gamma !== null && !isNaN(e.gamma)) { lastGamma = e.gamma; valid = true; }
 
-    anglesEl.textContent =
-        'α (yaw):   ' + lastAlpha.toFixed(1) + '°\n' +
-        'β (pitch): ' + lastBeta.toFixed(1)  + '°\n' +
-        'γ (roll):  ' + lastGamma.toFixed(1) + '°';
+    if (valid) {
+        hasReceivedOrientation = true;
+        if (noticeEl && noticeEl.style.display === 'block') {
+            noticeEl.style.display = 'none';
+        }
+    }
+
+    updateHud();
 }
 
-// ── WebSocket ──────────────────────────────────────────────
-function connectWs() {
-    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-        return;
+function updateHud() {
+    anglesEl.textContent =
+        'α (yaw):   ' + lastAlpha.toFixed(1).padStart(5) + '°\n' +
+        'β (pitch): ' + lastBeta.toFixed(1).padStart(5)  + '°\n' +
+        'γ (roll):  ' + lastGamma.toFixed(1).padStart(5) + '°';
+
+    const now = performance.now();
+    fpsFrames++;
+    if (now - lastFpsTime >= 1000) {
+        currentHz = Math.round((fpsFrames * 1000) / (now - lastFpsTime));
+        fpsFrames = 0;
+        lastFpsTime = now;
     }
-    setStatus('CONNECTING…', 'status-connecting');
+    statsEl.textContent = 'Frames: ' + frameCount + ' · ' + currentHz + ' Hz';
+}
 
-    try {
-        ws = new WebSocket(WS_URL);
-    } catch (err) {
-        scheduleReconnect();
-        return;
+// ── Frame Transmission ─────────────────────────────────────
+function sendFrame() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            a: Math.round(lastAlpha * 100) / 100,
+            b: Math.round(lastBeta  * 100) / 100,
+            g: Math.round(lastGamma * 100) / 100
+        }));
+        frameCount++;
+        updateHud();
     }
-
-    ws.onopen = function() {
-        setStatus('TRACKING', 'status-tracking');
-        clearReconnectTimer();
-        startSending();
-    };
-
-    ws.onclose = function() {
-        stopSending();
-        setStatus('DISCONNECTED', 'status-disconnected');
-        scheduleReconnect();
-    };
-
-    ws.onerror = function() {
-        // onclose will fire after this
-    };
 }
 
 function startSending() {
     stopSending();
-    sendTimer = setInterval(function() {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-                a: Math.round(lastAlpha * 100) / 100,
-                b: Math.round(lastBeta  * 100) / 100,
-                g: Math.round(lastGamma * 100) / 100
-            }));
-        }
-    }, SEND_INTERVAL_MS);
+    // Immediate frame dispatch on open ensures zero latency handshake-to-data flow
+    sendFrame();
+    sendTimer = setInterval(sendFrame, SEND_INTERVAL_MS);
 }
 
 function stopSending() {
@@ -186,11 +305,59 @@ function stopSending() {
     }
 }
 
+// ── WebSocket Lifecycle (Race-Condition Free) ───────────────
+function connectWs() {
+    // If already open or connecting, do not create duplicate socket
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        return;
+    }
+
+    // Fully tear down any old socket instance to prevent ghost onclose callbacks
+    if (ws) {
+        ws.onopen = null;
+        ws.onclose = null;
+        ws.onerror = null;
+        try { ws.close(); } catch (e) { }
+        ws = null;
+    }
+
+    setStatus('CONNECTING…', 'status-connecting');
+
+    try {
+        ws = new WebSocket(WS_URL);
+    } catch (err) {
+        scheduleReconnect();
+        return;
+    }
+
+    const currentSocket = ws;
+
+    currentSocket.onopen = function() {
+        if (ws !== currentSocket) return;
+        setStatus('TRACKING', 'status-tracking');
+        clearReconnectTimer();
+        startSending();
+    };
+
+    currentSocket.onclose = function() {
+        if (ws !== currentSocket) return;
+        stopSending();
+        setStatus('DISCONNECTED', 'status-disconnected');
+        scheduleReconnect();
+    };
+
+    currentSocket.onerror = function() {
+        // onclose will follow
+    };
+}
+
 function scheduleReconnect() {
     clearReconnectTimer();
     reconnectTimer = setTimeout(function() {
-        if (tracking) connectWs();
-    }, 2000);
+        if (tracking) {
+            connectWs();
+        }
+    }, 1500);
 }
 
 function clearReconnectTimer() {
@@ -200,13 +367,13 @@ function clearReconnectTimer() {
     }
 }
 
-// ── UI helpers ─────────────────────────────────────────────
+// ── UI Helper ──────────────────────────────────────────────
 function setStatus(text, cls) {
     statusEl.textContent = text;
     statusEl.className = cls;
 }
 
-// ── Boot ───────────────────────────────────────────────────
+// ── Auto Boot ──────────────────────────────────────────────
 checkGyroSupport();
 </script>
 </body>

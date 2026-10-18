@@ -1005,7 +1005,7 @@ namespace TrishulSim.Scenarios
             {
                 _currentElapsedMs = 0;
                 _tickCount = 0;
-                if (currentMode == OperationMode.SingleLaptopSplit || spawnDefaultSwarmIfEmpty)
+                if (currentMode == OperationMode.SingleLaptopSplit || currentMode == OperationMode.VRMode || spawnDefaultSwarmIfEmpty)
                 {
                     _injectedSwarmSnapshot = CreateDefaultBoidSwarm(launchConfig);
                 }

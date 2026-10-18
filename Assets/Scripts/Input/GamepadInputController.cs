@@ -29,15 +29,25 @@ namespace TrishulSim.Input
     /// Handles Gamepad and Keyboard input using Unity's new Input System,
     /// routing actions to CockpitController and providing Recalibrate event for VR head tracking.
     /// </summary>
+#if UNITY_5_3_OR_NEWER
     public class GamepadInputController : UnityEngine.MonoBehaviour
+#else
+    public class GamepadInputController
+#endif
     {
 #if UNITY_5_3_OR_NEWER
         [SerializeField] private CockpitController cockpit;
         [SerializeField] private float azimuthSensitivity = 3.0f;
+        [SerializeField] private float lookSensitivity = 60.0f;
+        [SerializeField] private float deadzone = 0.05f;
+        [SerializeField] private Transform cameraTransform;
+        [SerializeField] private TrishulSim.VR.GyroReceiver gyroReceiver;
         [SerializeField] private InputActionAsset inputActionsAsset;
 #else
         private CockpitController cockpit;
         private float azimuthSensitivity = 3.0f;
+        private float lookSensitivity = 60.0f;
+        private float deadzone = 0.05f;
 #endif
 
         // ── State ─────────────────────────────────────────────
@@ -46,6 +56,12 @@ namespace TrishulSim.Input
         private float currentBandGHz = 5.825f;
         private bool currentEngaged = false;
         private int currentBandIndex = 1; // 1 -> 5.825 GHz default
+
+        // ── Camera Look State ─────────────────────────────────
+        private float currentCameraYaw = 0f;
+        private float currentCameraPitch = 0f;
+        private float pitchClampMin = -80f;
+        private float pitchClampMax = 80f;
 
         // Available bands cycle order: 2.4 -> 5.825 -> 0.915 GHz
         private readonly float[] availableBands = new float[]
@@ -71,6 +87,7 @@ namespace TrishulSim.Input
         private InputAction bandUpAction;
         private InputAction bandDownAction;
         private InputAction recalibrateAction;
+        private InputAction cameraLookAction;
 #endif
 
         // ── Public Accessors ──────────────────────────────────
@@ -86,6 +103,18 @@ namespace TrishulSim.Input
             set { azimuthSensitivity = value; }
         }
 
+        public float LookSensitivity
+        {
+            get { return lookSensitivity; }
+            set { lookSensitivity = value; }
+        }
+
+        public float Deadzone
+        {
+            get { return deadzone; }
+            set { deadzone = value; }
+        }
+
         public float CurrentAzimuth { get { return currentAzimuth; } }
         public int CurrentElevation { get { return currentElevation; } }
         public float CurrentBandGHz { get { return currentBandGHz; } }
@@ -93,7 +122,24 @@ namespace TrishulSim.Input
         public int CurrentBandIndex { get { return currentBandIndex; } }
         public float[] AvailableBands { get { return availableBands; } }
 
+        public float CurrentCameraYaw { get { return currentCameraYaw; } }
+        public float CurrentCameraPitch { get { return currentCameraPitch; } }
+        public float PitchClampMin { get { return pitchClampMin; } set { pitchClampMin = value; } }
+        public float PitchClampMax { get { return pitchClampMax; } set { pitchClampMax = value; } }
+
 #if UNITY_5_3_OR_NEWER
+        public Transform CameraTransform
+        {
+            get { return cameraTransform; }
+            set { cameraTransform = value; }
+        }
+
+        public TrishulSim.VR.GyroReceiver Gyro
+        {
+            get { return gyroReceiver; }
+            set { gyroReceiver = value; }
+        }
+
         public InputActionAsset RuntimeActions { get { return runtimeActions; } }
         public InputAction JammerAzimuthAction { get { return jammerAzimuthAction; } }
         public InputAction JammerElevationAction { get { return jammerElevationAction; } }
@@ -102,6 +148,7 @@ namespace TrishulSim.Input
         public InputAction BandUpAction { get { return bandUpAction; } }
         public InputAction BandDownAction { get { return bandDownAction; } }
         public InputAction RecalibrateAction { get { return recalibrateAction; } }
+        public InputAction CameraLookAction { get { return cameraLookAction; } }
 #endif
 
         // ══════════════════════════════════════════════════════
@@ -155,6 +202,7 @@ namespace TrishulSim.Input
         private void Update()
         {
             ResolveCockpit();
+            ResolveCameraTransform();
 
 #if UNITY_5_3_OR_NEWER
             if (runtimeActions == null)
@@ -169,6 +217,33 @@ namespace TrishulSim.Input
                 stickX = jammerAzimuthAction.ReadValue<float>();
             }
             ApplyAzimuthDelta(stickX);
+
+            // Read Camera Look (Right Stick / Arrow Keys)
+            Vector2 lookVal = Vector2.zero;
+            if (cameraLookAction != null)
+            {
+                lookVal = cameraLookAction.ReadValue<Vector2>();
+            }
+
+            // Fallback 1: Direct Gamepad rightStick polling for maximum hardware/driver compatibility
+            if (lookVal.sqrMagnitude < 0.001f && Gamepad.current != null)
+            {
+                lookVal = Gamepad.current.rightStick.ReadValue();
+            }
+
+            // Fallback 2: Keyboard Arrow keys
+            if (lookVal.sqrMagnitude < 0.001f && Keyboard.current != null)
+            {
+                float kx = 0f;
+                float ky = 0f;
+                if (Keyboard.current.rightArrowKey.isPressed) kx += 1f;
+                if (Keyboard.current.leftArrowKey.isPressed) kx -= 1f;
+                if (Keyboard.current.upArrowKey.isPressed) ky += 1f;
+                if (Keyboard.current.downArrowKey.isPressed) ky -= 1f;
+                lookVal = new Vector2(kx, ky);
+            }
+
+            ApplyCameraLook(lookVal.x, lookVal.y);
 #endif
         }
 
@@ -247,6 +322,7 @@ namespace TrishulSim.Input
                     bandUpAction          = map.FindAction("BandUp");
                     bandDownAction        = map.FindAction("BandDown");
                     recalibrateAction     = map.FindAction("Recalibrate");
+                    cameraLookAction      = map.FindAction("CameraLook") ?? map.FindAction("Look");
                 }
             }
 #endif
@@ -481,11 +557,147 @@ namespace TrishulSim.Input
         }
 
         /// <summary>
-        /// Select button / R key: triggers head tracking zero-point recalibration.
+        /// Reads right-stick or arrow key deflection and rotates the camera (pitch and yaw).
+        /// Uses Time.deltaTime for smooth frame-rate independent rotation.
+        /// </summary>
+        public void ApplyCameraLook(float lookX, float lookY)
+        {
+#if UNITY_5_3_OR_NEWER
+            float dt = Time.deltaTime > 0f ? Time.deltaTime : 0.02f;
+#else
+            float dt = 0.02f;
+#endif
+            ApplyCameraLookDelta(lookX, lookY, dt);
+        }
+
+        public void ApplyCameraLookDelta(float lookX, float lookY, float dt)
+        {
+            float magSq = lookX * lookX + lookY * lookY;
+            if (magSq > deadzone * deadzone)
+            {
+                float yawDelta = lookX * lookSensitivity * dt;
+                float pitchDelta = -lookY * lookSensitivity * dt;
+
+                currentCameraYaw += yawDelta;
+                currentCameraYaw = ((currentCameraYaw % 360f) + 360f) % 360f;
+
+                currentCameraPitch = ClampFloat(currentCameraPitch + pitchDelta, pitchClampMin, pitchClampMax);
+
+                ResolveCameraTransform();
+
+#if UNITY_5_3_OR_NEWER
+                if (gyroReceiver != null)
+                {
+                    gyroReceiver.AddLookOffset(yawDelta, pitchDelta);
+                }
+                else if (cameraTransform != null)
+                {
+                    cameraTransform.localRotation = Quaternion.Euler(currentCameraPitch, currentCameraYaw, 0f);
+                }
+#endif
+            }
+        }
+
+        private static float ClampFloat(float val, float min, float max)
+        {
+            if (val < min) return min;
+            if (val > max) return max;
+            return val;
+        }
+
+        public void ResolveCameraTransform()
+        {
+#if UNITY_5_3_OR_NEWER
+            if (gyroReceiver == null)
+            {
+                gyroReceiver = GetComponent<TrishulSim.VR.GyroReceiver>();
+                if (gyroReceiver == null)
+                {
+#if UNITY_2023_1_OR_NEWER
+                    gyroReceiver = FindAnyObjectByType<TrishulSim.VR.GyroReceiver>();
+#else
+                    gyroReceiver = FindObjectOfType<TrishulSim.VR.GyroReceiver>();
+#endif
+                }
+            }
+
+            if (cameraTransform == null)
+            {
+                // 1. If GyroReceiver exists and has StereoHead
+                if (gyroReceiver != null && gyroReceiver.StereoHead != null)
+                {
+                    cameraTransform = gyroReceiver.StereoHead;
+                }
+                else
+                {
+                    // 2. Check for StereoHead in hierarchy / scene
+                    Transform head = transform.Find("StereoHead");
+                    if (head == null)
+                    {
+                        GameObject go = GameObject.Find("StereoHead");
+                        if (go != null) head = go.transform;
+                    }
+
+                    if (head != null)
+                    {
+                        cameraTransform = head;
+                    }
+                    else
+                    {
+                        // 3. Check for CameraCockpit
+                        Transform camCockpit = transform.Find("CameraCockpit");
+                        if (camCockpit == null)
+                        {
+                            GameObject go = GameObject.Find("CameraCockpit");
+                            if (go != null) camCockpit = go.transform;
+                        }
+
+                        if (camCockpit != null)
+                        {
+                            cameraTransform = camCockpit;
+                        }
+                        else if (Camera.main != null)
+                        {
+                            cameraTransform = Camera.main.transform;
+                        }
+                        else
+                        {
+#if UNITY_2023_1_OR_NEWER
+                            Camera cam = FindAnyObjectByType<Camera>();
+#else
+                            Camera cam = FindObjectOfType<Camera>();
+#endif
+                            if (cam != null) cameraTransform = cam.transform;
+                        }
+                    }
+                }
+
+                if (cameraTransform != null && gyroReceiver == null)
+                {
+                    Vector3 euler = cameraTransform.localEulerAngles;
+                    currentCameraYaw = euler.y;
+                    currentCameraPitch = euler.x > 180f ? euler.x - 360f : euler.x;
+                }
+            }
+#endif
+        }
+
+        /// <summary>
+        /// Select button / R key: triggers head tracking zero-point recalibration
+        /// and resets camera look angles.
         /// Subscribed by GyroReceiver in VG-P1-D.
         /// </summary>
         public void TriggerRecalibrate()
         {
+            currentCameraYaw = 0f;
+            currentCameraPitch = 0f;
+#if UNITY_5_3_OR_NEWER
+            ResolveCameraTransform();
+            if (gyroReceiver == null && cameraTransform != null)
+            {
+                cameraTransform.localRotation = Quaternion.identity;
+            }
+#endif
             UnityEngine.Debug.Log("[GamepadInput] Recalibrate event triggered.");
             if (OnRecalibrate != null)
             {
@@ -569,6 +781,13 @@ namespace TrishulSim.Input
                     ""id"": ""b304c40b-7e61-4fa3-9f50-32b0ebfa8007"",
                     ""expectedControlType"": ""Button"",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""CameraLook"",
+                    ""type"": ""Value"",
+                    ""id"": ""b304c40b-7e61-4fa3-9f50-32b0ebfa8008"",
+                    ""expectedControlType"": ""Vector2"",
+                    ""initialStateCheck"": true
                 }
             ],
             ""bindings"": [
@@ -733,6 +952,60 @@ namespace TrishulSim.Input
                     ""action"": ""Recalibrate"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""c1a2b3c4-0008-4000-8000-000000000001"",
+                    ""path"": ""<Gamepad>/rightStick"",
+                    ""groups"": ""Gamepad"",
+                    ""action"": ""CameraLook"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": ""2DVector"",
+                    ""id"": ""c1a2b3c4-0008-4000-8000-000000000002"",
+                    ""path"": ""2DVector"",
+                    ""groups"": ""Keyboard"",
+                    ""action"": ""CameraLook"",
+                    ""isComposite"": true,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": ""up"",
+                    ""id"": ""c1a2b3c4-0008-4000-8000-000000000003"",
+                    ""path"": ""<Keyboard>/upArrow"",
+                    ""groups"": ""Keyboard"",
+                    ""action"": ""CameraLook"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""down"",
+                    ""id"": ""c1a2b3c4-0008-4000-8000-000000000004"",
+                    ""path"": ""<Keyboard>/downArrow"",
+                    ""groups"": ""Keyboard"",
+                    ""action"": ""CameraLook"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""left"",
+                    ""id"": ""c1a2b3c4-0008-4000-8000-000000000005"",
+                    ""path"": ""<Keyboard>/leftArrow"",
+                    ""groups"": ""Keyboard"",
+                    ""action"": ""CameraLook"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
+                },
+                {
+                    ""name"": ""right"",
+                    ""id"": ""c1a2b3c4-0008-4000-8000-000000000006"",
+                    ""path"": ""<Keyboard>/rightArrow"",
+                    ""groups"": ""Keyboard"",
+                    ""action"": ""CameraLook"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": true
                 }
             ]
         }

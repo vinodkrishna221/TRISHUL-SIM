@@ -35,6 +35,7 @@ using UnityEngine.SceneManagement;
 using TrishulSim.Scenarios;
 #if UNITY_5_3_OR_NEWER
 using TrishulSim.UI;
+using UnityEngine.UIElements;
 #endif
 
 namespace TrishulSim.VR

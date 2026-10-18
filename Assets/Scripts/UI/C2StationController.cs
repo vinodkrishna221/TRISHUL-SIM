@@ -239,7 +239,7 @@ namespace TrishulSim.UI
                 (TrishulSim.Scenarios.ScenarioManager.Instance != null && TrishulSim.Scenarios.ScenarioManager.Instance.CurrentMode == TrishulSim.Scenarios.OperationMode.SingleLaptopSplit);
             if (isSplit)
             {
-                root.style.width = Length.Percent(50);
+                root.style.width = Length.Percent(35);
                 root.style.height = Length.Percent(100);
                 root.style.position = Position.Absolute;
                 root.style.left = 0;

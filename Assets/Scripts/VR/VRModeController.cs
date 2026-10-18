@@ -100,6 +100,7 @@ namespace TrishulSim.VR
         public OperationMode PreviousMode { get { return previousMode; } set { previousMode = value; } }
         public string VrSceneName { get { return vrSceneName; } set { vrSceneName = value; } }
         public string DesktopCockpitSceneName { get { return desktopCockpitSceneName; } set { desktopCockpitSceneName = value; } }
+        public string InstructorC2SceneName { get { return instructorC2SceneName; } set { instructorC2SceneName = value; } }
         public Camera LeftEyeCamera { get { return leftEyeCamera; } set { leftEyeCamera = value; } }
         public Camera RightEyeCamera { get { return rightEyeCamera; } set { rightEyeCamera = value; } }
         public Camera C2Camera { get { return c2Camera; } set { c2Camera = value; } }
@@ -170,7 +171,38 @@ namespace TrishulSim.VR
         {
             SubscribeScenarioManager();
             FindCameras();
+#if UNITY_EDITOR
+            ApplyEditorPreviewMode();
+#endif
         }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// In the Unity Editor without a secondary display, shows both eye cameras
+        /// side-by-side on Display 1 (left half = left eye, right half = right eye)
+        /// so the VR stereo split is visible when pressing Play during development.
+        /// </summary>
+        private void ApplyEditorPreviewMode()
+        {
+            if (IsDisplay2Connected) return; // Phone attached — normal stereo path
+
+            if (leftEyeCamera != null)
+            {
+                leftEyeCamera.targetDisplay = 0;
+                leftEyeCamera.rect = new Rect(0f, 0f, 0.5f, 1f);
+                leftEyeCamera.enabled = true;
+                Debug.Log("[VRModeController] Editor preview: LeftEyeCamera → left half of Display 1 (stereo split).");
+            }
+
+            if (rightEyeCamera != null)
+            {
+                rightEyeCamera.targetDisplay = 0;
+                rightEyeCamera.rect = new Rect(0.5f, 0f, 0.5f, 1f);
+                rightEyeCamera.enabled = true;
+                Debug.Log("[VRModeController] Editor preview: RightEyeCamera → right half of Display 1 (stereo split).");
+            }
+        }
+#endif
 
         public void Update()
         {
