@@ -114,6 +114,9 @@ namespace TrishulSim.VR
         public string CurrentThreatState        { get { return currentThreatState; } }
         public bool IsScenarioRunning           { get { return isScenarioRunning; } }
         public bool IsInitialized               { get { return isInitialized; } }
+        public bool LastBlackoutRisk            { get { return lastBlackoutRisk; } }
+        public bool LastEwEngaged               { get { return lastEwEngaged; } }
+        public bool LastKineticHit              { get { return lastKineticHit; } }
         public Texture2D AcousticTex            { get { return acousticTex; } }
         public Texture2D EwSmashTex             { get { return ewSmashTex; } }
 
@@ -191,8 +194,6 @@ namespace TrishulSim.VR
                     lbl.localScale = new Vector3(0.29f, 0.66f, 1f);
                 }
             }
-
-            DestroyDuplicateScenePanels();
         }
 
         private static void OrientPanelToOperator(Transform panelTransform, Vector3 operatorPos)
@@ -226,22 +227,6 @@ namespace TrishulSim.VR
             Debug.Log("[VRHudController] Optimal wraparound panel layout applied.");
         }
 #endif
-
-        private void DestroyDuplicateScenePanels()
-        {
-#if UNITY_5_3_OR_NEWER
-            var duplicates = GameObject.FindObjectsByType<GameObject>(FindObjectsSortMode.None);
-            for (int i = 0; i < duplicates.Length; i++)
-            {
-                var go = duplicates[i];
-                if (go != null && go.name == "VRHudPanels" && go.transform.parent == null)
-                {
-                    Debug.Log("[VRHudController] Cleaned up root-level duplicate VRHudPanels.");
-                    Destroy(go);
-                }
-            }
-#endif
-        }
 
         private void AdjustThreatTorusPosition()
         {
@@ -307,7 +292,26 @@ namespace TrishulSim.VR
             SubscribeToScenarioEvents();
             AllocateProceduralTextures();
             ValidateAndInitialize();
+            EnsureScenarioSelectorAttached();
             Debug.Log("[VRHudController] Initialized. Panels ready for scenario data.");
+        }
+
+        public void EnsureScenarioSelectorAttached()
+        {
+#if UNITY_5_3_OR_NEWER
+            if (GetComponent<VRScenarioSelector>() == null)
+            {
+                gameObject.AddComponent<VRScenarioSelector>();
+            }
+#endif
+        }
+
+        public void EnsureSubscribedToScenarioEvents()
+        {
+#if UNITY_5_3_OR_NEWER
+            UnsubscribeFromScenarioEvents();
+            SubscribeToScenarioEvents();
+#endif
         }
 
         private void OnDestroy()
@@ -419,6 +423,10 @@ namespace TrishulSim.VR
                 {
                     // Safe edit-mode fallback when Graphics.Blit target is not yet GPU-bound
                 }
+                finally
+                {
+                    RenderTexture.active = null;
+                }
                 UpdatePanelTextures();
             }
         }
@@ -457,7 +465,30 @@ namespace TrishulSim.VR
                 RenderEwSmashPanel();
                 if (rtEwSmashPanel != null) Graphics.Blit(ewSmashTex, rtEwSmashPanel);
 
+                RenderTexture.active = null;
                 UpdatePanelTextures();
+            }
+        }
+
+        private Transform cachedVrRig;
+
+        private void LateUpdate()
+        {
+            // If VRHudPanels is placed at root level, align position and rotation to VRRig
+            if (transform.parent == null)
+            {
+                if (cachedVrRig == null)
+                {
+#if UNITY_5_3_OR_NEWER
+                    var rig = GameObject.Find("VRRig");
+                    if (rig != null) cachedVrRig = rig.transform;
+#endif
+                }
+                if (cachedVrRig != null)
+                {
+                    transform.position = cachedVrRig.position;
+                    transform.rotation = cachedVrRig.rotation;
+                }
             }
         }
 
@@ -636,6 +667,7 @@ namespace TrishulSim.VR
                 RenderEwSmashPanel();
                 Graphics.Blit(ewSmashTex, rtEwSmashPanel);
             }
+            RenderTexture.active = null;
         }
 #endif
 
@@ -654,6 +686,7 @@ namespace TrishulSim.VR
                 RenderEwSmashPanel();
                 Graphics.Blit(ewSmashTex, rtEwSmashPanel);
             }
+            RenderTexture.active = null;
         }
 
         // ══════════════════════════════════════════════════════════
@@ -1041,6 +1074,27 @@ namespace TrishulSim.VR
                 DrawBlip(dopplerRenderBuf, S, S, px, py, false, 1);
             }
 
+            // Tactical header reflecting training state & in-flight stop reminder
+            string dopplerHeader = "MICRO-DOPPLER RADAR";
+            if (VRScenarioSelector.Instance != null)
+            {
+                switch (VRScenarioSelector.Instance.CurrentState)
+                {
+                    case VRTrainingState.SELECTING:
+                        dopplerHeader = "L-BAND [SELECT 1-4]";
+                        break;
+                    case VRTrainingState.RUNNING:
+                        dopplerHeader = "L-BAND [ESC TO STOP]";
+                        break;
+                    case VRTrainingState.AAR_SCORECARD:
+                        dopplerHeader = "L-BAND [AAR REVIEW]";
+                        break;
+                }
+            }
+            Color brightGreen = new Color(0f, 0.95f, 0.35f, 1f);
+            DrawFilledRect(dopplerRenderBuf, S, 48, 242, 160, 12, new Color(0.02f, 0.04f, 0.02f, 1f));
+            DrawText(dopplerRenderBuf, S, S, 54, 246, dopplerHeader, brightGreen);
+
             dopplerFallbackTex.SetPixels(dopplerRenderBuf);
             dopplerFallbackTex.Apply();
         }
@@ -1292,6 +1346,10 @@ namespace TrishulSim.VR
                     break;
             }
 
+            if (threatMpb == null)
+            {
+                threatMpb = new MaterialPropertyBlock();
+            }
             threatTorusRenderer.GetPropertyBlock(threatMpb);
             threatMpb.SetColor("_BaseColor", color);
             threatMpb.SetColor("_Color", color);

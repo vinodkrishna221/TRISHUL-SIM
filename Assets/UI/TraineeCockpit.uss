@@ -86,6 +86,10 @@
     position: relative;
 }
 
+#doppler-content {
+    -unity-background-scale-mode: scale-to-fit;
+}
+
 .stub-label {
     font-size: 11px;
     color: #555555;

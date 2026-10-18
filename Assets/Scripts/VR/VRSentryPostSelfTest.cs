@@ -111,6 +111,18 @@ namespace TrishulSim.VR
 
             TestURPPipelineConfiguration();
             Console.WriteLine("[PASS] TestURPPipelineConfiguration");
+
+            TestVRScenarioSelectorIntegration();
+            Console.WriteLine("[PASS] TestVRScenarioSelectorIntegration");
+
+            TestVRHolographicScorecardIntegration();
+            Console.WriteLine("[PASS] TestVRHolographicScorecardIntegration");
+
+            TestVRHudControllerIntegration();
+            Console.WriteLine("[PASS] TestVRHudControllerIntegration");
+
+            TestStopOptionAndAarFlow();
+            Console.WriteLine("[PASS] TestStopOptionAndAarFlow");
         }
 
         public static void TestSceneFileExistsAndValidYaml()
@@ -391,6 +403,92 @@ namespace TrishulSim.VR
             string graphicsSettings = Path.Combine("ProjectSettings", "GraphicsSettings.asset");
             string graphicsYaml = File.ReadAllText(graphicsSettings, Encoding.UTF8);
             Assert(graphicsYaml.Contains("m_CustomRenderPipeline: {fileID: 11400000, guid: a1b2c3d4e5f647898a1b2c3d4e5f9202, type: 2}"), "GraphicsSettings m_CustomRenderPipeline must reference TrishulURPPipeline GUID");
+        }
+
+        public static void TestVRScenarioSelectorIntegration()
+        {
+            string scriptPath = Path.Combine("Assets", "Scripts", "VR", "VRScenarioSelector.cs");
+            Assert(File.Exists(scriptPath), "VRScenarioSelector.cs must exist at " + scriptPath);
+
+            string code = File.ReadAllText(scriptPath, Encoding.UTF8);
+            Assert(code.Contains("enum VRTrainingState"), "VRScenarioSelector must define VRTrainingState enum");
+            Assert(code.Contains("SELECTING"), "VRTrainingState must have SELECTING state");
+            Assert(code.Contains("RUNNING"), "VRTrainingState must have RUNNING state");
+            Assert(code.Contains("AAR_SCORECARD"), "VRTrainingState must have AAR_SCORECARD state");
+
+            // Stop control assertions
+            Assert(code.Contains("KeyCode.Escape"), "VRScenarioSelector must support KeyCode.Escape for in-flight stop");
+            Assert(code.Contains("buttonEast") || code.Contains("JoystickButton1"), "VRScenarioSelector must support Gamepad B button for in-flight stop");
+            Assert(code.Contains("StopScenario"), "VRScenarioSelector must define StopScenario method");
+
+            // Direct AAR transition & actions
+            Assert(code.Contains("TransitionToAar"), "VRScenarioSelector must transition directly to AAR on stop");
+            Assert(code.Contains("ReturnToMissionSelect"), "VRScenarioSelector must support ReturnToMissionSelect");
+            Assert(code.Contains("InstantReplay"), "VRScenarioSelector must support InstantReplay");
+            Assert(code.Contains("ExportPdfReport"), "VRScenarioSelector must support ExportPdfReport");
+        }
+
+        public static void TestVRHolographicScorecardIntegration()
+        {
+            string scriptPath = Path.Combine("Assets", "Scripts", "VR", "VRHolographicScorecard.cs");
+            Assert(File.Exists(scriptPath), "VRHolographicScorecard.cs must exist at " + scriptPath);
+
+            string code = File.ReadAllText(scriptPath, Encoding.UTF8);
+            Assert(code.Contains("TexWidth = 512"), "Holographic scorecard texture width must be 512");
+            Assert(code.Contains("TexHeight = 384"), "Holographic scorecard texture height must be 384");
+
+            // MIL-STD-2525 pass/fail colors
+            Assert(code.Contains("0.702f"), "Pass badge must use MIL-STD-2525 Green (#00B300)");
+            Assert(code.Contains("0.80f") || code.Contains("0.8f"), "Fail badge must use MIL-STD-2525 Red (#CC0000)");
+
+            // Core benchmarks
+            Assert(code.Contains("TIME TO DETECTION"), "Scorecard must display Time to Detection benchmark");
+            Assert(code.Contains("ROE COMPLIANCE"), "Scorecard must display ROE Compliance benchmark");
+            Assert(code.Contains("KINETIC ACCURACY"), "Scorecard must display Kinetic Accuracy benchmark");
+            Assert(code.Contains("PREMATURE EW"), "Scorecard must display Premature EW penalty benchmark");
+
+            // Public API
+            Assert(code.Contains("ShowScorecard"), "Scorecard must define ShowScorecard method");
+            Assert(code.Contains("HideScorecard"), "Scorecard must define HideScorecard method");
+            Assert(code.Contains("SetPdfExportedStatus"), "Scorecard must define SetPdfExportedStatus method");
+        }
+
+        public static void TestVRHudControllerIntegration()
+        {
+            string scriptPath = Path.Combine("Assets", "Scripts", "VR", "VRHudController.cs");
+            Assert(File.Exists(scriptPath), "VRHudController.cs must exist at " + scriptPath);
+
+            string code = File.ReadAllText(scriptPath, Encoding.UTF8);
+            Assert(code.Contains("EnsureScenarioSelectorAttached"), "VRHudController must define EnsureScenarioSelectorAttached");
+            Assert(code.Contains("EnsureSubscribedToScenarioEvents"), "VRHudController must define EnsureSubscribedToScenarioEvents");
+            Assert(code.Contains("ESC TO STOP"), "VRHudController Doppler radar header must reflect ESC TO STOP during flight");
+        }
+
+        public static void TestStopOptionAndAarFlow()
+        {
+            // Verify that ScenarioEndPayload contains all 4 standard terminal reasons in ScenarioConfig.cs
+            string configPath = Path.Combine("Assets", "Scripts", "Scenarios", "ScenarioConfig.cs");
+            Assert(File.Exists(configPath), "ScenarioConfig.cs must exist at " + configPath);
+            string configCode = File.ReadAllText(configPath, Encoding.UTF8);
+            Assert(configCode.Contains("REASON_INSTRUCTOR_ABORT"), "ScenarioEndPayload must define REASON_INSTRUCTOR_ABORT");
+            Assert(configCode.Contains("REASON_ALL_NEUTRALISED"), "ScenarioEndPayload must define REASON_ALL_NEUTRALISED");
+            Assert(configCode.Contains("REASON_EXCLUSION_BREACH"), "ScenarioEndPayload must define REASON_EXCLUSION_BREACH");
+            Assert(configCode.Contains("REASON_TIME_LIMIT"), "ScenarioEndPayload must define REASON_TIME_LIMIT");
+
+            // Verify ScenarioManager has AbortScenario and ResetScenarioState
+            string smPath = Path.Combine("Assets", "Scripts", "Scenarios", "ScenarioManager.cs");
+            Assert(File.Exists(smPath), "ScenarioManager.cs must exist at " + smPath);
+            string smCode = File.ReadAllText(smPath, Encoding.UTF8);
+            Assert(smCode.Contains("AbortScenario()"), "ScenarioManager must define AbortScenario method");
+            Assert(smCode.Contains("ResetScenarioState()"), "ScenarioManager must define ResetScenarioState method");
+
+            // Verify VRScenarioSelector transitions directly to AAR on stop
+            string selectorPath = Path.Combine("Assets", "Scripts", "VR", "VRScenarioSelector.cs");
+            Assert(File.Exists(selectorPath), "VRScenarioSelector.cs must exist at " + selectorPath);
+            string selectorCode = File.ReadAllText(selectorPath, Encoding.UTF8);
+            Assert(selectorCode.Contains("TransitionToAar"), "VRScenarioSelector must call TransitionToAar");
+            Assert(selectorCode.Contains("VRTrainingState.AAR_SCORECARD"), "VRScenarioSelector must transition to AAR_SCORECARD state");
+            Assert(selectorCode.Contains("ShowScorecard"), "VRScenarioSelector must drive HolographicScorecard ShowScorecard");
         }
 
         private static void Assert(bool condition, string message)

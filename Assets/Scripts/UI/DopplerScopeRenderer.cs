@@ -59,6 +59,9 @@ namespace TrishulSim.UI
 
             // Set as background of container
             container.style.backgroundImage = new StyleBackground(scopeTexture);
+#if UNITY_5_3_OR_NEWER
+            container.style.unityBackgroundScaleMode = ScaleMode.ScaleToFit;
+#endif
             isInitialized = true;
         }
 

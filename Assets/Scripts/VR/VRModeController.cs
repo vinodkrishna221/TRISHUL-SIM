@@ -171,7 +171,38 @@ namespace TrishulSim.VR
         {
             SubscribeScenarioManager();
             FindCameras();
+#if UNITY_EDITOR
+            ApplyEditorPreviewMode();
+#endif
         }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// In the Unity Editor without a secondary display, shows both eye cameras
+        /// side-by-side on Display 1 (left half = left eye, right half = right eye)
+        /// so the VR stereo split is visible when pressing Play during development.
+        /// </summary>
+        private void ApplyEditorPreviewMode()
+        {
+            if (IsDisplay2Connected) return; // Phone attached — normal stereo path
+
+            if (leftEyeCamera != null)
+            {
+                leftEyeCamera.targetDisplay = 0;
+                leftEyeCamera.rect = new Rect(0f, 0f, 0.5f, 1f);
+                leftEyeCamera.enabled = true;
+                Debug.Log("[VRModeController] Editor preview: LeftEyeCamera → left half of Display 1 (stereo split).");
+            }
+
+            if (rightEyeCamera != null)
+            {
+                rightEyeCamera.targetDisplay = 0;
+                rightEyeCamera.rect = new Rect(0.5f, 0f, 0.5f, 1f);
+                rightEyeCamera.enabled = true;
+                Debug.Log("[VRModeController] Editor preview: RightEyeCamera → right half of Display 1 (stereo split).");
+            }
+        }
+#endif
 
         public void Update()
         {

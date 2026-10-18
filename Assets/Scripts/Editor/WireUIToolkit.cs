@@ -29,6 +29,7 @@ namespace TrishulSim.Editor
                 WirePrefab("Assets/Prefabs/InstructorC2Root.prefab", true);
                 WirePrefab("Assets/Prefabs/TraineeCockpitRoot.prefab", false);
                 TrishulSim.VR.Editor.VRHudSetup.ExportHudPrefabAndAssets(false);
+                RenderTexture.active = null;
                 AssetDatabase.SaveAssets();
                 Debug.Log("[WireUIToolkit] ✅ Successfully wired UI Toolkit documents to scenes and prefabs!");
             }
@@ -164,11 +165,17 @@ namespace TrishulSim.Editor
                     modified = true;
                     Debug.Log("[WireUIToolkit] Configured Punjab Military Environment in scene: " + scene.name);
                 }
-                if (vrRig.transform.Find("Panel_RF") == null || vrRig.GetComponent<TrishulSim.VR.VRHudController>() == null)
+                var hudCtrl = vrRig.GetComponentInChildren<TrishulSim.VR.VRHudController>();
+                if (hudCtrl == null)
+                {
+                    var hudGo = GameObject.Find("VRHudPanels");
+                    if (hudGo != null) hudCtrl = hudGo.GetComponent<TrishulSim.VR.VRHudController>();
+                }
+                if (hudCtrl == null)
                 {
                     TrishulSim.VR.Editor.VRHudSetup.SetupHudPanels(false);
                     modified = true;
-                    Debug.Log("[WireUIToolkit] Configured VR HUD Panels on VRRig in scene: " + scene.name);
+                    Debug.Log("[WireUIToolkit] Configured VR HUD Panels in scene: " + scene.name);
                 }
             }
 

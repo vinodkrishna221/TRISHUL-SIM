@@ -79,6 +79,11 @@ namespace TrishulSim.VR
             get { return _isConnected || s_clientConnected; }
         }
 
+        public bool IsRunning
+        {
+            get { return _isRunning || s_isServerRunning; }
+        }
+
         public Transform StereoHead
         {
             get { return stereoHead; }

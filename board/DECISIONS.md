@@ -50,3 +50,9 @@ CHOSE: Centered Punjab watchtower FBX at origin with cabin door swung 75° open;
 BECAUSE: Blender volumetric fog exports as an opaque solid mesh to Unity FBX; URP native fog handles atmospheric riverine fog properly without occluding viewports; origin centering aligns sentry eye level (1.65m) and HUD panels seamlessly.
 AFFECTS: Assets/Scenes/VRSentryPost.unity, Assets/Models/punjab_military_terrain_watchtower.fbx, Assets/Scripts/VR/Editor/VRHudSetup.cs.
 
+### 10 · Standalone VR Mission Selector, Stop Control & Floating 3D Holographic AAR  2026-10-17 · by Vinod (vr-gamepad)
+CHOSE: Dynamic runtime VRScenarioSelector & VRHolographicScorecard quad (512x384) with keyboard [Esc]/Gamepad [B] stop and [Space]/[R]/[P] AAR actions.
+BECAUSE: Allows closed-loop VR training without InstructorC2; in-flight stop provides immediate mission halt into AAR; runtime generation preserves zero-drone scene YAML doctrine.
+AFFECTS: Assets/Scripts/VR/VRScenarioSelector.cs, Assets/Scripts/VR/VRHolographicScorecard.cs, Assets/Scripts/VR/VRHudController.cs, Assets/Scripts/VR/VRSentryPostSelfTest.cs.
+
+

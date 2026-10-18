@@ -43,6 +43,92 @@ namespace TrishulSim.VR.Editor
             SetupPunjabEnvironment(true);
         }
 
+        [MenuItem("TRISHUL-SIM/VR/Balance Watchtower Light Intensities", false, 102)]
+        public static void BalanceWatchtowerLightsMenu()
+        {
+            BalanceWatchtowerLights(true);
+        }
+
+        public static void BalanceWatchtowerLights(bool showDialog = false)
+        {
+            int modifiedCount = 0;
+#if UNITY_2023_1_OR_NEWER
+            var allLights = Object.FindObjectsByType<Light>();
+            var renderers = Object.FindObjectsByType<MeshRenderer>();
+#else
+            var allLights = Object.FindObjectsOfType<Light>();
+            var renderers = Object.FindObjectsOfType<MeshRenderer>();
+#endif
+            foreach (var light in allLights)
+            {
+                string name = light.gameObject.name;
+                if (name.Contains("Searchlight_Beam") || name.Contains("Searchlight"))
+                {
+                    light.intensity = 5.0f;
+                    light.range = 60.0f;
+                    EditorUtility.SetDirty(light);
+                    modifiedCount++;
+                }
+                else if (name.Contains("Outpost_Security_Flood"))
+                {
+                    light.intensity = 3.5f;
+                    light.range = 40.0f;
+                    EditorUtility.SetDirty(light);
+                    modifiedCount++;
+                }
+                else if (name.Contains("Beacon_Point_Light"))
+                {
+                    light.intensity = 2.0f;
+                    light.range = 15.0f;
+                    EditorUtility.SetDirty(light);
+                    modifiedCount++;
+                }
+                else if (name.Contains("Cabin_Interior_Light"))
+                {
+                    light.intensity = 1.0f;
+                    light.range = 6.0f;
+                    EditorUtility.SetDirty(light);
+                    modifiedCount++;
+                }
+            }
+
+            foreach (var r in renderers)
+            {
+                string name = r.gameObject.name;
+                if (name.Contains("Searchlight_Volumetric") || name.Contains("Searchlight_Glow"))
+                {
+                    foreach (var mat in r.sharedMaterials)
+                    {
+                        if (mat != null && mat.HasProperty("_EmissionColor"))
+                        {
+                            Color c = mat.GetColor("_EmissionColor");
+                            mat.SetColor("_EmissionColor", new Color(c.r * 0.1f, c.g * 0.1f, c.b * 0.1f, c.a));
+                            EditorUtility.SetDirty(mat);
+                        }
+                    }
+                }
+            }
+
+            AssetDatabase.SaveAssets();
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
+                UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene()
+            );
+
+            Debug.Log($"[VRHudSetup] Adjusted {modifiedCount} watchtower lights to balanced night intensities.");
+            if (showDialog)
+            {
+                EditorUtility.DisplayDialog(
+                    "Lighting Balanced",
+                    $"Successfully adjusted {modifiedCount} watchtower lights!\n\n" +
+                    "• Searchlight_Beam: intensity set to 5.0\n" +
+                    "• Floodlights: intensity set to 3.5\n" +
+                    "• Beacon & Cabin lights tuned for night sentry.\n\n" +
+                    "Save the scene (Ctrl + S) to persist.",
+                    "OK"
+                );
+            }
+        }
+
         public static GameObject SetupPunjabEnvironment(bool showDialog = false)
         {
             GameObject fbxAsset = AssetDatabase.LoadAssetAtPath<GameObject>(PUNJAB_FBX_PATH);
@@ -113,6 +199,7 @@ namespace TrishulSim.VR.Editor
 
             // Ensure VR HUD panels are set up cleanly
             SetupHudPanels(false);
+            BalanceWatchtowerLights(false);
 
             AssetDatabase.SaveAssets();
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
@@ -195,11 +282,11 @@ namespace TrishulSim.VR.Editor
             SetupHudPanels(true);
         }
 
-        public static void SetupHudPanels(bool showDialog = false)
+        public static GameObject SetupHudPanels(bool showDialog = false)
         {
-            CleanupDuplicateHudPanels();
             EnsureDirectory(RT_DIR);
             EnsureDirectory(MAT_DIR);
+            EnsureDirectory(PREFAB_DIR);
 
             GameObject vrRig = GameObject.Find("VRRig");
             if (vrRig == null)
@@ -211,10 +298,51 @@ namespace TrishulSim.VR.Editor
 
             RenderTexture[] rts = CreateRenderTextures();
             Material[] mats = CreateMaterials(rts);
-            Renderer[] panelRenderers;
-            Renderer torusRenderer;
-            BuildPanelHierarchy(vrRig, mats, out panelRenderers, out torusRenderer);
-            WireController(vrRig, rts, panelRenderers, torusRenderer);
+
+            // Find or instantiate VRHudPanels in scene
+            GameObject hudGo = GameObject.Find("VRHudPanels");
+            if (hudGo == null)
+            {
+                string prefabPath = PREFAB_DIR + "/VRHudPanels.prefab";
+                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+                if (prefab != null)
+                {
+                    hudGo = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                    Debug.Log("[VRHudSetup] Instantiated VRHudPanels prefab in scene.");
+                }
+                else
+                {
+                    hudGo = new GameObject("VRHudPanels");
+                    Renderer[] panelRenderers;
+                    Renderer torusRenderer;
+                    BuildPanelHierarchy(hudGo, mats, out panelRenderers, out torusRenderer);
+                    WireController(hudGo, rts, panelRenderers, torusRenderer);
+                    Debug.Log("[VRHudSetup] Built new VRHudPanels hierarchy.");
+                }
+            }
+
+            if (hudGo != null)
+            {
+                hudGo.transform.position = vrRig.transform.position;
+                hudGo.transform.rotation = vrRig.transform.rotation;
+
+                // Ensure references are wired
+                var controller = hudGo.GetComponent<VRHudController>();
+                if (controller != null)
+                {
+                    Renderer[] panelRenderers;
+                    Renderer torusRenderer;
+                    FindRenderersFromHierarchy(hudGo, out panelRenderers, out torusRenderer);
+                    controller.AssignReferences(
+                        rts[0], rts[1], rts[2], rts[3],
+                        panelRenderers[0], panelRenderers[1], panelRenderers[2], panelRenderers[3],
+                        torusRenderer
+                    );
+                }
+            }
+
+            // Remove any legacy loose panels directly under VRRig
+            CleanLoosePanelsFromRig(vrRig);
 
             // Wire GyroReceiver on VRRig if not present
             var gyro = vrRig.GetComponent<TrishulSim.VR.GyroReceiver>();
@@ -224,6 +352,7 @@ namespace TrishulSim.VR.Editor
                 Debug.Log("[VRHudSetup] Attached GyroReceiver to VRRig.");
             }
 
+            RenderTexture.active = null;
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
@@ -235,10 +364,11 @@ namespace TrishulSim.VR.Editor
             {
                 EditorUtility.DisplayDialog(
                     "VR HUD Setup Complete",
-                    "4 floating panels, labels, threat torus, and VRHudController created.\n\nSave the scene to persist changes.",
+                    "VRHudPanels with 4 floating panels, labels, threat torus, and VRHudController configured.\n\nSave the scene to persist changes.",
                     "OK"
                 );
             }
+            return hudGo;
         }
 
         // ══════════════════════════════════════════════════════════
@@ -253,21 +383,50 @@ namespace TrishulSim.VR.Editor
 
         public static void CleanupDuplicateHudPanels()
         {
-            var scene = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
-            if (!scene.isLoaded) return;
-            foreach (var go in scene.GetRootGameObjects())
+            // Safe no-op: Preserve VRHudPanels in active scenes
+        }
+
+        private static void CleanLoosePanelsFromRig(GameObject vrRig)
+        {
+            if (vrRig == null) return;
+            string[] panelNames = new string[] { "Panel_RF", "Panel_Doppler", "Panel_Acoustic", "Panel_EwSmash" };
+            foreach (var pName in panelNames)
             {
-                if (go != null && go.name == "VRHudPanels")
+                Transform t = vrRig.transform.Find(pName);
+                if (t != null && t.gameObject.name != "VRHudPanels")
                 {
-                    Object.DestroyImmediate(go);
-                    Debug.Log("[VRHudSetup] Cleaned up orphaned root VRHudPanels.");
+                    Object.DestroyImmediate(t.gameObject);
+                }
+            }
+            var looseCtrl = vrRig.GetComponent<VRHudController>();
+            if (looseCtrl != null)
+            {
+                Object.DestroyImmediate(looseCtrl);
+            }
+        }
+
+        private static void FindRenderersFromHierarchy(GameObject root, out Renderer[] panelRenderers, out Renderer torusRenderer)
+        {
+            panelRenderers = new Renderer[4];
+            torusRenderer = null;
+            for (int i = 0; i < 4; i++)
+            {
+                Transform t = root.transform.Find(Panels[i].name);
+                if (t != null)
+                {
+                    panelRenderers[i] = t.GetComponent<Renderer>();
+                    if (i == 1) // Doppler
+                    {
+                        Transform torusT = t.Find("ThreatTorus");
+                        if (torusT != null)
+                            torusRenderer = torusT.GetComponent<Renderer>();
+                    }
                 }
             }
         }
 
         public static void ExportHudPrefabAndAssets(bool showDialog = false)
         {
-            CleanupDuplicateHudPanels();
             EnsureDirectory(RT_DIR);
             EnsureDirectory(MAT_DIR);
             EnsureDirectory(PREFAB_DIR);
@@ -277,7 +436,7 @@ namespace TrishulSim.VR.Editor
             Material[] mats = CreateMaterials(rts);
 
             // Build a temporary root GO
-            GameObject root = new GameObject("VRHudPanels");
+            GameObject root = new GameObject("VRHudPanels_TempExport");
             root.transform.position = Vector3.zero;
             string prefabPath = PREFAB_DIR + "/VRHudPanels.prefab";
 
@@ -289,25 +448,19 @@ namespace TrishulSim.VR.Editor
                 WireController(root, rts, panelRenderers, torusRenderer);
 
                 // Save as prefab
-                GameObject existingPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
-                if (existingPrefab != null)
-                {
-                    PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
-                    Debug.Log(string.Format("[VRHudSetup] Updated prefab: {0}", prefabPath));
-                }
-                else
-                {
-                    PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
-                    Debug.Log(string.Format("[VRHudSetup] Created prefab: {0}", prefabPath));
-                }
+                root.name = "VRHudPanels";
+                PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+                Debug.Log(string.Format("[VRHudSetup] Saved prefab: {0}", prefabPath));
             }
             finally
             {
+                RenderTexture.active = null;
                 // Always destroy temp root from scene
                 if (root != null)
                     Object.DestroyImmediate(root);
             }
 
+            RenderTexture.active = null;
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 

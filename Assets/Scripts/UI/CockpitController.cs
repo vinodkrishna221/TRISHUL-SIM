@@ -219,10 +219,10 @@ namespace TrishulSim.UI
                 (TrishulSim.Scenarios.ScenarioManager.Instance != null && TrishulSim.Scenarios.ScenarioManager.Instance.CurrentMode == TrishulSim.Scenarios.OperationMode.SingleLaptopSplit);
             if (isSplit)
             {
-                root.style.width = Length.Percent(50);
+                root.style.width = Length.Percent(65);
                 root.style.height = Length.Percent(100);
                 root.style.position = Position.Absolute;
-                root.style.left = Length.Percent(50);
+                root.style.left = Length.Percent(35);
                 root.style.top = 0;
             }
 #endif
@@ -776,6 +776,28 @@ namespace TrishulSim.UI
                     };
                 }
                 TrishulSim.Scenarios.ScenarioManager.Instance.InjectTraineeAction(action);
+
+                // Also push the live EW jammer state so the VR HUD panel reflects
+                // gamepad inputs during an active scenario. Without this,
+                // _injectedEwJammerState stays at its default (zeroed) value and
+                // every SCENARIO_TICK carries stale data — the panel only "woke up"
+                // when the scenario ended (fail) because VRHudController.Update()
+                // switched to its idle path which polls GamepadInputController directly.
+                //
+                // Note: TrishulSim.UI.EWJammerState and TrishulSim.Scenarios.EWJammerState
+                // are structurally identical but different types — map fields explicitly.
+                if (currentEwState != null)
+                {
+                    TrishulSim.Scenarios.ScenarioManager.Instance.InjectEWJammerState(
+                        new TrishulSim.Scenarios.EWJammerState
+                        {
+                            engaged             = currentEwState.engaged,
+                            bearingDeg          = currentEwState.bearingDeg,
+                            elevationDeg        = currentEwState.elevationDeg,
+                            bandGHz             = currentEwState.bandGHz,
+                            friendlyBlackoutRisk = currentEwState.friendlyBlackoutRisk
+                        });
+                }
             }
 #endif
 
