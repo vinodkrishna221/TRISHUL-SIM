@@ -177,3 +177,24 @@
 .threat-red {
     background-color: var(--mil-red);
 }
+
+/* --- VR Mode & Gyro Status (VG-P1-E) --- */
+.btn-vr-mode {
+    background-color: #0077BE;
+    color: #FFFFFF;
+    border-color: #005588;
+}
+
+.btn-vr-mode:hover {
+    background-color: #0099EE;
+}
+
+.btn-vr-active {
+    background-color: var(--mil-green);
+    color: #FFFFFF;
+    border-color: #008800;
+}
+
+.vr-status-badge {
+    margin-left: 12px;
+}
